@@ -1,0 +1,10 @@
+server:
+  name: "Emerald SMP"
+
+visual:
+  primary-color: "GREEN"
+  secondary-color: "DARK_GREEN"
+  accent-color: "LIME"
+
+messages:
+  prefix: "&a💚 &2&lEmerald SMP &8»"
