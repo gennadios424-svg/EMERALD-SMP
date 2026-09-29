@@ -1,0 +1,23 @@
+name: EmeraldSMP
+version: '1.0'
+main: net.emeraldsmp.EmeraldSMP
+api-version: '1.21'
+description: Emerald SMP foundation
+authors:
+  - Emerald SMP
+
+commands:
+  emerald:
+    description: Emerald SMP foundation command
+    usage: /emerald [reload]
+    permission: emerald.command
+
+permissions:
+  emerald.command:
+    description: Allows use of /emerald
+    default: true
+  emerald.admin:
+    description: Allows administrative Emerald SMP commands
+    default: op
+    children:
+      emerald.command: true
