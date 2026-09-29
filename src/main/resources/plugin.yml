@@ -2,7 +2,7 @@ name: EmeraldSMP
 version: '1.0'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP foundation
+description: Emerald SMP economy foundation
 authors:
   - Emerald SMP
 
@@ -11,10 +11,31 @@ commands:
     description: Emerald SMP foundation command
     usage: /emerald [reload]
     permission: emerald.command
+  balance:
+    description: Shows your Emerald balance
+    usage: /balance
+    aliases: [bal, money]
+    permission: emerald.command
+  bal:
+    description: Shows your Emerald balance
+    usage: /bal
+    permission: emerald.command
+  money:
+    description: Shows your Emerald balance
+    usage: /money
+    permission: emerald.command
+  pay:
+    description: Pay another online player
+    usage: /pay <player> <amount>
+    permission: emerald.command
+  eco:
+    description: Emerald economy administration
+    usage: /eco <give|take|set|reset> <player> [amount]
+    permission: emerald.admin
 
 permissions:
   emerald.command:
-    description: Allows use of /emerald
+    description: Allows use of Emerald SMP commands
     default: true
   emerald.admin:
     description: Allows administrative Emerald SMP commands
