@@ -1,6 +1,10 @@
 server:
   name: "Emerald SMP"
 
+economy:
+  starting-balance: 0
+  currency-symbol: "$"
+
 visual:
   primary-color: "GREEN"
   secondary-color: "DARK_GREEN"
