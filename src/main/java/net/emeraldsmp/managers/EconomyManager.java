@@ -20,24 +20,33 @@ public final class EconomyManager {
     public synchronized boolean deposit(UUID uuid, long amount) {
         if (amount <= 0) return false;
         PlayerData data = requireLoaded(uuid);
-        if (Long.MAX_VALUE - data.getBalance() < amount) return false;
-        data.setBalance(data.getBalance() + amount);
-        return plugin.getPlayerDataManager().save(data);
+        long old = data.getBalance();
+        if (Long.MAX_VALUE - old < amount) return false;
+        data.setBalance(old + amount);
+        if (plugin.getPlayerDataManager().save(data)) return true;
+        data.setBalance(old);
+        return false;
     }
 
     public synchronized boolean withdraw(UUID uuid, long amount) {
         if (amount <= 0) return false;
         PlayerData data = requireLoaded(uuid);
-        if (data.getBalance() < amount) return false;
-        data.setBalance(data.getBalance() - amount);
-        return plugin.getPlayerDataManager().save(data);
+        long old = data.getBalance();
+        if (old < amount) return false;
+        data.setBalance(old - amount);
+        if (plugin.getPlayerDataManager().save(data)) return true;
+        data.setBalance(old);
+        return false;
     }
 
     public synchronized boolean setBalance(UUID uuid, long amount) {
         if (amount < 0) return false;
         PlayerData data = requireLoaded(uuid);
+        long old = data.getBalance();
         data.setBalance(amount);
-        return plugin.getPlayerDataManager().save(data);
+        if (plugin.getPlayerDataManager().save(data)) return true;
+        data.setBalance(old);
+        return false;
     }
 
     public synchronized boolean reset(UUID uuid) {
@@ -46,16 +55,19 @@ public final class EconomyManager {
 
     public synchronized boolean transfer(Player sender, Player receiver, long amount) {
         if (amount <= 0 || sender.getUniqueId().equals(receiver.getUniqueId())) return false;
+
         PlayerData from = requireLoaded(sender.getUniqueId());
         PlayerData to = requireLoaded(receiver.getUniqueId());
-        if (from.getBalance() < amount || Long.MAX_VALUE - to.getBalance() < amount) return false;
-
         long oldFrom = from.getBalance();
         long oldTo = to.getBalance();
+
+        if (oldFrom < amount || Long.MAX_VALUE - oldTo < amount) return false;
+
         from.setBalance(oldFrom - amount);
         to.setBalance(oldTo + amount);
 
         if (plugin.getPlayerDataManager().saveBoth(from, to)) return true;
+
         from.setBalance(oldFrom);
         to.setBalance(oldTo);
         return false;
