@@ -58,8 +58,14 @@ public final class ServerUI implements Listener {
                 + ChatColor.GRAY + "Online: " + ChatColor.WHITE + online + ChatColor.DARK_GRAY + "  •  "
                 + ChatColor.GRAY + "Your Ping: " + ChatColor.WHITE + p.getPing() + "ms" + "\n"
         );
-        p.setPlayerListName(ChatColor.GREEN + "💚 " + ChatColor.WHITE + p.getName()
-            + ChatColor.DARK_GRAY + "  •  " + ChatColor.GRAY + p.getPing() + "ms");
+        if (plugin.getAfkManager() != null && plugin.getConfig().getBoolean("afk.show-in-tab", true)
+                && plugin.getAfkManager().isAfk(p.getUniqueId())) {
+            p.setPlayerListName(ChatColor.GRAY + "[AFK] " + ChatColor.WHITE + p.getName()
+                + ChatColor.DARK_GRAY + "  •  " + ChatColor.GRAY + "AFK");
+        } else {
+            p.setPlayerListName(ChatColor.GREEN + "💚 " + ChatColor.WHITE + p.getName()
+                + ChatColor.DARK_GRAY + "  •  " + ChatColor.GRAY + p.getPing() + "ms");
+        }
     }
 
     private void updateAll() {
