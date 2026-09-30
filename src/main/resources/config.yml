@@ -65,6 +65,20 @@ shop:
         smoker: {enabled: true, material: SMOKER, display-name: "§6Smoker", buy: -1, sell: -1, slot: 32, lore: []}
         anvil: {enabled: true, material: ANVIL, display-name: "§7Anvil", buy: -1, sell: -1, slot: 33, lore: []}
         enchanting_table: {enabled: true, material: ENCHANTING_TABLE, display-name: "§5Enchanting Table", buy: -1, sell: -1, slot: 34, lore: []}
+    cpvp:
+      enabled: true
+      display-name: "§c⚔ CPVP"
+      icon: NETHERITE_SWORD
+      slot: 11
+      lore: ["§7Combat and crystal PvP supplies"]
+      items:
+        end_crystal: {enabled: true, material: END_CRYSTAL, display-name: "§dEnd Crystal", buy: -1, sell: -1, slot: 10, lore: []}
+        obsidian: {enabled: true, material: OBSIDIAN, display-name: "§8Obsidian", buy: -1, sell: -1, slot: 11, lore: []}
+        respawn_anchor: {enabled: true, material: RESPAWN_ANCHOR, display-name: "§5Respawn Anchor", buy: -1, sell: -1, slot: 12, lore: []}
+        glowstone: {enabled: true, material: GLOWSTONE, display-name: "§eGlowstone", buy: -1, sell: -1, slot: 13, lore: []}
+        tnt: {enabled: true, material: TNT, display-name: "§cTNT", buy: -1, sell: -1, slot: 14, lore: []}
+        diamond_sword: {enabled: true, material: DIAMOND_SWORD, display-name: "§bDiamond Sword", buy: -1, sell: -1, slot: 15, lore: []}
+        netherite_sword: {enabled: true, material: NETHERITE_SWORD, display-name: "§8Netherite Sword", buy: -1, sell: -1, slot: 16, lore: []}
     gear:
       enabled: true
       display-name: "§c⚔ CPVP / Gear"
@@ -119,6 +133,18 @@ shop:
         melon: {enabled: true, material: MELON, display-name: "§aMelon", buy: -1, sell: -1, slot: 21, lore: []}
         nether_wart: {enabled: true, material: NETHER_WART, display-name: "§4Nether Wart", buy: -1, sell: -1, slot: 22, lore: []}
         bone_meal: {enabled: true, material: BONE_MEAL, display-name: "§fBone Meal", buy: -1, sell: -1, slot: 23, lore: []}
+    end:
+      enabled: true
+      display-name: "§5🟢 End"
+      icon: ENDER_CHEST
+      slot: 15
+      lore: ["§7Useful End resources"]
+      items:
+        ender_chest: {enabled: true, material: ENDER_CHEST, display-name: "§5Ender Chest", buy: -1, sell: -1, slot: 10, lore: []}
+        ender_pearl: {enabled: true, material: ENDER_PEARL, display-name: "§5Ender Pearl", buy: -1, sell: -1, slot: 11, lore: []}
+        chorus_fruit: {enabled: true, material: CHORUS_FRUIT, display-name: "§dChorus Fruit", buy: -1, sell: -1, slot: 12, lore: []}
+        shulker_shell: {enabled: true, material: SHULKER_SHELL, display-name: "§dShulker Shell", buy: -1, sell: -1, slot: 13, lore: []}
+        purpur_block: {enabled: true, material: PURPUR_BLOCK, display-name: "§dPurpur Block", buy: -1, sell: -1, slot: 14, lore: []}
     resources:
       enabled: true
       display-name: "§b💎 Resources"
