@@ -1,6 +1,8 @@
 package net.emeraldsmp;
 
 import net.emeraldsmp.commands.*;
+import net.emeraldsmp.auction.AuctionCommand;
+import net.emeraldsmp.auction.AuctionManager;
 import net.emeraldsmp.data.PlayerDataManager;
 import net.emeraldsmp.listeners.PlayerDataListener;
 import net.emeraldsmp.managers.ConfigManager;
@@ -23,6 +25,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private WorthListener worthListener;
     private RtpCommand rtpCommand;
     private ServerUI serverUI;
+    private AuctionManager auctionManager;
 
     @Override public void onEnable() {
         try {
@@ -43,6 +46,8 @@ public final class EmeraldSMP extends JavaPlugin {
             rtpCommand=new RtpCommand(this);register("rtp",rtpCommand,null);
             OrderCommand order=new OrderCommand(this);register("order",order,null);
             CoinFlipCommand cf=new CoinFlipCommand(this);register("cf",cf,null);
+            auctionManager=new AuctionManager(this);
+            AuctionCommand ah=new AuctionCommand(this,auctionManager);register("ah",ah,null);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
             getServer().getPluginManager().registerEvents(new ShopListener(this),this);
@@ -50,6 +55,7 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(rtpCommand,this);
             getServer().getPluginManager().registerEvents(order,this);
             getServer().getPluginManager().registerEvents(cf,this);
+            getServer().getPluginManager().registerEvents(ah,this);
 
             serverUI=new ServerUI(this);
             getServer().getPluginManager().registerEvents(serverUI,this);
@@ -82,4 +88,5 @@ public final class EmeraldSMP extends JavaPlugin {
     public EconomyManager getEconomyManager(){return economyManager;}
     public ShopManager getShopManager(){return shopManager;}
     public WorthManager getWorthManager(){return worthManager;}
+    public AuctionManager getAuctionManager(){return auctionManager;}
 }
