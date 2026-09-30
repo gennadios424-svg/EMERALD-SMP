@@ -192,6 +192,7 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
 
     private void beginCountdown(Player p, UUID u, Location destination, int seconds) {
         countdownStarts.put(u, p.getLocation().clone());
+        plugin.getMessageService().send(p, "&e⚠ &cDon't move while teleporting!");
 
         BukkitTask task = new org.bukkit.scheduler.BukkitRunnable() {
             int remaining = seconds;
@@ -227,7 +228,7 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
 
                 String msg = plugin.getConfig().getString("messages.rtp.countdown", "&aTeleporting in &f%time%&a...")
                     .replace("%time%", String.valueOf(remaining));
-                player.sendActionBar(msg);
+                player.sendActionBar(plugin.getMessageService().color(msg));
                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, .7f, 1f + remaining * .05f);
                 remaining--;
             }
@@ -252,7 +253,7 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
         countdownStarts.remove(u);
         Player p = Bukkit.getPlayer(u);
         if (notify && p != null)
-            plugin.getMessageService().send(p, plugin.getConfig().getString("messages.rtp.cancelled", "&cRTP cancelled because you moved."));
+            plugin.getMessageService().send(p, plugin.getConfig().getString("messages.rtp.cancelled", "&cTeleport cancelled because you moved."));
     }
 
     @EventHandler public void onQuit(PlayerQuitEvent e) {
