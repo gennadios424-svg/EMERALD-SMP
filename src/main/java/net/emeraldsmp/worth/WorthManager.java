@@ -71,7 +71,16 @@ public final class WorthManager {
         }
     }
 
-    public synchronized Collection<WorthEntry> all(){return entries.values().stream().filter(WorthEntry::enabled).toList();}
+    public synchronized Collection<WorthEntry> all(){
+        List<WorthEntry> result=new ArrayList<>();
+        for(Material m:Material.values()){
+            if(!isSupported(m)) continue;
+            WorthEntry e=entries.get(m);
+            if(e!=null){ if(e.enabled()) result.add(e); }
+            else result.add(new WorthEntry(m,defaultPrice(m),defaultCategory(m),true));
+        }
+        return result;
+    }
     public synchronized WorthEntry get(Material m){return entries.get(m);}
     public synchronized long value(Material m,int amount){WorthEntry e=entries.get(m);if(e==null||!e.enabled()||amount<0)return 0;return Math.multiplyExact(e.worth(),(long)amount);}
 
@@ -89,7 +98,7 @@ public final class WorthManager {
         views.put(p.getUniqueId(),new ViewState(q,safe,filter,sort,list));
         Inventory inv=plugin.getServer().createInventory(null,54,"§2§l💚 WORTH §8• §fPage "+(safe+1)+"/"+pages);
         int from=safe*45,to=Math.min(from+45,list.size());
-        for(int i=from;i<to;i++) inv.setItem(i,display(list.get(i-from),false));
+        for(int i=from;i<to;i++) inv.setItem(i,display(list.get(i),false));
         inv.setItem(45,button("ARROW","§a⬅ Previous",List.of("§7Go to the previous page")));
         inv.setItem(46,button("COMPASS","§b🏠 All Items",List.of("§7Clear category filter")));
         inv.setItem(47,button("NAME_TAG","§e🔎 Search",List.of("§7Use /worth <search>")));
