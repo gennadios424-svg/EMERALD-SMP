@@ -192,3 +192,24 @@ spawners:
   skeleton:
     amount: 8
     interval-seconds: 12
+
+
+# Custom Emerald SMP drill progression. These values are configurable.
+drills:
+  blocks-per-level: 100
+  tiers:
+    1:
+      efficiency: 1
+      shards-per-level: 5
+    2:
+      efficiency: 2
+      shards-per-level: 6
+    3:
+      efficiency: 3
+      shards-per-level: 7
+    4:
+      efficiency: 4
+      shards-per-level: 8
+    5:
+      efficiency: 5
+      shards-per-level: 10
