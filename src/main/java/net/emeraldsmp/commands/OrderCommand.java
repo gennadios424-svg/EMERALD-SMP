@@ -18,7 +18,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class OrderCommand implements org.bukkit.command.CommandExecutor, Listener {
     private final EmeraldSMP plugin;
     private final Map<UUID,Order> orders=new LinkedHashMap<>();
-    private final Map<UUID,Creation> creating=new HashMap<>();
     private final AtomicBoolean locked=new AtomicBoolean(false);
     public OrderCommand(EmeraldSMP plugin){this.plugin=plugin;}
     @Override public boolean onCommand(org.bukkit.command.CommandSender s, org.bukkit.command.Command c,String l,String[] a){
@@ -90,7 +89,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     private void giveItems(Player p,Material m,int n){ItemStack left=new ItemStack(m,n);Map<Integer,ItemStack> extra=p.getInventory().addItem(left);for(ItemStack x:extra.values())p.getWorld().dropItemNaturally(p.getLocation(),x);}
     private String pretty(Material m){return m.name().toLowerCase(Locale.ROOT).replace('_',' ');}
     @EventHandler public void quit(PlayerQuitEvent e){
-        UUID u=e.getPlayer().getUniqueId(); creating.remove(u);
+        UUID u=e.getPlayer().getUniqueId(); 
         List<UUID> refund=new ArrayList<>();
         for(Order o:orders.values()) if(o.owner.equals(u)) refund.add(o.id);
         for(UUID id:refund){Order o=orders.remove(id); if(o!=null) plugin.getEconomyManager().deposit(u,o.total);}
