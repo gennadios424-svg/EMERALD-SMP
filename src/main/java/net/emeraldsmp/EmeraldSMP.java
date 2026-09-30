@@ -16,6 +16,7 @@ import net.emeraldsmp.worth.WorthCommand;
 import net.emeraldsmp.worth.WorthListener;
 import net.emeraldsmp.worth.WorthManager;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.logging.Level;
 
@@ -26,6 +27,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private EconomyManager economyManager;
     private ShopManager shopManager;
     private WorthManager worthManager;
+    private WorthListener worthListener;
 
     @Override public void onEnable(){try{
         configManager=new ConfigManager(this);
@@ -49,7 +51,8 @@ public final class EmeraldSMP extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
         getServer().getPluginManager().registerEvents(new ShopListener(this),this);
-        getServer().getPluginManager().registerEvents(new WorthListener(this),this);
+        worthListener=new WorthListener(this);
+        getServer().getPluginManager().registerEvents(worthListener,this);
         getLogger().info("EmeraldSMP has been enabled!");
         getLogger().info("Stage 2A worth database loaded: "+worthManager.all().size()+" supported items.");
     }catch(Exception ex){getLogger().log(Level.SEVERE,"ERROR: EmeraldSMP could not start safely.",ex);getServer().getPluginManager().disablePlugin(this);}}
@@ -63,6 +66,7 @@ public final class EmeraldSMP extends JavaPlugin {
 
     @Override public void onDisable(){if(playerDataManager!=null)playerDataManager.shutdown();getLogger().info("EmeraldSMP has been disabled.");}
 
+    public void beginWorthSearch(Player p){if(worthListener!=null)worthListener.beginSearch(p);}
     public ConfigManager getConfigManager(){return configManager;}
     public MessageService getMessageService(){return messageService;}
     public PlayerDataManager getPlayerDataManager(){return playerDataManager;}
