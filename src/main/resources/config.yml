@@ -4,6 +4,8 @@ server:
 economy:
   starting-balance: 0
   currency-symbol: "$"
+  # /sell payout = Worth value × this multiplier. 0.50 = 50%.
+  sell-multiplier: 0.50
 
 visual:
   primary-color: "GREEN"
