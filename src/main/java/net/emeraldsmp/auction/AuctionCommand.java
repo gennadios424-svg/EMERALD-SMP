@@ -145,7 +145,6 @@ public final class AuctionCommand implements org.bukkit.command.CommandExecutor,
         if(s==null||s.price<=0){p.sendMessage("§cSet a price first.");return;}
         ItemStack secured=item.clone();
         inv.setItem(13,null);
-        if(!removeExactFromInventory(p,secured)){giveBack(p,secured);p.sendMessage("§cCould not secure the selected item.");return;}
         if(!manager.add(p,secured,s.price)){giveBack(p,secured);p.sendMessage("§cCould not save the listing. Your item was returned.");return;}
         selling.remove(u);p.closeInventory();p.sendMessage("§aListing created for §6$"+fmt(s.price)+"§a.");open(p,0);
     }
