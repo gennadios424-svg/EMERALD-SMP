@@ -61,6 +61,10 @@ commands:
     description: Delete a saved home
     usage: /delhome <name>
     permission: emerald.command
+  afk:
+    description: Toggle AFK status
+    usage: /afk
+    permission: emerald.command
 permissions:
   emerald.command:
     description: Allows use of Emerald SMP commands
