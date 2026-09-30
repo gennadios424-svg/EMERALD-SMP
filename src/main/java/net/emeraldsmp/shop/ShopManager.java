@@ -25,13 +25,12 @@ public final class ShopManager {
 
     public void openMain(Player p) {
         Inventory inv = plugin.getServer().createInventory(null, 27, "§2§l💚 EMERALD SMP SHOP");
-        int slot = 10;
-        for (WorthCategory category : WorthCategory.values()) {
-            if (slot == 22) slot++;
-            inv.setItem(slot++, icon(categoryIcon(category), "§a" + category.displayName(),
+        int[] categorySlots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 23, 24, 25};
+        WorthCategory[] categories = WorthCategory.values();
+        for (int i = 0; i < categorySlots.length && i < categories.length; i++) {
+            WorthCategory category = categories[i];
+            inv.setItem(categorySlots[i], icon(categoryIcon(category), "§a" + category.displayName(),
                     List.of("§7Browse items in this category")));
-            if (slot == 16) slot = 19;
-            if (slot >= 26) break;
         }
         inv.setItem(22, icon("BARRIER", "§cClose", List.of()));
         views.put(p.getUniqueId(), new ShopView(false, null, 0, null));
