@@ -159,14 +159,15 @@ public final class SpawnerManager implements Listener {
 
     @EventHandler public void place(BlockPlaceEvent e){
         if(!isSpawnerItem(e.getItemInHand()) || e.getBlockPlaced().getType()!=Material.SPAWNER)return;
-        Block b=e.getBlockPlaced(); CreatureSpawner state=(CreatureSpawner)b.getState();
+        Block b=e.getBlockPlaced();
+        Data d=new Data(b.getWorld().getName(),b.getX(),b.getY(),b.getZ(),e.getPlayer().getUniqueId());
+        d.amount=Math.max(1,getItemStackAmount(e.getItemInHand()));
+        CreatureSpawner state=(CreatureSpawner)b.getState();
         state.setSpawnedType(org.bukkit.entity.EntityType.SKELETON); state.setSpawnCount(0);
         state.setMinSpawnDelay(Integer.MAX_VALUE); state.setMaxSpawnDelay(Integer.MAX_VALUE); state.setDelay(Integer.MAX_VALUE);
         state.getPersistentDataContainer().set(keys.type,PersistentDataType.STRING,TYPE_SKELETON);
         state.getPersistentDataContainer().set(keys.stack,PersistentDataType.INTEGER,d.amount);
         state.update(true,false);
-        Data d=new Data(b.getWorld().getName(),b.getX(),b.getY(),b.getZ(),e.getPlayer().getUniqueId());
-        d.amount=Math.max(1,getItemStackAmount(e.getItemInHand()));
         spawners.put(d.key(),d); markBlock(d); save();
         e.getPlayer().sendMessage(ChatColor.GREEN+"Skeleton Spawner placed.");
     }
@@ -205,7 +206,7 @@ public final class SpawnerManager implements Listener {
         e.setCancelled(true);
         e.getBlock().setType(Material.AIR,false);
         spawners.remove(d.key());
-        give(p,Material.SPAWNER,d.amount);
+        giveSpawnerItems(p,d.amount);
         give(p,Material.BONE,d.bones); give(p,Material.ARROW,d.arrows); give(p,Material.BOW,d.bows);
         if(d.collectXp&&d.xp>0)p.giveExp((int)Math.min(Integer.MAX_VALUE,d.xp));
         d.bones=d.arrows=d.bows=d.xp=0;
@@ -218,7 +219,7 @@ public final class SpawnerManager implements Listener {
 
     private void open(Player p,Data d){
         Inventory inv=Bukkit.createInventory(null,54,TITLE_PREFIX);
-        inv.setItem(4,item(Material.SPAWNER,"§a🧟 Skeleton Spawner",List.of("§7" + plugin.getConfig().getInt("spawners.skeleton.amount",8)+" Skeletons / "+plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12)+" Seconds","§7Owner: §f"+Bukkit.getOfflinePlayer(d.owner).getName())));
+        inv.setItem(4,item(Material.SPAWNER,"§a🧟 Skeleton Spawner",List.of("§7Amount: §f"+d.amount+"x","§7Production: §f"+(plugin.getConfig().getInt("spawners.skeleton.amount",8)*d.amount)+" Skeletons / "+plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12)+" Seconds","§7Owner: §f"+Bukkit.getOfflinePlayer(d.owner).getName())));
         inv.setItem(10,item(Material.BONE,"§f🦴 Bones: §a"+d.bones,List.of(d.bonesEnabled?"§a✓ Collecting":"§c✗ Disabled")));
         inv.setItem(12,item(Material.ARROW,"§f🏹 Arrows: §a"+d.arrows,List.of(d.arrowsEnabled?"§a✓ Collecting":"§c✗ Disabled")));
         inv.setItem(14,item(Material.BOW,"§f🏹 Bows: §a"+d.bows,List.of(d.bowsEnabled?"§a✓ Collecting":"§c✗ Disabled")));
