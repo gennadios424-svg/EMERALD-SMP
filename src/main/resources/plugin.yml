@@ -1,16 +1,16 @@
 name: EmeraldSMP
-version: '1.2'
+version: '1.3'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP economy, worth database, shop, RTP, orders, coin flips, auction house and homes
+description: Emerald SMP economy, teams, tags, spawners, worth, shop, RTP, orders, coin flips, auction house and homes
 commands:
   emerald:
     description: Emerald SMP foundation command
     usage: /emerald [reload]
     permission: emerald.command
   balance:
-    description: Shows your Emerald balance
-    usage: /balance
+    description: Shows your Money balance
+    usage: /balance [player]
     aliases: [bal, money]
     permission: emerald.command
   pay:
@@ -65,15 +65,37 @@ commands:
     description: Toggle AFK status
     usage: /afk
     permission: emerald.command
+  teams:
+    description: Opens the Emerald SMP team GUI
+    usage: /teams
+    aliases: [team]
+    permission: emerald.command
+  tags:
+    description: Opens cosmetic tags
+    usage: /tags
+    permission: emerald.command
+  spawner:
+    description: Emerald SMP custom spawner administration
+    usage: /spawner give <player> skeleton [amount]
+    permission: emerald.admin
 permissions:
   emerald.command:
     description: Allows use of Emerald SMP commands
     default: true
   emerald.admin:
-    description: Allows administrative economy commands
+    description: Allows administrative commands
     default: op
     children:
       emerald.command: true
   emerald.rtp.bypass:
     description: Bypasses the /rtp cooldown
     default: op
+  emerald.owner:
+    description: Visual OWNER role only; grants no permissions
+    default: false
+  emerald.dev:
+    description: Visual DEV role only; grants no permissions
+    default: false
+  emerald.mod:
+    description: Visual MOD role only; grants no permissions
+    default: false
