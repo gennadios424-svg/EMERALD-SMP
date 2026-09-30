@@ -1,0 +1,30 @@
+package net.emeraldsmp.crates;
+
+import net.emeraldsmp.EmeraldSMP;
+import org.bukkit.*;import org.bukkit.block.Block;import org.bukkit.entity.Player;import org.bukkit.event.*;import org.bukkit.event.block.*;import org.bukkit.event.inventory.*;import org.bukkit.event.player.*;import org.bukkit.inventory.*;import org.bukkit.inventory.meta.ItemMeta;import org.bukkit.persistence.PersistentDataType;
+import java.io.*;import java.util.*;
+
+public final class CrateManager implements Listener{
+ private final EmeraldSMP plugin; private final File file; private final Map<String,String> crates=new LinkedHashMap<>(); private final NamespacedKey crateKey,keyKey; private final Set<UUID> opening=new HashSet<>(); private final Random random=new Random();
+ public CrateManager(EmeraldSMP p){plugin=p;file=new File(p.getDataFolder(),"crates.yml");crateKey=new NamespacedKey(p,"emerald-crate");keyKey=new NamespacedKey(p,"emerald-crate-key");}
+ public void load(){crates.clear();if(!file.exists())return;var y=org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);var s=y.getConfigurationSection("crates");if(s!=null)for(String k:s.getKeys(false))crates.put(k,y.getString("crates."+k+".type","common"));}
+ public void save(){var y=new org.bukkit.configuration.file.YamlConfiguration();for(var e:crates.entrySet())y.set("crates."+e.getKey()+".type",e.getValue());try{y.save(file);}catch(IOException ex){plugin.getLogger().warning("Could not save crates.yml: "+ex.getMessage());}}
+ public void stop(){save();}
+ private String loc(Block b){return b.getWorld().getName()+":"+b.getX()+":"+b.getY()+":"+b.getZ();}
+ private String type(Block b){String t=crates.get(loc(b));return t==null?null:t;}
+ public ItemStack createKey(String type,int amount){type=normalize(type);ItemStack i=new ItemStack(Material.TRIPWIRE_HOOK,Math.max(1,Math.min(64,amount)));ItemMeta m=i.getItemMeta();m.setDisplayName("§a🔑 "+cap(type)+" Key");m.setLore(List.of("§7Opens a §f"+cap(type)+" Crate"));m.getPersistentDataContainer().set(keyKey,PersistentDataType.STRING,type);i.setItemMeta(m);return i;}
+ private String keyType(ItemStack i){if(i==null||!i.hasItemMeta())return null;return i.getItemMeta().getPersistentDataContainer().get(keyKey,PersistentDataType.STRING);}
+ public void place(Player p,String type){type=normalize(type);Block b=p.getTargetBlockExact(5);if(b==null||b.getType()!=Material.AIR){p.sendMessage(ChatColor.RED+"Look at an empty block within 5 blocks.");return;}b.setType(Material.CHEST,false);crates.put(loc(b),type);save();p.sendMessage(ChatColor.GREEN+"Placed "+cap(type)+" Crate.");}
+ @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void interact(PlayerInteractEvent e){if(e.getAction()!=Action.RIGHT_CLICK_BLOCK)return;Block b=e.getClickedBlock();if(b==null)return;String t=type(b);if(t==null)return;e.setCancelled(true);open((Player)e.getPlayer(),b,t);}
+ private void open(Player p,Block b,String type){if(opening.contains(p.getUniqueId()))return;ItemStack held=p.getInventory().getItemInMainHand();if(!type.equals(keyType(held))){p.sendMessage(ChatColor.RED+"❌ This key cannot open this crate!");return;}opening.add(p.getUniqueId());held.setAmount(held.getAmount()-1);Inventory inv=Bukkit.createInventory(null,27,"§2§l🎁 "+cap(type)+" CRATE");p.openInventory(inv);runAnimation(p,type,inv);}
+ private void runAnimation(Player p,String type,Inventory inv){String[] names={"COMMON","EMERALD","GOLD","CRIMSON","SPAWNER"};final int[] tick={0};int id=Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin,()->{if(!p.isOnline()||!opening.contains(p.getUniqueId())){Bukkit.getScheduler().cancelTask(id);opening.remove(p.getUniqueId());return;}String shown=names[random.nextInt(names.length)];ItemStack x=new ItemStack(icon(shown));ItemMeta m=x.getItemMeta();m.setDisplayName("§f"+shown+" §7REWARD");x.setItemMeta(m);for(int s:new int[]{10,11,12,13,14,15,16})inv.setItem(s,x);tick[0]++;if(tick[0]>=35){Bukkit.getScheduler().cancelTask(id);String reward=reward(type);giveReward(p,reward);p.sendMessage(ChatColor.GREEN+"🎉 "+cap(type)+" Crate reward: §f"+reward);opening.remove(p.getUniqueId());}},2L,2L);}
+ private String reward(String type){var c=plugin.getConfig();var list=c.getStringList("crates.rewards."+type);if(list.isEmpty())return "$"+(type.equals("emerald")?100000:type.equals("gold")?25000:5000);return list.get(random.nextInt(list.size()));}
+ private void giveReward(Player p,String r){if(r.startsWith("$")){try{plugin.getEconomyManager().depositToUuid(p.getUniqueId(),Long.parseLong(r.substring(1)),p.getName());}catch(Exception ignored){}return;}if(r.startsWith("shards:")){try{long n=Long.parseLong(r.substring(7));long cur=plugin.getPlayerDataManager().getEmeraldShards(p.getUniqueId());plugin.getPlayerDataManager().setEmeraldShards(p.getUniqueId(),cur+n);}catch(Exception ignored){}return;}try{String[] q=r.split(":");Material m=Material.matchMaterial(q[0]);int n=q.length>1?Integer.parseInt(q[1]):1;if(m!=null)give(p,new ItemStack(m,Math.max(1,Math.min(64,n))));}catch(Exception ignored){}}
+ private void give(Player p,ItemStack i){for(ItemStack x:p.getInventory().addItem(i).values())p.getWorld().dropItemNaturally(p.getLocation(),x);}
+ private Material icon(String n){return switch(n){case"EMERALD"->Material.EMERALD;case"GOLD"->Material.GOLD_INGOT;case"CRIMSON"->Material.CRIMSON_NYLIUM;case"SPAWNER"->Material.SPAWNER;default->Material.CHEST;};}
+ private String normalize(String t){t=t.toLowerCase(Locale.ROOT);return List.of("common","spawner","gold","crimson","emerald").contains(t)?t:"common";}
+ private String cap(String t){return t.substring(0,1).toUpperCase()+t.substring(1);}
+ @EventHandler public void inventoryClose(InventoryCloseEvent e){if(opening.contains(e.getPlayer().getUniqueId())){Bukkit.getScheduler().runTaskLater(plugin,()->{if(!e.getPlayer().isOnline())opening.remove(e.getPlayer().getUniqueId());},2L);}}
+ public boolean isCrate(Block b){return type(b)!=null;}
+ public void remove(Block b){crates.remove(loc(b));save();}
+}
