@@ -27,7 +27,7 @@ public final class WorthListener implements Listener {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         String title = ChatColor.stripColor(e.getView().getTitle());
         boolean browser = title.startsWith("💚 WORTH");
-        boolean info = e.getView().getTopInventory().getSize() == 27 && title.startsWith("💚 ") && !browser;
+        boolean info = e.getView().getTopInventory().getSize() == 27 && title.startsWith("💚 WORTH INFO");
         if (!browser && !info) return;
 
         int slot = e.getRawSlot();
@@ -46,7 +46,7 @@ public final class WorthListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void drag(InventoryDragEvent e) {
         String title = ChatColor.stripColor(e.getView().getTitle());
-        if (title.startsWith("💚 WORTH") || (e.getView().getTopInventory().getSize() == 27 && title.startsWith("💚 "))) e.setCancelled(true);
+        if (title.startsWith("💚 WORTH")) e.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
