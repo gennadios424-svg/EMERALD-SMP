@@ -12,11 +12,12 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class WorthManager {
     private static final int PREVIOUS=45, ALL=46, SEARCH=47, CLEAR=48, CATEGORY=49, SORT=50, INFO=52, NEXT=53;
     private static final Set<Material> EXCLUDED=EnumSet.of(Material.AIR,Material.CAVE_AIR,Material.VOID_AIR,Material.BEDROCK,Material.BARRIER,Material.LIGHT,Material.DEBUG_STICK,Material.KNOWLEDGE_BOOK,Material.COMMAND_BLOCK,Material.CHAIN_COMMAND_BLOCK,Material.REPEATING_COMMAND_BLOCK,Material.COMMAND_BLOCK_MINECART,Material.JIGSAW,Material.STRUCTURE_BLOCK,Material.STRUCTURE_VOID,Material.END_PORTAL,Material.END_GATEWAY,Material.NETHER_PORTAL,Material.FIRE,Material.SOUL_FIRE,Material.SPAWNER,Material.END_PORTAL_FRAME,Material.REINFORCED_DEEPSLATE,Material.BUDDING_AMETHYST,Material.TRIAL_SPAWNER,Material.VAULT);
-    private final EmeraldSMP plugin; private final File file; private final Map<Material,WorthEntry> entries=new EnumMap<>(Material.class); private final Map<UUID,ViewState> views=new HashMap<>();
+    private final EmeraldSMP plugin; private final File file; private final Map<Material,WorthEntry> entries=new EnumMap<>(Material.class); private final Map<UUID,ViewState> views=new ConcurrentHashMap<>();
     public WorthManager(EmeraldSMP plugin){this.plugin=plugin;this.file=new File(plugin.getDataFolder(),"worth.yml");}
     public void load(){if(!plugin.getDataFolder().exists()&&!plugin.getDataFolder().mkdirs())throw new IllegalStateException("Could not create plugin data folder.");if(!file.exists())generateDefaultFile();if(!reload())throw new IllegalStateException("Initial worth data could not be loaded.");}
     public synchronized boolean reload(){try{if(!file.exists())generateDefaultFile();YamlConfiguration next=YamlConfiguration.loadConfiguration(file);ConfigurationSection worth=next.getConfigurationSection("worth");if(worth==null)throw new IllegalArgumentException("Missing 'worth' section.");Map<Material,WorthEntry> parsed=new EnumMap<>(Material.class);for(String key:worth.getKeys(false)){Material m=Material.matchMaterial(key);if(m==null||!isSupported(m))continue;long value;try{value=new BigDecimal(String.valueOf(worth.get(key))).longValueExact();}catch(Exception ex){continue;}if(value<0)continue;String cn=next.getString("categories."+key,defaultCategory(m).name());WorthCategory cat;try{cat=WorthCategory.valueOf(cn.toUpperCase(Locale.ROOT));}catch(Exception ex){cat=defaultCategory(m);}parsed.put(m,new WorthEntry(m,value,cat,next.getBoolean("enabled."+key,true)));}if(parsed.isEmpty())throw new IllegalArgumentException("No valid worth entries found.");entries.clear();entries.putAll(parsed);return true;}catch(Exception ex){plugin.getLogger().log(java.util.logging.Level.SEVERE,"[Worth] Reload failed; previous valid data was kept.",ex);return false;}}
@@ -31,7 +32,7 @@ public final class WorthManager {
             int idx=s.page*45+slot;
             if(idx>=0&&idx<s.results.size()){
                 WorthEntry entry=s.results.get(idx);
-                plugin.getServer().getScheduler().runTask(plugin,()->openInfo(p,entry,s));
+                openInfo(p,entry,s);
             }
             return;
         }
@@ -39,27 +40,27 @@ public final class WorthManager {
             case PREVIOUS->{
                 if(s.page<=0){plugin.getMessageService().send(p,"&7Already on the first page.");return;}
                 String q=s.query; int page=s.page-1; WorthCategoryFilter f=s.filter; WorthSort sort=s.sort;
-                plugin.getServer().getScheduler().runTask(plugin,()->openBrowser(p,q,page,f,sort));
+                openBrowser(p,q,page,f,sort);
             }
             case NEXT->{
                 int last=(s.results.size()-1)/45;
                 if(s.page>=last){plugin.getMessageService().send(p,"&7Already on the last page.");return;}
                 String q=s.query; int page=s.page+1; WorthCategoryFilter f=s.filter; WorthSort sort=s.sort;
-                plugin.getServer().getScheduler().runTask(plugin,()->openBrowser(p,q,page,f,sort));
+                openBrowser(p,q,page,f,sort);
             }
             case ALL->{
                 WorthSort sort=s.sort;
-                plugin.getServer().getScheduler().runTask(plugin,()->openBrowser(p,"",0,WorthCategoryFilter.ALL,sort));
+                openBrowser(p,"",0,WorthCategoryFilter.ALL,sort);
             }
-            case SEARCH->{p.closeInventory();plugin.getServer().getScheduler().runTask(plugin,()->plugin.beginWorthSearch(p));}
+            case SEARCH->{p.closeInventory();plugin.beginWorthSearch(p);}
             case CLEAR->{
                 WorthCategoryFilter f=s.filter; WorthSort sort=s.sort;
-                plugin.getServer().getScheduler().runTask(plugin,()->openBrowser(p,"",0,f,sort));
+                openBrowser(p,"",0,f,sort);
             }
             case CATEGORY->{
                 WorthCategoryFilter[] v=WorthCategoryFilter.values();
                 String q=s.query; WorthCategoryFilter f=v[(s.filter.ordinal()+1)%v.length]; WorthSort sort=s.sort;
-                plugin.getServer().getScheduler().runTask(plugin,()->openBrowser(p,q,0,f,sort));
+                openBrowser(p,q,0,f,sort);
             }
             case SORT->{
                 String q=s.query; WorthCategoryFilter f=s.filter; WorthSort sort=s.sort.next();
