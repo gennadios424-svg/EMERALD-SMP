@@ -131,6 +131,11 @@ public final class ShopManager {
         Inventory inv = sellInventories.get(p.getUniqueId());
         if (inv == null) return;
 
+        List<ItemStack> original = new ArrayList<>();
+        for (int slot = 0; slot < 45; slot++) {
+            ItemStack stack = inv.getItem(slot);
+            original.add(stack == null ? null : stack.clone());
+        }
         long total = calculateSellValue(inv, new HashSet<>());
         if (total <= 0) {
             p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThere are no sellable items in the sell menu.");
@@ -141,11 +146,12 @@ public final class ShopManager {
         for (int slot = 0; slot < 45; slot++) inv.setItem(slot, null);
 
         if (!plugin.getEconomyManager().deposit(p.getUniqueId(), total)) {
-            // Economy failed: return the exact top-level stacks to the player inventory.
-            // If the inventory is full, drop them rather than deleting player items.
-            // This path is deliberately after removal and therefore only handles the
-            // exceptional economy-save failure.
-            p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThe transaction could not be completed.");
+            for (ItemStack stack : original) {
+                if (stack == null || stack.getType().isAir()) continue;
+                Map<Integer, ItemStack> left = p.getInventory().addItem(stack);
+                for (ItemStack drop : left.values()) p.getWorld().dropItemNaturally(p.getLocation(), drop);
+            }
+            p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThe transaction could not be completed; your items were returned.");
             return;
         }
 
