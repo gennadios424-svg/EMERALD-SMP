@@ -220,7 +220,7 @@ public final class ShopManager {
         ShopView view = views.get(p.getUniqueId());
         if (view == null || view.items == null || slot < 0 || slot >= ITEMS_PER_PAGE) return null;
         int index = view.page * ITEMS_PER_PAGE + slot;
-        return index >= 0 && index < view.items.size() ? view.items.get(index) : null;
+        return index >= 0 && index < view.items.size() ? (ShopItem) view.items.get(index) : null;
     }
 
     public boolean buy(Player p, ShopItem item, int qty) {
