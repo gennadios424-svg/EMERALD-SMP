@@ -145,43 +145,57 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
         int seconds = Math.max(1, plugin.getConfig().getInt("rtp.countdown", 5));
         Location origin = p.getLocation().clone();
 
+        // There must only ever be one active countdown per player.
+        cancelPending(uuid, false);
         pendingOrigin.put(uuid, origin);
-        final int[] remaining = {seconds};
 
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            BukkitTask self;
+        BukkitTask task = new org.bukkit.scheduler.BukkitRunnable() {
+            private int remaining = seconds;
 
-            @Override public void run() {
-                self = pending.get(uuid);
-                if (!p.isOnline()) {
+            @Override
+            public void run() {
+                Player player = Bukkit.getPlayer(uuid);
+
+                if (player == null || !player.isOnline()) {
                     cancelPending(uuid, false);
+                    cancel();
                     return;
                 }
-                if (remaining[0] <= 0) {
+
+                // Countdown finished: teleport exactly once, then stop this task.
+                if (remaining <= 0) {
                     pending.remove(uuid);
                     pendingOrigin.remove(uuid);
+                    cancel();
 
-                    if (!p.teleport(destination, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
-                        plugin.getMessageService().send(p, plugin.getConfig().getString(
+                    if (!player.teleport(destination, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
+                        plugin.getMessageService().send(player, plugin.getConfig().getString(
                                 "messages.rtp.failed", "&cCould not teleport you. Please try again."));
                         return;
                     }
 
-                    if (!p.hasPermission("emerald.rtp.bypass") && plugin.getConfig().getLong("rtp.cooldown", 60L) > 0) {
+                    if (!player.hasPermission("emerald.rtp.bypass")
+                            && plugin.getConfig().getLong("rtp.cooldown", 60L) > 0) {
                         cooldowns.put(uuid, System.currentTimeMillis());
                     }
-                    plugin.getMessageService().send(p, plugin.getConfig().getString(
+
+                    player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                    plugin.getMessageService().send(player, plugin.getConfig().getString(
                             "messages.rtp.success", "&aTeleported safely to your random location."));
                     return;
                 }
 
                 String message = plugin.getConfig().getString(
                         "messages.rtp.countdown", "&aTeleporting in &f%time%&a...")
-                        .replace("%time%", Integer.toString(remaining[0]));
-                plugin.getMessageService().send(p, message);
-                remaining[0]--;
+                        .replace("%time%", Integer.toString(remaining));
+                plugin.getMessageService().send(player, message);
+
+                // One sound per countdown tick; no repeating/looping sound.
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.8f, 1.0f + (remaining * 0.05f));
+
+                remaining--;
             }
-        }, 0L, 20L);
+        }.runTaskTimer(plugin, 0L, 20L);
 
         pending.put(uuid, task);
     }
