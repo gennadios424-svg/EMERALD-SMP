@@ -1,8 +1,8 @@
 name: EmeraldSMP
-version: '1.3'
+version: '1.4'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP economy, teams, tags, spawners, worth, shop, RTP, orders, coin flips, auction house and homes
+description: Emerald SMP economy, teams, tags, roles, spawners, drills, worth, shop, RTP, orders, coin flips, auction house and homes
 commands:
   emerald:
     description: Emerald SMP foundation command
@@ -78,6 +78,10 @@ commands:
     description: Emerald SMP custom spawner administration
     usage: /spawner give <player> skeleton [amount]
     permission: emerald.admin
+  drill:
+    description: Emerald SMP custom drill administration
+    usage: /drill give <player> [tier]
+    permission: emerald.admin
 permissions:
   emerald.command:
     description: Allows use of Emerald SMP commands
@@ -98,4 +102,7 @@ permissions:
     default: false
   emerald.mod:
     description: Visual MOD role only; grants no permissions
+    default: false
+  emerald.media:
+    description: Visual MEDIA role only; grants no permissions
     default: false
