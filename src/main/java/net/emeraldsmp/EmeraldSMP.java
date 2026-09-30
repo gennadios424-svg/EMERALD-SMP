@@ -47,6 +47,7 @@ public final class EmeraldSMP extends JavaPlugin {
         EcoCommand eco=new EcoCommand(this);
         register("eco",eco,eco);
         register("shop",new ShopCommand(this),null);
+        register("sell",new net.emeraldsmp.shop.SellCommand(this),null);
         register("worth",new WorthCommand(this),new WorthCommand(this));
 
         getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
