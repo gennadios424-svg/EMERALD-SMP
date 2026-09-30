@@ -9,8 +9,12 @@ import org.bukkit.entity.Player;
 public final class ShopCommand implements CommandExecutor {
     private final EmeraldSMP plugin;
     public ShopCommand(EmeraldSMP plugin) { this.plugin = plugin; }
+
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player player)) { sender.sendMessage("Only players can use /shop."); return true; }
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("Only players can use /shop.");
+            return true;
+        }
         plugin.getShopManager().openMain(player);
         return true;
     }
