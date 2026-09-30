@@ -88,7 +88,6 @@ public final class EconomyManager {
     }
 
     public String format(long amount) {
-        String symbol = plugin.getConfigManager().getConfig().getString("economy.currency-symbol", "$");
-        return symbol + String.format("%,d", amount);
+        return "💚 " + String.format("%,d", amount) + " Emerald Shards";
     }
 }

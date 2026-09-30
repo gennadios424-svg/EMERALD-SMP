@@ -22,7 +22,6 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     private final Map<UUID, Order> orders = new LinkedHashMap<>();
     private final Map<UUID, Pending> pending = new HashMap<>();
     private final Map<UUID, String> searchWaiting = new HashMap<>();
-    private final Map<UUID, OrderInput> orderInput = new HashMap<>();
     private SortMode sortMode = SortMode.MOST_PAID;
     private final Set<UUID> busy = new HashSet<>();
     private final List<Material> requestable;
@@ -148,9 +147,9 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         BlockData original = b.getBlockData();
         b.setType(Material.OAK_SIGN, false);
         Sign sign = (Sign) b.getState();
-        sign.setLine(0, "Amount");
+        sign.setLine(0, "AMOUNT");
         sign.setLine(1, "");
-        sign.setLine(2, "Per Item");
+        sign.setLine(2, "PRICE / ITEM");
         sign.setLine(3, "");
         sign.update(true, false);
         pending.put(p.getUniqueId(), new Pending(item, b.getLocation(), original));
@@ -163,18 +162,6 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
                 if (p.isOnline() && pending.containsKey(p.getUniqueId())) p.openSign((Sign) b.getState());
             }
         }.runTask(plugin);
-        new BukkitRunnable() {
-            public void run() {
-                Pending still = pending.remove(p.getUniqueId());
-                if (still == null || !p.isOnline()) return;
-                still.location.getBlock().setBlockData(still.original, false);
-                orderInput.put(p.getUniqueId(), new OrderInput(still.item, 1, 0));
-                p.closeInventory();
-                p.sendMessage("§e§lSIGN INPUT FALLBACK");
-                p.sendMessage("§7The sign editor did not submit. Enter the §famount §7in chat:");
-                p.sendMessage("§7Example: §f64§7. Type §ccancel §7to cancel.");
-            }
-        }.runTaskLater(plugin, 200L);
     }
 
     @EventHandler
@@ -186,59 +173,10 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
             public void run() { q.location.getBlock().setBlockData(q.original, false); }
         }.runTask(plugin);
 
-        int amount = parseInt(e.getLine(1));
-        long price = plugin.getEconomyManager().parseAmount(e.getLine(3));
-        createOrder(p, q.item, amount, price);
-    }
-
-    @EventHandler
-    public void chat(AsyncPlayerChatEvent e) {
-        Player p = e.getPlayer();
-        UUID u = p.getUniqueId();
-        OrderInput input = orderInput.get(u);
-        if (input != null) {
-            e.setCancelled(true);
-            String message = e.getMessage().trim();
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (message.equalsIgnoreCase("cancel")) {
-                    orderInput.remove(u);
-                    p.sendMessage("§cOrder creation cancelled.");
-                    openItemSelection(p, 0, "");
-                    return;
-                }
-                if (input.step == 1) {
-                    int amount = parseInt(message);
-                    if (amount < 1 || amount > 2304) {
-                        p.sendMessage("§cEnter a valid amount from 1 to 2304, or §fcancel§c.");
-                        return;
-                    }
-                    orderInput.put(u, new OrderInput(input.item, 2, amount));
-                    p.sendMessage("§aAmount: §f" + amount);
-                    p.sendMessage("§7Enter the §fprice per item §7in chat:");
-                    p.sendMessage("§7Example: §f500§7. Type §ccancel §7to cancel.");
-                } else {
-                    long price = plugin.getEconomyManager().parseAmount(message);
-                    if (price < 1) {
-                        p.sendMessage("§cEnter a valid positive whole-number price, or §fcancel§c.");
-                        return;
-                    }
-                    orderInput.remove(u);
-                    createOrder(p, input.item, input.amount, price);
-                }
-            });
-            return;
-        }
-        String mode = searchWaiting.remove(u);
-        if (!"order".equals(mode)) return;
-        e.setCancelled(true);
-        String query = e.getMessage().trim();
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            if (query.equalsIgnoreCase("cancel")) openItemSelection(p, 0, "");
-            else openItemSelection(p, 0, query);
-        });
-    }
-
-    private void createOrder(Player p, Material item, int amount, long price) {
+        String amountText = e.getLine(1);
+        String priceText = e.getLine(3);
+        int amount = parseInt(amountText);
+        long price = plugin.getEconomyManager().parseAmount(priceText);
         if (amount < 1 || amount > 2304 || price < 1) {
             p.sendMessage("§cInvalid order. Enter a positive amount (max 2304) and price per item.");
             return;
@@ -255,13 +193,25 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
             return;
         }
         UUID id = UUID.randomUUID();
-        orders.put(id, new Order(id, p.getUniqueId(), p.getName(), item, amount, price, total));
+        orders.put(id, new Order(id, p.getUniqueId(), p.getName(), q.item, amount, price, total));
         p.sendMessage("§aOrder created:");
-        p.sendMessage("§7Selected Item: §f" + pretty(item));
+        p.sendMessage("§7Selected Item: §f" + pretty(q.item));
         p.sendMessage("§7Amount: §f" + amount);
         p.sendMessage("§7Price Per Item: §6$" + price);
         p.sendMessage("§7Total: §6$" + total);
         refreshOrders();
+    }
+
+    @EventHandler
+    public void chat(AsyncPlayerChatEvent e) {
+        Player p = e.getPlayer();
+        if (!searchWaiting.remove(p.getUniqueId()).equals("order")) return;
+        e.setCancelled(true);
+        String query = e.getMessage().trim();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (query.equalsIgnoreCase("cancel")) openItemSelection(p, 0, "");
+            else openItemSelection(p, 0, query);
+        });
     }
 
     private int parseInt(String s) {
@@ -368,7 +318,6 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         UUID u = e.getPlayer().getUniqueId();
         Pending q = pending.remove(u);
         searchWaiting.remove(u);
-        orderInput.remove(u);
         if (q != null) q.location.getBlock().setBlockData(q.original, false);
         List<UUID> refund = new ArrayList<>();
         for (Order o : orders.values()) if (o.owner.equals(u)) refund.add(o.id);
@@ -382,7 +331,6 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     private enum SortMode { MOST_PAID("MOST PAID"), MOST_PER_ITEM("MOST PER ITEM"); final String label; SortMode(String label) { this.label = label; } }
     private record Order(UUID id, UUID owner, String name, Material item, int amount, long price, long total) {}
     private record Pending(Material item, Location location, BlockData original) {}
-    private record OrderInput(Material item, int step, int amount) {}
     private static final class OrderHolder implements InventoryHolder {
         final int page; OrderHolder(int page) { this.page = page; } public Inventory getInventory() { return null; }
     }
