@@ -24,7 +24,7 @@ public final class CoinFlipCommand implements org.bukkit.command.CommandExecutor
         open(p);return true;
     }
     private void open(Player p){
-        Inventory inv=Bukkit.createInventory(new Holder(),"§2§l🪙 COIN FLIP");
+        Inventory inv=Bukkit.createInventory(new Holder(),54,"§2§l🪙 COIN FLIP");
         ItemStack create=button(Material.GOLD_INGOT,"§6§lCREATE COIN FLIP",List.of("§7Use: §f/cf create <amount>","§7Example: §f/cf create 1000"));inv.setItem(4,create);
         int slot=10;
         for(Flip f:flips.values()){if(f.owner.equals(p.getUniqueId()))continue;if(slot>=44)break;
@@ -51,7 +51,7 @@ public final class CoinFlipCommand implements org.bukkit.command.CommandExecutor
         confirm(p,visible.get(idx));
     }
     private void confirm(Player p,Flip f){
-        Inventory inv=Bukkit.createInventory(new ConfirmHolder(f.id),"§2§l🪙 JOIN COIN FLIP?");
+        Inventory inv=Bukkit.createInventory(new ConfirmHolder(f.id),27,"§2§l🪙 JOIN COIN FLIP?");
         inv.setItem(11,button(Material.LIME_WOOL,"§a§lCONFIRM",List.of("§7Creator: §f"+f.name,"§7Your wager: §6$"+f.amount)));
         inv.setItem(15,button(Material.RED_WOOL,"§c§lCANCEL",List.of("§7Return to /cf")));
         p.openInventory(inv);
