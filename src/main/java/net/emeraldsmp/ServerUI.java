@@ -58,12 +58,16 @@ public final class ServerUI implements Listener {
                 + ChatColor.GRAY + "Online: " + ChatColor.WHITE + online + ChatColor.DARK_GRAY + "  •  "
                 + ChatColor.GRAY + "Your Ping: " + ChatColor.WHITE + p.getPing() + "ms" + "\n"
         );
+        String role = net.emeraldsmp.roles.RoleUtil.rolePrefix(p);
+        String team = plugin.getTeamManager() == null ? "" : plugin.getTeamManager().tag(p.getUniqueId());
+        String tag = plugin.getTagsManager() == null ? "" : plugin.getTagsManager().active(p.getUniqueId());
+        String prefix = role + (team.isEmpty() ? "" : ChatColor.GREEN + "[" + team + "] ");
+        String suffix = tag.isEmpty() ? "" : ChatColor.DARK_GREEN + " [" + tag + "]";
         if (plugin.getAfkManager() != null && plugin.getConfig().getBoolean("afk.show-in-tab", true)
                 && plugin.getAfkManager().isAfk(p.getUniqueId())) {
-            p.setPlayerListName(ChatColor.GRAY + "[AFK] " + ChatColor.WHITE + p.getName()
-                + ChatColor.DARK_GRAY + "  •  " + ChatColor.GRAY + "AFK");
+            p.setPlayerListName(ChatColor.GRAY + "[AFK] " + prefix + ChatColor.WHITE + p.getName() + suffix);
         } else {
-            p.setPlayerListName(ChatColor.GREEN + "💚 " + ChatColor.WHITE + p.getName()
+            p.setPlayerListName(prefix + ChatColor.WHITE + p.getName() + suffix
                 + ChatColor.DARK_GRAY + "  •  " + ChatColor.GRAY + p.getPing() + "ms");
         }
     }
@@ -74,6 +78,7 @@ public final class ServerUI implements Listener {
 
     private void update(Player p) {
         setupTab(p);
+        updateNametags(p);
         Scoreboard board = boards.computeIfAbsent(p.getUniqueId(), k -> Bukkit.getScoreboardManager().getNewScoreboard());
         Objective objective = board.getObjective("emerald");
         if (objective == null) {
@@ -104,6 +109,26 @@ public final class ServerUI implements Listener {
         addLine(objective, previous, ChatColor.GREEN.toString() + ChatColor.BOLD.toString() + "💚 Emerald SMP", 1);
 
         p.setScoreboard(board);
+    }
+
+    private void updateNametags(Player viewer) {
+        Scoreboard board = viewer.getScoreboard();
+        for (org.bukkit.scoreboard.Team team : new ArrayList<>(board.getTeams())) {
+            if (team.getName().startsWith("emr_")) team.unregister();
+        }
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            String teamName = "emr_" + target.getUniqueId().toString().replace("-", "").substring(0, 12);
+            org.bukkit.scoreboard.Team team = board.registerNewTeam(teamName);
+            String role = net.emeraldsmp.roles.RoleUtil.rolePrefix(target);
+            String squad = plugin.getTeamManager() == null ? "" : plugin.getTeamManager().tag(target.getUniqueId());
+            String tag = plugin.getTagsManager() == null ? "" : plugin.getTagsManager().active(target.getUniqueId());
+            String prefix = role + (squad.isEmpty() ? "" : ChatColor.GREEN + "[" + squad + "] ");
+            String suffix = (tag.isEmpty() ? "" : ChatColor.DARK_GREEN + " [" + tag + "]")
+                    + ChatColor.DARK_GRAY + "  $" + plugin.getEconomyManager().formatCompact(plugin.getEconomyManager().getBalance(target.getUniqueId()));
+            team.setPrefix(prefix);
+            team.setSuffix(suffix);
+            team.addEntry(target.getName());
+        }
     }
 
     private void addLine(Objective objective, Set<String> entries, String text, int score) {
