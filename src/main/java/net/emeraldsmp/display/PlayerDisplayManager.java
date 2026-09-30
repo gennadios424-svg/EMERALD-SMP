@@ -20,12 +20,12 @@ public final class PlayerDisplayManager {
         Scoreboard board=Bukkit.getScoreboardManager().getNewScoreboard();
         Objective obj=board.registerNewObjective("emerald","dummy","§a§l💚 EMERALD SMP");
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-        int money=(int)Math.min(Integer.MAX_VALUE,plugin.getEconomyManager().getBalance(p.getUniqueId()));
+        int kills=p.getStatistic(org.bukkit.Statistic.PLAYER_KILLS);
         String[] lines={
             "§r",
             "§6💰 Money: §f$"+String.format("%,d",plugin.getEconomyManager().getBalance(p.getUniqueId())),
             "§a👥 Players: §f"+Bukkit.getOnlinePlayers().size(),
-            "§c⚔ Kills: §f0",
+            "§c⚔ Kills: §f"+kills",
             "§r§7play.emeraldsmp.net"
         };
         int score=lines.length;
