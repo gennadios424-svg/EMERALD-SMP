@@ -13,6 +13,9 @@ import net.emeraldsmp.managers.EconomyManager;
 import net.emeraldsmp.shop.*;
 import net.emeraldsmp.utils.MessageService;
 import net.emeraldsmp.worth.*;
+import net.emeraldsmp.teams.*;
+import net.emeraldsmp.tags.*;
+import net.emeraldsmp.spawner.*;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -31,6 +34,9 @@ public final class EmeraldSMP extends JavaPlugin {
     private AuctionManager auctionManager;
     private HomeCommand homeCommand;
     private AfkManager afkManager;
+    private TeamManager teamManager;
+    private TagsManager tagsManager;
+    private SpawnerManager spawnerManager;
 
     @Override public void onEnable() {
         try {
@@ -41,6 +47,9 @@ public final class EmeraldSMP extends JavaPlugin {
             shopManager=new ShopManager(this);
             worthManager=new WorthManager(this);worthManager.load();
             afkManager=new AfkManager(this);
+            teamManager=new TeamManager(this);teamManager.load();
+            tagsManager=new TagsManager(this);tagsManager.load();
+            spawnerManager=new SpawnerManager(this);spawnerManager.load();
 
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
             register("balance",new BalanceCommand(this),null);
@@ -59,6 +68,9 @@ public final class EmeraldSMP extends JavaPlugin {
             register("home",homeCommand,homeCommand);
             register("delhome",homeCommand,homeCommand);
             register("afk",new AfkCommand(this),null);
+            TeamCommand teams=new TeamCommand(this,teamManager);register("teams",teams,teams);
+            TagsCommand tags=new TagsCommand(this,tagsManager);register("tags",tags,null);
+            SpawnerCommand spawner=new SpawnerCommand(this,spawnerManager);register("spawner",spawner,spawner);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
             getServer().getPluginManager().registerEvents(new ShopListener(this),this);
@@ -69,6 +81,10 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(ah,this);
             getServer().getPluginManager().registerEvents(homeCommand,this);
             getServer().getPluginManager().registerEvents(new AfkListener(afkManager),this);
+            getServer().getPluginManager().registerEvents(teams,this);
+            getServer().getPluginManager().registerEvents(tags,this);
+            getServer().getPluginManager().registerEvents(spawnerManager,this);
+            spawnerManager.start();
 
             afkManager.start();
             serverUI=new ServerUI(this);
@@ -92,6 +108,9 @@ public final class EmeraldSMP extends JavaPlugin {
     @Override public void onDisable() {
         if(serverUI!=null) serverUI.stop();
         if(afkManager!=null) afkManager.stop();
+        if(spawnerManager!=null) spawnerManager.stop();
+        if(teamManager!=null) teamManager.save();
+        if(tagsManager!=null) tagsManager.save();
         if(playerDataManager!=null)playerDataManager.shutdown();
         getLogger().info("EmeraldSMP has been disabled.");
     }
@@ -105,4 +124,7 @@ public final class EmeraldSMP extends JavaPlugin {
     public WorthManager getWorthManager(){return worthManager;}
     public AuctionManager getAuctionManager(){return auctionManager;}
     public AfkManager getAfkManager(){return afkManager;}
+    public TeamManager getTeamManager(){return teamManager;}
+    public TagsManager getTagsManager(){return tagsManager;}
+    public SpawnerManager getSpawnerManager(){return spawnerManager;}
 }
