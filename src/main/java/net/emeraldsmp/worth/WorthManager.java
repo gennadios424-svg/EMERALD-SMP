@@ -213,7 +213,7 @@ public final class WorthManager {
         if(n.equals("RAIL")) return 100;
         if(n.equals("POWERED_RAIL")) return 500;
         if(n.equals("MINECART")) return 1_000;
-        if(n.equals("CHEST_BOAT")||n.name().endsWith("_BOAT")) return n.equals("CHEST_BOAT")?700:400;
+        if(n.equals("CHEST_BOAT")||n.endsWith("_BOAT")) return n.equals("CHEST_BOAT")?700:400;
         // Tools/armor scale from their material tier.
         if(n.startsWith("NETHERITE_") && (n.endsWith("_SWORD")||n.endsWith("_AXE")||n.endsWith("_PICKAXE")||n.endsWith("_SHOVEL")||n.endsWith("_HOE")||n.endsWith("_HELMET")||n.endsWith("_CHESTPLATE")||n.endsWith("_LEGGINGS")||n.endsWith("_BOOTS"))) return 180_000;
         if(n.startsWith("DIAMOND_") && (n.endsWith("_SWORD")||n.endsWith("_AXE")||n.endsWith("_PICKAXE")||n.endsWith("_SHOVEL")||n.endsWith("_HOE")||n.endsWith("_HELMET")||n.endsWith("_CHESTPLATE")||n.endsWith("_LEGGINGS")||n.endsWith("_BOOTS"))) return 35_000;
