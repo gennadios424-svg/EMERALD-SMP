@@ -73,6 +73,18 @@ public final class PlayerDataManager {
         save(data);
     }
 
+    public synchronized boolean withdrawEmeraldShards(UUID uuid, long amount) {
+        if (amount <= 0) return false;
+        PlayerData data = loaded.get(uuid);
+        if (data == null) data = loadOrCreate(uuid, null);
+        long old = data.getEmeraldShards();
+        if (old < amount) return false;
+        data.setEmeraldShards(old - amount);
+        if (save(data)) return true;
+        data.setEmeraldShards(old);
+        return false;
+    }
+
     public synchronized void markSeen(Player player) {
         PlayerData data = loadOrCreate(player);
         data.setUsername(player.getName());
