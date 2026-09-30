@@ -3,6 +3,7 @@ package net.emeraldsmp.spawner;
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.CreatureSpawner;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
