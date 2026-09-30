@@ -82,6 +82,7 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
         // IMPORTANT: never synchronously search/generate chunks on the server thread.
         // Paper's async chunk API lets world generation/loading happen off-thread,
         // while the actual Bukkit block inspection stays on the main thread.
+        BukkitTask[] searchHolder=new BukkitTask[1];
         BukkitTask searchTask=Bukkit.getScheduler().runTaskTimer(plugin,new Runnable(){
             private int attempts=0;
             private boolean finished=false;
@@ -127,9 +128,10 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
                     }
                     beginCountdown(player,u,destination,seconds);
                 }));
-                cancel();
+                if(searchHolder[0]!=null)searchHolder[0].cancel();
             }
         },0L,1L);
+        searchHolder[0]=searchTask;
         pending.put(u,searchTask);
     }
 
