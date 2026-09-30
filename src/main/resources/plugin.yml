@@ -45,6 +45,10 @@ commands:
     description: Opens coin flip
     usage: /cf
     permission: emerald.command
+  ah:
+    description: Opens the Auction House
+    usage: /ah [sell]
+    permission: emerald.command
 permissions:
   emerald.command:
     description: Allows use of Emerald SMP commands
