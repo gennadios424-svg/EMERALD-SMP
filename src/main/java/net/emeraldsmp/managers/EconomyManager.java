@@ -9,7 +9,6 @@ import java.util.UUID;
 
 public final class EconomyManager {
     private final EmeraldSMP plugin;
-
     public EconomyManager(EmeraldSMP plugin) { this.plugin = plugin; }
 
     public synchronized long getBalance(UUID uuid) {
@@ -20,6 +19,16 @@ public final class EconomyManager {
     public synchronized boolean deposit(UUID uuid, long amount) {
         if (amount <= 0) return false;
         PlayerData data = requireLoaded(uuid);
+        return depositData(data, amount);
+    }
+
+    public synchronized boolean depositToUuid(UUID uuid, long amount, String username) {
+        if (amount <= 0) return false;
+        PlayerData data = plugin.getPlayerDataManager().loadOrCreate(uuid, username);
+        return depositData(data, amount);
+    }
+
+    private boolean depositData(PlayerData data, long amount) {
         long old = data.getBalance();
         if (Long.MAX_VALUE - old < amount) return false;
         data.setBalance(old + amount);
@@ -55,22 +64,13 @@ public final class EconomyManager {
 
     public synchronized boolean transfer(Player sender, Player receiver, long amount) {
         if (amount <= 0 || sender.getUniqueId().equals(receiver.getUniqueId())) return false;
-
         PlayerData from = requireLoaded(sender.getUniqueId());
         PlayerData to = requireLoaded(receiver.getUniqueId());
-        long oldFrom = from.getBalance();
-        long oldTo = to.getBalance();
-
+        long oldFrom = from.getBalance(), oldTo = to.getBalance();
         if (oldFrom < amount || Long.MAX_VALUE - oldTo < amount) return false;
-
-        from.setBalance(oldFrom - amount);
-        to.setBalance(oldTo + amount);
-
+        from.setBalance(oldFrom - amount); to.setBalance(oldTo + amount);
         if (plugin.getPlayerDataManager().saveBoth(from, to)) return true;
-
-        from.setBalance(oldFrom);
-        to.setBalance(oldTo);
-        return false;
+        from.setBalance(oldFrom); to.setBalance(oldTo); return false;
     }
 
     public long parseAmount(String input) {
@@ -78,9 +78,7 @@ public final class EconomyManager {
             BigDecimal value = new BigDecimal(input);
             if (value.signum() <= 0 || value.scale() > 0) return -1L;
             return value.longValueExact();
-        } catch (NumberFormatException | ArithmeticException exception) {
-            return -1L;
-        }
+        } catch (NumberFormatException | ArithmeticException exception) { return -1L; }
     }
 
     private PlayerData requireLoaded(UUID uuid) {
