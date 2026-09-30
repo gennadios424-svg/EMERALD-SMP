@@ -11,6 +11,7 @@ import net.emeraldsmp.managers.EconomyManager;
 import net.emeraldsmp.utils.MessageService;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
+
 import java.util.logging.Level;
 
 public final class EmeraldSMP extends JavaPlugin {
@@ -31,10 +32,12 @@ public final class EmeraldSMP extends JavaPlugin {
 
             EmeraldCommand emeraldCommand = new EmeraldCommand(this);
             register("emerald", emeraldCommand, emeraldCommand);
+
+            // balance has the /bal and /money aliases in plugin.yml.
+            // They must NOT be registered as separate Bukkit commands.
             register("balance", new BalanceCommand(this), null);
-            register("bal", new BalanceCommand(this), null);
-            register("money", new BalanceCommand(this), null);
             register("pay", new PayCommand(this), null);
+
             EcoCommand ecoCommand = new EcoCommand(this);
             register("eco", ecoCommand, ecoCommand);
 
