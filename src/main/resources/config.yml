@@ -203,22 +203,14 @@ spawners:
     interval-seconds: 12
 
 
-# Custom Emerald SMP drill progression. These values are configurable.
-drills:
+# 💚 Emerald Miner progression. Both tools are separate and expire in real time.
+emerald-miner:
+  expiration-days: 7
+  xp-per-block: 1
   blocks-per-level: 100
-  tiers:
-    1:
-      efficiency: 1
-      shards-per-level: 5
-    2:
-      efficiency: 2
-      shards-per-level: 6
-    3:
-      efficiency: 3
-      shards-per-level: 7
-    4:
-      efficiency: 4
-      shards-per-level: 8
-    5:
-      efficiency: 5
-      shards-per-level: 10
+  levels-per-tier: 10
+  gainer:
+    min-blocks: 1
+    max-blocks: 128
+    min-shards: 1
+    max-shards: 5
