@@ -75,9 +75,100 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
         return list.stream().anyMatch(s->s.equalsIgnoreCase(w.getName()));
     }
     private void startTeleport(Player p,World world){
-        Location destination=findSafeLocation(world,p.getLocation());
-        if(destination==null){plugin.getMessageService().send(p,plugin.getConfig().getString("messages.rtp.failed","&cCould not find a safe RTP location."));return;}
-        UUID u=p.getUniqueId(); int seconds=Math.max(1,plugin.getConfig().getInt("rtp.countdown",5));
+        UUID u=p.getUniqueId();
+        int seconds=Math.max(1,plugin.getConfig().getInt("rtp.countdown",5));
+        cancelPending(u,false);
+
+        // IMPORTANT: never synchronously search/generate chunks on the server thread.
+        // Paper's async chunk API lets world generation/loading happen off-thread,
+        // while the actual Bukkit block inspection stays on the main thread.
+        BukkitTask searchTask=Bukkit.getScheduler().runTaskTimer(plugin,new Runnable(){
+            private int attempts=0;
+            private boolean finished=false;
+
+            @Override public void run(){
+                Player player=Bukkit.getPlayer(u);
+                if(player==null||!player.isOnline()){
+                    finished=true;
+                    cancelPending(u,false);
+                    return;
+                }
+                if(finished){
+                    return;
+                }
+                if(attempts++>=MAX_ATTEMPTS){
+                    finished=true;
+                    cancelPending(u,false);
+                    plugin.getMessageService().send(player,plugin.getConfig().getString("messages.rtp.failed","&cCould not find a safe RTP location."));
+                    return;
+                }
+
+                Location candidate=pickCandidate(world,player.getLocation());
+                if(candidate==null){
+                    if(attempts>=MAX_ATTEMPTS){
+                        finished=true;
+                        cancelPending(u,false);
+                        plugin.getMessageService().send(player,plugin.getConfig().getString("messages.rtp.failed","&cCould not find a safe RTP location."));
+                    }
+                    return;
+                }
+
+                finished=true;
+                preloadForCandidate(world,candidate).whenComplete((ignored,error)->Bukkit.getScheduler().runTask(plugin,()->{
+                    if(error!=null){
+                        startAnotherSearch(player,world,u);
+                        return;
+                    }
+                    Location destination=findSafeAt(world,candidate.getBlockX(),candidate.getBlockZ());
+                    if(destination==null){
+                        startAnotherSearch(player,world,u);
+                        return;
+                    }
+                    beginCountdown(player,u,destination,seconds);
+                }));
+                cancel();
+            }
+        },0L,1L);
+        pending.put(u,searchTask);
+    }
+
+    private void startAnotherSearch(Player player,World world,UUID u){
+        if(player==null||!player.isOnline()){
+            cancelPending(u,false);
+            return;
+        }
+        cancelPending(u,false);
+        startTeleport(player,world);
+    }
+
+    private Location pickCandidate(World w,Location center){
+        int min=Math.max(0,plugin.getConfig().getInt("rtp.min-distance",500));
+        int max=Math.max(min+1,plugin.getConfig().getInt("rtp.max-distance",5000));
+        int border=(int)Math.max(1,Math.floor(w.getWorldBorder().getSize()/2.0)-32);
+        max=Math.min(max,border);
+        if(max<=min)min=Math.max(0,max/2);
+
+        ThreadLocalRandom r=ThreadLocalRandom.current();
+        double angle=r.nextDouble(0,Math.PI*2);
+        double dist=Math.sqrt(r.nextDouble((double)min*min,(double)max*max));
+        int x=(int)Math.round(center.getX()+Math.cos(angle)*dist);
+        int z=(int)Math.round(center.getZ()+Math.sin(angle)*dist);
+        if(!w.getWorldBorder().isInside(new Location(w,x,64,z)))return null;
+        return new Location(w,x,0,z);
+    }
+
+    private java.util.concurrent.CompletableFuture<Void> preloadForCandidate(World world,Location candidate){
+        int cx=candidate.getBlockX()>>4, cz=candidate.getBlockZ()>>4;
+        java.util.List<java.util.concurrent.CompletableFuture<Chunk>> futures=new ArrayList<>();
+        for(int dx=-1;dx<=1;dx++){
+            for(int dz=-1;dz<=1;dz++){
+                futures.add(world.getChunkAtAsync(cx+dx,cz+dz,true));
+            }
+        }
+        return java.util.concurrent.CompletableFuture.allOf(futures.toArray(new java.util.concurrent.CompletableFuture[0]));
+    }
+
+    private void beginCountdown(Player p,UUID u,Location destination,int seconds){
         cancelPending(u,false);
         BukkitTask task=new org.bukkit.scheduler.BukkitRunnable(){
             int remaining=seconds;
@@ -106,11 +197,7 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
         }.runTaskTimer(plugin,0L,20L);
         pending.put(u,task);
     }
-    @EventHandler public void onMove(PlayerMoveEvent e){
-        if(!pending.containsKey(e.getPlayer().getUniqueId())||e.getTo()==null)return;
-        Location a=e.getFrom(),b=e.getTo();
-        if(a.getX()!=b.getX()||a.getY()!=b.getY()||a.getZ()!=b.getZ())cancelPending(e.getPlayer().getUniqueId(),true);
-    }
+
     private void cancelPending(UUID u,boolean notify){
         BukkitTask t=pending.remove(u);if(t!=null)t.cancel();
         Player p=Bukkit.getPlayer(u);if(notify&&p!=null)plugin.getMessageService().send(p,plugin.getConfig().getString("messages.rtp.cancelled","&cRTP cancelled because you moved."));
