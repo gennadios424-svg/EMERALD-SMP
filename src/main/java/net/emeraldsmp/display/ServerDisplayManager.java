@@ -8,11 +8,9 @@ import org.bukkit.scoreboard.*;
 
 public final class ServerDisplayManager {
     private final EmeraldSMP plugin;
-    private final Scoreboard board;
 
     public ServerDisplayManager(EmeraldSMP plugin) {
         this.plugin = plugin;
-        this.board = Bukkit.getScoreboardManager().getNewScoreboard();
     }
 
     public void start() {
@@ -30,29 +28,26 @@ public final class ServerDisplayManager {
     }
 
     private void updateTab(Player player) {
-        player.setPlayerListHeaderFooter(
-                color("&a&l💚 Emerald SMP"),
-                color("&7Online: &f" + Bukkit.getOnlinePlayers().size()
-                        + " &8• &7Ping: &f" + safePing(player) + "ms"));
+        String header = color("&a&l💚 Emerald SMP\n&7Player: &f" + player.getName());
+        String footer = color("&7Online: &f" + Bukkit.getOnlinePlayers().size()
+                + " &8• &7Ping: &f" + safePing(player) + "ms");
+        player.setPlayerListHeaderFooter(header, footer);
     }
 
     private void updateScoreboard(Player player) {
-        Objective objective = board.getObjective("emerald");
-        if (objective == null) {
-            objective = board.registerNewObjective("emerald", Criteria.DUMMY, color("&a&l💚 EMERALD SMP"));
-            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        }
-
-        for (String entry : board.getEntries()) board.resetScores(entry);
+        Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = board.registerNewObjective("emerald", Criteria.DUMMY, color("&a&l💚 EMERALD SMP"));
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         long balance = plugin.getEconomyManager().getBalance(player.getUniqueId());
         String money = plugin.getEconomyManager().format(balance);
-        set(objective, color("&aMoney: &f" + money), 4);
-        set(objective, color("&aPlayers: &f" + Bukkit.getOnlinePlayers().size()), 3);
-        set(objective, color("&aPing: &f" + safePing(player) + "ms"), 2);
-        set(objective, color("&8play.emeraldsmp..."), 1);
 
-        if (player.getScoreboard() != board) player.setScoreboard(board);
+        objective.getScore(color("&aMoney: &f" + money)).setScore(4);
+        objective.getScore(color("&aPlayers: &f" + Bukkit.getOnlinePlayers().size())).setScore(3);
+        objective.getScore(color("&aPing: &f" + safePing(player) + "ms")).setScore(2);
+        objective.getScore(color("&8play.emeraldsmp...")).setScore(1);
+
+        player.setScoreboard(board);
     }
 
     private int safePing(Player player) {
