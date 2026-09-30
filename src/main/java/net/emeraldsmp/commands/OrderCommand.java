@@ -89,7 +89,12 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     private void removeItems(Player p,Material m,int n){for(int i=0;i<p.getInventory().getStorageContents().length&&n>0;i++){ItemStack it=p.getInventory().getItem(i);if(it==null||it.getType()!=m)continue;int take=Math.min(n,it.getAmount());it.setAmount(it.getAmount()-take);n-=take;}}
     private void giveItems(Player p,Material m,int n){ItemStack left=new ItemStack(m,n);Map<Integer,ItemStack> extra=p.getInventory().addItem(left);for(ItemStack x:extra.values())p.getWorld().dropItemNaturally(p.getLocation(),x);}
     private String pretty(Material m){return m.name().toLowerCase(Locale.ROOT).replace('_',' ');}
-    @EventHandler public void quit(PlayerQuitEvent e){\n        UUID u=e.getPlayer().getUniqueId(); creating.remove(u);\n        List<UUID> refund=new ArrayList<>();\n        for(Order o:orders.values()) if(o.owner.equals(u)) refund.add(o.id);\n        for(UUID id:refund){Order o=orders.remove(id); if(o!=null) plugin.getEconomyManager().deposit(u,o.total);}\n    }
+    @EventHandler public void quit(PlayerQuitEvent e){
+        UUID u=e.getPlayer().getUniqueId(); creating.remove(u);
+        List<UUID> refund=new ArrayList<>();
+        for(Order o:orders.values()) if(o.owner.equals(u)) refund.add(o.id);
+        for(UUID id:refund){Order o=orders.remove(id); if(o!=null) plugin.getEconomyManager().deposit(u,o.total);}
+    }
     private record Order(UUID id,UUID owner,String name,Material item,int amount,long price,long total){}
     private static final class Holder implements InventoryHolder{final String kind;Holder(String k){kind=k;}public Inventory getInventory(){return null;}}
 }
