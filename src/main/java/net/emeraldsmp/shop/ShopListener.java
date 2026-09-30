@@ -93,11 +93,6 @@ public final class ShopListener implements Listener {
         }
     }
 
-    @EventHandler
-    public void close(InventoryCloseEvent e) {
-        plugin.getShopManager().clear((Player) e.getPlayer());
-    }
-
     private WorthCategory categoryAt(int slot) {
         int[] slots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 23, 24, 25};
         WorthCategory[] categories = WorthCategory.values();
