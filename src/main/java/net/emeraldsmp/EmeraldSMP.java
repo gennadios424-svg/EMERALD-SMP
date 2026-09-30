@@ -22,6 +22,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private WorthManager worthManager;
     private WorthListener worthListener;
     private RtpCommand rtpCommand;
+    private ServerUI serverUI;
 
     @Override public void onEnable() {
         try {
@@ -50,6 +51,10 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(order,this);
             getServer().getPluginManager().registerEvents(cf,this);
 
+            serverUI=new ServerUI(this);
+            getServer().getPluginManager().registerEvents(serverUI,this);
+            serverUI.start();
+
             getLogger().info("EmeraldSMP has been enabled!");
             getLogger().info("Worth database loaded: "+worthManager.all().size()+" supported items.");
         } catch(Exception ex) {
@@ -65,6 +70,7 @@ public final class EmeraldSMP extends JavaPlugin {
     }
 
     @Override public void onDisable() {
+        if(serverUI!=null) serverUI.stop();
         if(playerDataManager!=null)playerDataManager.shutdown();
         getLogger().info("EmeraldSMP has been disabled.");
     }
