@@ -26,6 +26,7 @@ public final class SpawnerManager implements Listener {
     private final EmeraldSMP plugin;
     private final File file;
     private final Map<String, Data> spawners = new LinkedHashMap<>();
+    private final Map<UUID, String> openSpawners = new HashMap<>();
     private final NamespacedKeyHolder keys;
     private int taskId = -1;
 
@@ -126,7 +127,7 @@ public final class SpawnerManager implements Listener {
     public ItemStack createItem(int amount){
         ItemStack item=new ItemStack(Material.SPAWNER,Math.max(1,Math.min(64,amount)));
         ItemMeta meta=item.getItemMeta(); meta.setDisplayName("§a🧟 Skeleton Spawner");
-        meta.setLore(List.of("§7Produces §f8 Skeletons §7every §f12s","§7Right-click to configure","§8Emerald SMP"));
+        meta.setLore(List.of("§7Produces §f" + plugin.getConfig().getInt("spawners.skeleton.amount", 8) + " Skeletons §7every §f" + plugin.getConfig().getLong("spawners.skeleton.interval-seconds", 12) + "s","§7Right-click to configure","§8Emerald SMP"));
         meta.getPersistentDataContainer().set(keys.type,PersistentDataType.STRING,TYPE_SKELETON);
         item.setItemMeta(meta); return item;
     }
@@ -171,6 +172,7 @@ public final class SpawnerManager implements Listener {
         inv.setItem(41,item(Material.CHEST,"§b📦 Collect Drops",List.of("§7Collect all stored item drops")));
         inv.setItem(43,item(Material.BOOK,"§f📊 Statistics",List.of("§7Total Spawned: §f"+d.totalSpawned,"§7Time Active: §f"+formatTime(d.activeMillis),"§7Money Generated: §f"+plugin.getEconomyManager().format(d.moneyGenerated))));
         inv.setItem(49,item(Material.BARRIER,"§cPickup Spawner",List.of("§7Stored drops and XP will be given to you")));
+        openSpawners.put(p.getUniqueId(), d.key());
         p.openInventory(inv);
     }
 
@@ -181,7 +183,9 @@ public final class SpawnerManager implements Listener {
     @EventHandler public void click(InventoryClickEvent e){
         if(!(e.getWhoClicked() instanceof Player p)||!e.getView().getTitle().equals(TITLE_PREFIX))return;
         e.setCancelled(true);
-        Data d=findNearestOwned(p); if(d==null)return;
+        String openKey = openSpawners.get(p.getUniqueId());
+        Data d = openKey == null ? null : spawners.get(openKey);
+        if(d==null)return;
         switch(e.getRawSlot()){
             case 28 -> {d.bonesEnabled=!d.bonesEnabled;open(p,d);}
             case 30 -> {d.arrowsEnabled=!d.arrowsEnabled;open(p,d);}
@@ -195,15 +199,6 @@ public final class SpawnerManager implements Listener {
         save();
     }
 
-    private Data findNearestOwned(Player p){
-        Data best=null; double distance=Double.MAX_VALUE;
-        for(Data d:spawners.values()) if(d.owner.equals(p.getUniqueId())||p.hasPermission("emerald.admin")){
-            Location l=d.location(); if(l==null||!l.getWorld().equals(p.getWorld()))continue;
-            double ds=l.distanceSquared(p.getLocation()); if(ds<distance&&ds<64){distance=ds;best=d;}
-        }
-        return best;
-    }
-
     private void collect(Player p,Data d){
         give(p,Material.BONE,d.bones);give(p,Material.ARROW,d.arrows);give(p,Material.BOW,d.bows);
         if(d.collectXp&&d.xp>0){p.giveExp((int)Math.min(Integer.MAX_VALUE,d.xp));d.xp=0;}
@@ -212,7 +207,7 @@ public final class SpawnerManager implements Listener {
 
     private void pickup(Player p,Data d){
         collect(p,d); Location l=d.location(); if(l!=null)l.getBlock().setType(Material.AIR);
-        spawners.remove(d.key()); p.getInventory().addItem(createItem(1)); p.closeInventory(); save();
+        spawners.remove(d.key()); openSpawners.remove(p.getUniqueId()); p.getInventory().addItem(createItem(1)); p.closeInventory(); save();
         p.sendMessage(ChatColor.GREEN+"Spawner picked up.");
     }
 
