@@ -90,6 +90,9 @@ public final class WorthListener implements Listener {
 
     @EventHandler
     public void close(InventoryCloseEvent e) {
+        // Keep Worth ViewState when switching between browser/info/page inventories.
+        // openInventory() can fire InventoryCloseEvent for the old screen, and
+        // clearing state here breaks Previous/Next navigation.
         waitingForSearch.remove(e.getPlayer().getUniqueId());
     }
 }
