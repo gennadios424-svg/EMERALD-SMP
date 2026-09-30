@@ -25,10 +25,16 @@ public final class EmeraldCommand implements CommandExecutor, TabCompleter {
                 plugin.getMessageService().send(sender, "&cYou do not have permission to do that.");
                 return true;
             }
-            if (plugin.getConfigManager().reload()) {
-                plugin.getMessageService().send(sender, "&aConfiguration reloaded successfully.");
+            boolean configOk=plugin.getConfigManager().reload();
+            boolean worthOk=plugin.getWorthManager().reload();
+            if (configOk && worthOk) {
+                plugin.getMessageService().send(sender, "&aConfiguration and Worth data reloaded successfully.");
+            } else if (worthOk) {
+                plugin.getMessageService().send(sender, "&eMain configuration reloaded, but Worth data could not be reloaded. Previous valid Worth data was kept.");
+            } else if (configOk) {
+                plugin.getMessageService().send(sender, "&eMain configuration reloaded, but Worth data could not be reloaded. Previous valid Worth data was kept.");
             } else {
-                plugin.getMessageService().send(sender, "&cConfiguration could not be reloaded.");
+                plugin.getMessageService().send(sender, "&cConfiguration could not be reloaded. Previous valid Worth data was kept.");
             }
             return true;
         }
