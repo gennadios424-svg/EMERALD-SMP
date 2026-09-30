@@ -2,6 +2,9 @@ package net.emeraldsmp;
 
 import net.emeraldsmp.commands.*;
 import net.emeraldsmp.auction.AuctionCommand;
+import net.emeraldsmp.afk.AfkCommand;
+import net.emeraldsmp.afk.AfkListener;
+import net.emeraldsmp.afk.AfkManager;
 import net.emeraldsmp.auction.AuctionManager;
 import net.emeraldsmp.data.PlayerDataManager;
 import net.emeraldsmp.listeners.PlayerDataListener;
@@ -27,6 +30,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private ServerUI serverUI;
     private AuctionManager auctionManager;
     private HomeCommand homeCommand;
+    private AfkManager afkManager;
 
     @Override public void onEnable() {
         try {
@@ -36,6 +40,7 @@ public final class EmeraldSMP extends JavaPlugin {
             economyManager=new EconomyManager(this);
             shopManager=new ShopManager(this);
             worthManager=new WorthManager(this);worthManager.load();
+            afkManager=new AfkManager(this);
 
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
             register("balance",new BalanceCommand(this),null);
@@ -53,6 +58,7 @@ public final class EmeraldSMP extends JavaPlugin {
             register("sethome",homeCommand,homeCommand);
             register("home",homeCommand,homeCommand);
             register("delhome",homeCommand,homeCommand);
+            register("afk",new AfkCommand(this),null);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
             getServer().getPluginManager().registerEvents(new ShopListener(this),this);
@@ -62,7 +68,9 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(cf,this);
             getServer().getPluginManager().registerEvents(ah,this);
             getServer().getPluginManager().registerEvents(homeCommand,this);
+            getServer().getPluginManager().registerEvents(new AfkListener(afkManager),this);
 
+            afkManager.start();
             serverUI=new ServerUI(this);
             getServer().getPluginManager().registerEvents(serverUI,this);
             serverUI.start();
@@ -83,6 +91,7 @@ public final class EmeraldSMP extends JavaPlugin {
 
     @Override public void onDisable() {
         if(serverUI!=null) serverUI.stop();
+        if(afkManager!=null) afkManager.stop();
         if(playerDataManager!=null)playerDataManager.shutdown();
         getLogger().info("EmeraldSMP has been disabled.");
     }
@@ -95,4 +104,5 @@ public final class EmeraldSMP extends JavaPlugin {
     public ShopManager getShopManager(){return shopManager;}
     public WorthManager getWorthManager(){return worthManager;}
     public AuctionManager getAuctionManager(){return auctionManager;}
+    public AfkManager getAfkManager(){return afkManager;}
 }
