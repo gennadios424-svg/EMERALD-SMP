@@ -16,7 +16,7 @@ import net.emeraldsmp.worth.*;
 import net.emeraldsmp.teams.*;
 import net.emeraldsmp.tags.*;
 import net.emeraldsmp.spawner.*;
-import net.emeraldsmp.drill.*;
+import net.emeraldsmp.drill.*;\nimport net.emeraldsmp.crates.*;
 import net.emeraldsmp.roles.RoleChatListener;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
@@ -39,7 +39,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private TeamManager teamManager;
     private TagsManager tagsManager;
     private SpawnerManager spawnerManager;
-    private DrillManager drillManager;
+    private DrillManager drillManager;\n    private CrateManager crateManager;
 
     @Override public void onEnable() {
         try {
@@ -53,7 +53,7 @@ public final class EmeraldSMP extends JavaPlugin {
             teamManager=new TeamManager(this);teamManager.load();
             tagsManager=new TagsManager(this);tagsManager.load();
             spawnerManager=new SpawnerManager(this);spawnerManager.load();
-            drillManager=new DrillManager(this);drillManager.load();
+            drillManager=new DrillManager(this);drillManager.load();\n            crateManager=new CrateManager(this);crateManager.load();
 
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
             register("balance",new BalanceCommand(this),null);
@@ -75,7 +75,7 @@ public final class EmeraldSMP extends JavaPlugin {
             TeamCommand teams=new TeamCommand(this,teamManager);register("teams",teams,teams);
             TagsCommand tags=new TagsCommand(this,tagsManager);register("tags",tags,null);
             SpawnerCommand spawner=new SpawnerCommand(this,spawnerManager);register("spawner",spawner,spawner);
-            DrillCommand drill=new DrillCommand(this,drillManager);register("drill",drill,drill);
+            DrillCommand drill=new DrillCommand(this,drillManager);register("drill",drill,drill);\n            CrateCommand crates=new CrateCommand(crateManager);register("crates",crates,crates);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
             getServer().getPluginManager().registerEvents(new ShopListener(this),this);
@@ -89,7 +89,7 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(teams,this);
             getServer().getPluginManager().registerEvents(tags,this);
             getServer().getPluginManager().registerEvents(spawnerManager,this);
-            getServer().getPluginManager().registerEvents(drillManager,this);
+            getServer().getPluginManager().registerEvents(drillManager,this);\n            getServer().getPluginManager().registerEvents(crateManager,this);
             getServer().getPluginManager().registerEvents(new RoleChatListener(),this);
             spawnerManager.start();
 
@@ -116,7 +116,7 @@ public final class EmeraldSMP extends JavaPlugin {
         if(serverUI!=null) serverUI.stop();
         if(afkManager!=null) afkManager.stop();
         if(spawnerManager!=null) spawnerManager.stop();
-        if(drillManager!=null) drillManager.stop();
+        if(drillManager!=null) drillManager.stop();\n        if(crateManager!=null) crateManager.stop();
         if(teamManager!=null) teamManager.save();
         if(tagsManager!=null) tagsManager.save();
         if(playerDataManager!=null)playerDataManager.shutdown();
@@ -135,5 +135,5 @@ public final class EmeraldSMP extends JavaPlugin {
     public TeamManager getTeamManager(){return teamManager;}
     public TagsManager getTagsManager(){return tagsManager;}
     public SpawnerManager getSpawnerManager(){return spawnerManager;}
-    public DrillManager getDrillManager(){return drillManager;}
+    public DrillManager getDrillManager(){return drillManager;}\n    public CrateManager getCrateManager(){return crateManager;}
 }
