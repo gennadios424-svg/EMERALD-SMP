@@ -7,7 +7,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -16,12 +15,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class RtpCommand implements org.bukkit.command.CommandExecutor, Listener {
     private static final String GUI_TITLE = "§2💚 Emerald SMP §8» §aRTP";
-    private static final int MAX_ATTEMPTS = 80;
+    private static final int MAX_SEARCH_ATTEMPTS = 24;
     private final EmeraldSMP plugin;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, BukkitTask> pending = new HashMap<>();
@@ -97,7 +95,7 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
             return;
         }
         p.closeInventory();
-        startTeleport(p, world);
+        startSearch(p, world);
     }
 
     private String configuredWorld(String key, String fallback, int listIndex) {
@@ -114,113 +112,98 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
         return list.stream().anyMatch(s -> s.equalsIgnoreCase(w.getName()));
     }
 
-    private void startTeleport(Player p, World world) {
+    private void startSearch(Player p, World world) {
         UUID u = p.getUniqueId();
         int seconds = Math.max(1, plugin.getConfig().getInt("rtp.countdown", 5));
         cancelPending(u, false);
 
-        BukkitTask[] searchHolder = new BukkitTask[1];
-        BukkitTask searchTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            private int attempts = 0;
-            private boolean finished = false;
-
-            @Override
-            public void run() {
-                Player player = Bukkit.getPlayer(u);
-                if (player == null || !player.isOnline()) {
-                    cancelPending(u, false);
-                    return;
-                }
-                if (finished) return;
-
-                if (attempts++ >= MAX_ATTEMPTS) {
-                    finished = true;
-                    cancelPending(u, false);
-                    plugin.getMessageService().send(player,
-                        plugin.getConfig().getString("messages.rtp.failed", "&cCould not find a safe RTP location."));
-                    return;
-                }
-
-                Location candidate = pickCandidate(world);
-                if (candidate == null) return;
-
-                finished = true;
-                preloadForCandidate(world, candidate).whenComplete((ignored, error) -> Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (error != null) {
-                        startAnotherSearch(player, world, u);
-                        return;
-                    }
-                    if (!pending.containsKey(u)) return;
-                    Location destination = findSafeAt(world, candidate.getBlockX(), candidate.getBlockZ());
-                    if (destination == null) {
-                        startAnotherSearch(player, world, u);
-                        return;
-                    }
-                    beginCountdown(player, u, destination, seconds);
-                }));
-                if (searchHolder[0] != null) searchHolder[0].cancel();
-            }
-        }, 0L, 1L);
-        searchHolder[0] = searchTask;
-        pending.put(u, searchTask);
-    }
-
-    private void startAnotherSearch(Player player, World world, UUID u) {
-        if (!pending.containsKey(u)) return;
-        if (player == null || !player.isOnline()) {
-            cancelPending(u, false);
-            return;
-        }
-        cancelPending(u, false);
-        startTeleport(player, world);
-    }
-
-    /** Pick coordinates relative to the selected world's border, not the player's current dimension. */
-    private Location pickCandidate(World w) {
-        WorldBorder border = w.getWorldBorder();
-        int min = Math.max(0, plugin.getConfig().getInt("rtp.min-distance", 500));
-        int max = Math.max(min + 1, plugin.getConfig().getInt("rtp.max-distance", 5000));
-        double borderRadius = border.getSize() / 2.0 - 64.0;
-        max = (int) Math.min(max, Math.max(1, borderRadius));
-        if (max <= min) min = Math.max(0, max / 2);
-
-        ThreadLocalRandom r = ThreadLocalRandom.current();
-        double angle = r.nextDouble(0, Math.PI * 2);
-        double dist = Math.sqrt(r.nextDouble((double) min * min, (double) max * max));
-        double centerX = border.getCenter().getX();
-        double centerZ = border.getCenter().getZ();
-        int x = (int) Math.round(centerX + Math.cos(angle) * dist);
-        int z = (int) Math.round(centerZ + Math.sin(angle) * dist);
-        if (!border.isInside(new Location(w, x, 64, z))) return null;
-        return new Location(w, x, 0, z);
-    }
-
-    private CompletableFuture<Void> preloadForCandidate(World world, Location candidate) {
-        int cx = candidate.getBlockX() >> 4, cz = candidate.getBlockZ() >> 4;
-        List<CompletableFuture<Chunk>> futures = new ArrayList<>();
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                futures.add(world.getChunkAtAsync(cx + dx, cz + dz, true));
-            }
-        }
-        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
-    }
-
-    private void beginCountdown(Player p, UUID u, Location destination, int seconds) {
-        cancelPending(u, false);
-        countdownStarts.put(u, p.getLocation().clone());
-
         BukkitTask task = new org.bukkit.scheduler.BukkitRunnable() {
-            int remaining = seconds;
+            int attempts = 0;
 
-            @Override
-            public void run() {
+            @Override public void run() {
                 Player player = Bukkit.getPlayer(u);
                 if (player == null || !player.isOnline()) {
                     cancelPending(u, false);
                     cancel();
                     return;
                 }
+
+                if (attempts++ >= MAX_SEARCH_ATTEMPTS) {
+                    cancelPending(u, false);
+                    plugin.getMessageService().send(player,
+                        plugin.getConfig().getString("messages.rtp.failed", "&cCould not find a safe RTP location. Please try again."));
+                    cancel();
+                    return;
+                }
+
+                Location destination = findQuickLocation(world);
+                if (destination != null) {
+                    cancel();
+                    pending.remove(u);
+                    beginCountdown(player, u, destination, seconds);
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+
+        pending.put(u, task);
+        String searching = plugin.getConfig().getString("messages.rtp.searching", "");
+        if (searching != null && !searching.isBlank()) plugin.getMessageService().send(p, searching);
+    }
+
+    private Location findQuickLocation(World w) {
+        WorldBorder border = w.getWorldBorder();
+        int min = Math.max(0, plugin.getConfig().getInt("rtp.min-distance", 500));
+        int max = Math.max(min + 1, plugin.getConfig().getInt("rtp.max-distance", 5000));
+        double borderRadius = border.getSize() / 2.0 - 16.0;
+        max = (int) Math.min(max, Math.max(1, borderRadius));
+        if (max <= min) min = Math.max(0, max / 2);
+
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        double angle = r.nextDouble(0, Math.PI * 2);
+        double dist = Math.sqrt(r.nextDouble((double) min * min, (double) max * max));
+        int x = (int) Math.round(border.getCenter().getX() + Math.cos(angle) * dist);
+        int z = (int) Math.round(border.getCenter().getZ() + Math.sin(angle) * dist);
+        if (!border.isInside(new Location(w, x, 64, z))) return null;
+
+        int cx = x >> 4, cz = z >> 4;
+        if (!w.isChunkLoaded(cx, cz)) w.loadChunk(cx, cz, true);
+        return findQuickSafeAt(w, x, z);
+    }
+
+    private Location findQuickSafeAt(World w, int x, int z) {
+        int highest = w.getHighestBlockYAt(x, z);
+        int minY = w.getMinHeight() + 1;
+        int maxY = w.getMaxHeight() - 3;
+        if (w.getEnvironment() == World.Environment.NETHER) maxY = Math.min(maxY, 123);
+
+        int y = Math.min(highest, maxY);
+        if (y < minY) return null;
+
+        Block floor = w.getBlockAt(x, y, z);
+        Block feet = w.getBlockAt(x, y + 1, z);
+        Block head = w.getBlockAt(x, y + 2, z);
+
+        if (!isSafeFloor(floor) || !feet.isPassable() || !head.isPassable() || feet.isLiquid() || head.isLiquid()) return null;
+        Location loc = new Location(w, x + .5, y + 1, z + .5);
+        loc.setYaw(ThreadLocalRandom.current().nextFloat() * 360f);
+        loc.setPitch(0);
+        return loc;
+    }
+
+    private void beginCountdown(Player p, UUID u, Location destination, int seconds) {
+        countdownStarts.put(u, p.getLocation().clone());
+
+        BukkitTask task = new org.bukkit.scheduler.BukkitRunnable() {
+            int remaining = seconds;
+
+            @Override public void run() {
+                Player player = Bukkit.getPlayer(u);
+                if (player == null || !player.isOnline()) {
+                    cancelPending(u, false);
+                    cancel();
+                    return;
+                }
+
                 if (remaining <= 0) {
                     pending.remove(u);
                     countdownStarts.remove(u);
@@ -259,7 +242,6 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
         Location start = countdownStarts.get(u);
         if (start == null || e.getTo() == null) return;
         if (start.getWorld() != e.getTo().getWorld() || start.distanceSquared(e.getTo()) > 0.01D) {
-            countdownStarts.remove(u);
             cancelPending(u, true);
         }
     }
@@ -273,81 +255,34 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
             plugin.getMessageService().send(p, plugin.getConfig().getString("messages.rtp.cancelled", "&cRTP cancelled because you moved."));
     }
 
-    @EventHandler public void onClose(InventoryCloseEvent e) {}
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent e) {
+    @EventHandler public void onQuit(PlayerQuitEvent e) {
         cancelPending(e.getPlayer().getUniqueId(), false);
         cooldowns.remove(e.getPlayer().getUniqueId());
-    }
-
-    private Location findSafeLocation(World w, Location center) {
-        for (int a = 0; a < MAX_ATTEMPTS; a++) {
-            Location candidate = pickCandidate(w);
-            if (candidate == null) continue;
-            Location safe = findSafeAt(w, candidate.getBlockX(), candidate.getBlockZ());
-            if (safe != null) return safe;
-        }
-        return null;
-    }
-
-    private Location findSafeAt(World w, int x, int z) {
-        int minY = w.getMinHeight() + 2;
-        int maxY = w.getEnvironment() == World.Environment.NETHER
-            ? Math.min(118, w.getMaxHeight() - 4)
-            : w.getMaxHeight() - 4;
-        int highest = w.getHighestBlockYAt(x, z);
-        int start = Math.min(maxY, highest);
-
-        for (int y = start; y >= minY && y >= start - 128; y--) {
-            Block floor = w.getBlockAt(x, y, z);
-            Block feet = w.getBlockAt(x, y + 1, z);
-            Block head = w.getBlockAt(x, y + 2, z);
-            if (!isSafeFloor(floor) || !feet.isPassable() || !head.isPassable() || feet.isLiquid() || head.isLiquid()) continue;
-            if (!isTerrainLocation(w, x, y, z)) continue;
-            if (!hasSafeNeighbors(w, x, y, z)) continue;
-            Location loc = new Location(w, x + .5, y + 1, z + .5);
-            loc.setYaw(ThreadLocalRandom.current().nextFloat() * 360f);
-            loc.setPitch(0);
-            return loc;
-        }
-        return null;
-    }
-
-    private boolean isTerrainLocation(World w, int x, int y, int z) {
-        if (w.getBlockAt(x, y, z).getType() == Material.BEDROCK) return false;
-        // The floor must be the actual surface, which prevents cave/interior teleports.
-        return w.getHighestBlockYAt(x, z) == y;
-    }
-
-    private boolean hasSafeNeighbors(World w, int x, int y, int z) {
-        int[][] offsets = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        for (int[] d : offsets) {
-            int nx = x + d[0], nz = z + d[1];
-            int ny = w.getHighestBlockYAt(nx, nz);
-            if (Math.abs(ny - y) > 1) return false;
-            Block floor = w.getBlockAt(nx, ny, nz);
-            Block feet = w.getBlockAt(nx, ny + 1, nz);
-            Block head = w.getBlockAt(nx, ny + 2, nz);
-            if (!isSafeFloor(floor) || !feet.isPassable() || !head.isPassable() || feet.isLiquid() || head.isLiquid()) return false;
-        }
-        return true;
     }
 
     private boolean isStillSafe(Location l) {
         World w = l.getWorld();
         if (w == null) return false;
         int x = l.getBlockX(), y = l.getBlockY() - 1, z = l.getBlockZ();
-        return isTerrainLocation(w, x, y, z) && hasSafeNeighbors(w, x, y, z);
+        return isQuickSafeAt(w, x, y, z);
+    }
+
+    private boolean isQuickSafeAt(World w, int x, int floorY, int z) {
+        if (floorY < w.getMinHeight() || floorY >= w.getMaxHeight() - 2) return false;
+        if (w.getEnvironment() == World.Environment.NETHER && floorY > 123) return false;
+        Block floor = w.getBlockAt(x, floorY, z);
+        Block feet = w.getBlockAt(x, floorY + 1, z);
+        Block head = w.getBlockAt(x, floorY + 2, z);
+        return isSafeFloor(floor) && feet.isPassable() && head.isPassable() && !feet.isLiquid() && !head.isLiquid();
     }
 
     private boolean isSafeFloor(Block b) {
         Material m = b.getType();
         if (!m.isSolid() || b.isLiquid()) return false;
         return switch (m) {
-            case BEDROCK, DEEPSLATE, REINFORCED_DEEPSLATE, LAVA, MAGMA_BLOCK, CACTUS, FIRE, SOUL_FIRE,
+            case BEDROCK, LAVA, WATER, MAGMA_BLOCK, CACTUS, FIRE, SOUL_FIRE,
                  CAMPFIRE, SOUL_CAMPFIRE, POWDER_SNOW, SWEET_BERRY_BUSH, POINTED_DRIPSTONE,
-                 WITHER_ROSE, TNT, END_PORTAL, END_GATEWAY, NETHER_PORTAL, WATER -> false;
+                 WITHER_ROSE, TNT, END_PORTAL, END_GATEWAY, NETHER_PORTAL -> false;
             default -> true;
         };
     }
