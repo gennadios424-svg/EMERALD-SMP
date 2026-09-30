@@ -15,8 +15,8 @@ visual:
 messages:
   prefix: "&a💚 &2&lEmerald SMP &8»"
   rtp:
-    searching: "&7Finding a safe random location..."
-    success: "&aTeleported to &f%world% &7(&f%x%&7, &f%z%&7)&a."
+    searching: "&7Finding a safe random location..."\n    countdown: "&aTeleporting in &f%time%&a..."\n    cancelled: "&cRTP cancelled because you moved."
+    success: "&aRTP complete! You have been safely teleported."
     cooldown: "&cYou must wait &f%time%&c before using RTP again."
     failed: "&cCould not find a safe RTP location. Please try again."
     not-allowed: "&cRTP is not allowed in this world."
