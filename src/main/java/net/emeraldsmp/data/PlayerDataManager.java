@@ -43,11 +43,12 @@ public final class PlayerDataManager {
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
             long firstJoin = yaml.getLong("first-join", System.currentTimeMillis());
             long balance = Math.max(0L, yaml.getLong("balance", plugin.getConfigManager().getConfig().getLong("economy.starting-balance", 0L)));
-            data = new PlayerData(uuid, username == null ? yaml.getString("username", "Unknown") : username, firstJoin, System.currentTimeMillis(), balance);
+            long shards = Math.max(0L, yaml.getLong("emerald-shards", 0L));
+            data = new PlayerData(uuid, username == null ? yaml.getString("username", "Unknown") : username, firstJoin, System.currentTimeMillis(), balance, shards);
         } else {
             long now = System.currentTimeMillis();
             long starting = Math.max(0L, plugin.getConfigManager().getConfig().getLong("economy.starting-balance", 0L));
-            data = new PlayerData(uuid, username == null ? "Unknown" : username, now, now, starting);
+            data = new PlayerData(uuid, username == null ? "Unknown" : username, now, now, starting, 0L);
         }
 
         loaded.put(uuid, data);
@@ -56,6 +57,21 @@ public final class PlayerDataManager {
     }
 
     public synchronized PlayerData getLoaded(UUID uuid) { return loaded.get(uuid); }
+
+    public synchronized long getEmeraldShards(UUID uuid) {
+        PlayerData data = loaded.get(uuid);
+        if (data != null) return data.getEmeraldShards();
+        File file = fileFor(uuid);
+        if (!file.exists()) return 0L;
+        return Math.max(0L, YamlConfiguration.loadConfiguration(file).getLong("emerald-shards", 0L));
+    }
+
+    public synchronized void setEmeraldShards(UUID uuid, long amount) {
+        PlayerData data = loaded.get(uuid);
+        if (data == null) data = loadOrCreate(uuid, null);
+        data.setEmeraldShards(amount);
+        save(data);
+    }
 
     public synchronized void markSeen(Player player) {
         PlayerData data = loadOrCreate(player);
@@ -114,6 +130,7 @@ public final class PlayerDataManager {
         yaml.set("first-join", data.getFirstJoin());
         yaml.set("last-seen", data.getLastSeen());
         yaml.set("balance", data.getBalance());
+        yaml.set("emerald-shards", data.getEmeraldShards());
         yaml.save(target);
     }
 
