@@ -119,6 +119,7 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
                         startAnotherSearch(player,world,u);
                         return;
                     }
+                    if(!pending.containsKey(u))return;
                     Location destination=findSafeAt(world,candidate.getBlockX(),candidate.getBlockZ());
                     if(destination==null){
                         startAnotherSearch(player,world,u);
@@ -133,6 +134,7 @@ public final class RtpCommand implements org.bukkit.command.CommandExecutor, Lis
     }
 
     private void startAnotherSearch(Player player,World world,UUID u){
+        if(!pending.containsKey(u))return;
         if(player==null||!player.isOnline()){
             cancelPending(u,false);
             return;
