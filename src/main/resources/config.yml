@@ -168,6 +168,15 @@ shop:
         purpur_block: {enabled: true, material: PURPUR_BLOCK, display-name: "§dPurpur Block", buy: -1, sell: -1, lore: []}
         ender_chest: {enabled: true, material: ENDER_CHEST, display-name: "§5Ender Chest", buy: -1, sell: -1, lore: []}
 
+    spawners:
+      enabled: true
+      display-name: "§a🧟 Spawners"
+      icon: SPAWNER
+      slot: 16
+      lore: ["§7Custom Emerald SMP spawners"]
+      items:
+        spawner_skeleton: {enabled: true, material: SPAWNER, display-name: "§a🧟 Skeleton Spawner", buy: 1500, sell: 0, lore: ["§7Price: §a1,500 Emerald Shards", "§7Custom stackable spawner", "§7Produces Bones, Arrows and Bows"]}
+
 # /rtp settings.
 # Add world names to the list to allow RTP in those worlds.
 # Empty worlds list = RTP is allowed in every loaded world.
