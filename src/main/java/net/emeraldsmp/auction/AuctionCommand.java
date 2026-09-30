@@ -164,16 +164,21 @@ public final class AuctionCommand implements org.bukkit.command.CommandExecutor,
             EconomyManager eco=plugin.getEconomyManager();
             if(eco.getBalance(buyer.getUniqueId())<l.price()){buyer.sendMessage("§cYou need §6$"+fmt(l.price())+"§c.");return;}
             if(!eco.withdraw(buyer.getUniqueId(),l.price())){buyer.sendMessage("§cPayment could not be reserved.");return;}
+            ItemStack[] snapshot=buyer.getInventory().getStorageContents().clone();
             AuctionManager.Listing removed=manager.remove(id);
             if(removed==null){eco.deposit(buyer.getUniqueId(),l.price());buyer.sendMessage("§cThe listing changed; your money was returned.");return;}
             Map<Integer,ItemStack> extra=buyer.getInventory().addItem(removed.item().clone());
             if(!extra.isEmpty()){
-                removeFromInventory(buyer,removed.item());manager.restore(removed);eco.deposit(buyer.getUniqueId(),removed.price());
+                buyer.getInventory().setStorageContents(snapshot);
+                manager.restore(removed);eco.deposit(buyer.getUniqueId(),removed.price());
                 buyer.sendMessage("§cDelivery failed; your money was returned.");return;
             }
             if(!eco.depositToUuid(removed.seller(),removed.price(),removed.sellerName())){
-                removeFromInventory(buyer,removed.item());manager.restore(removed);eco.deposit(buyer.getUniqueId(),removed.price());
-                buyer.sendMessage("§cSeller payment failed; the purchase was rolled back.");return;
+                boolean restored=manager.restore(removed);
+                if(restored) buyer.getInventory().setStorageContents(snapshot);
+                eco.deposit(buyer.getUniqueId(),removed.price());
+                buyer.sendMessage(restored?"§cSeller payment failed; the purchase was rolled back.":"§cSeller payment failed; your money was returned and the item remains with you.");
+                return;
             }
             buyer.sendMessage("§aPurchased §f"+removed.amount()+"x "+pretty(removed.item().getType())+" §afor §6$"+fmt(removed.price())+"§a.");
             Player seller=Bukkit.getPlayer(removed.seller());if(seller!=null)seller.sendMessage("§aYour AH listing sold for §6$"+fmt(removed.price())+"§a.");
