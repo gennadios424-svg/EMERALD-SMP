@@ -14,18 +14,29 @@ public final class WorthListener implements Listener {
     public void click(InventoryClickEvent e){
         if(!(e.getWhoClicked() instanceof Player p))return;
         if(!isWorth(e.getView().getTitle()))return;
+
         e.setCancelled(true);
-        if(e.getClick()==ClickType.DOUBLE_CLICK||e.getClick()==ClickType.NUMBER_KEY||e.getClick()==ClickType.SWAP_OFFHAND||e.getClick()==ClickType.DROP||e.getClick()==ClickType.CONTROL_DROP)return;
-        if(e.getRawSlot()<0||e.getRawSlot()>=e.getView().getTopInventory().getSize())return;
-        String title=ChatColor.stripColor(e.getView().getTitle());
-        if(title.startsWith("💚 WORTH")) plugin.getWorthManager().click(p,e.getRawSlot());
-        else if(title.startsWith("💚 ")) {
-            if(e.getRawSlot()==22) plugin.getWorthManager().click(p,22);
+
+        if(e.getClick()==ClickType.DOUBLE_CLICK||e.getClick()==ClickType.NUMBER_KEY
+                ||e.getClick()==ClickType.SWAP_OFFHAND||e.getClick()==ClickType.DROP
+                ||e.getClick()==ClickType.CONTROL_DROP)return;
+
+        int topSize=e.getView().getTopInventory().getSize();
+        if(e.getRawSlot()<0||e.getRawSlot()>=topSize)return;
+
+        // Browser is a 54-slot inventory. Info screen is 27 slots.
+        // Route every browser button through WorthManager, including Next/Previous.
+        if(topSize==54){
+            plugin.getWorthManager().click(p,e.getRawSlot());
+        } else if(topSize==27 && e.getRawSlot()==22){
+            plugin.getWorthManager().click(p,22);
         }
     }
 
     @EventHandler(priority=EventPriority.HIGHEST)
-    public void drag(InventoryDragEvent e){if(isWorth(e.getView().getTitle()))e.setCancelled(true);}
+    public void drag(InventoryDragEvent e){
+        if(isWorth(e.getView().getTitle()))e.setCancelled(true);
+    }
 
     private boolean isWorth(String title){
         String t=ChatColor.stripColor(title);
