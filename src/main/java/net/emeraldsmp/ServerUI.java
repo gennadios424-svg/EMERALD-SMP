@@ -52,7 +52,7 @@ public final class ServerUI implements Listener {
     private void setupTab(Player p) {
         int online = Bukkit.getOnlinePlayers().size();
         p.setPlayerListHeaderFooter(
-            "\n" + ChatColor.GREEN + ChatColor.BOLD + "💚 EMERALD SMP" + ChatColor.RESET
+            "\n" + ChatColor.GREEN.toString() + ChatColor.BOLD + "💚 EMERALD SMP" + ChatColor.RESET
                 + ChatColor.DARK_GREEN + "  •  " + ChatColor.GRAY + "Survival Economy",
             ChatColor.DARK_GREEN + "play.emeraldsmp.net" + ChatColor.DARK_GRAY + "  •  "
                 + ChatColor.GRAY + "Online: " + ChatColor.WHITE + online + ChatColor.DARK_GRAY + "  •  "
@@ -72,7 +72,7 @@ public final class ServerUI implements Listener {
         Objective objective = board.getObjective("emerald");
         if (objective == null) {
             objective = board.registerNewObjective("emerald", "dummy",
-                ChatColor.GREEN + ChatColor.BOLD + "💚 EMERALD SMP");
+                ChatColor.GREEN.toString() + ChatColor.BOLD + "💚 EMERALD SMP");
             objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         }
 
@@ -90,7 +90,7 @@ public final class ServerUI implements Listener {
         addLine(objective, previous, ChatColor.GREEN + "👥 Online: " + ChatColor.WHITE + online, 7);
         addLine(objective, previous, ChatColor.GREEN + "⚔ Kills: " + ChatColor.WHITE + kills, 6);
         addLine(objective, previous, ChatColor.DARK_GRAY + " ", 5);
-        addLine(objective, previous, ChatColor.GREEN + ChatColor.BOLD + "SERVER", 4);
+        addLine(objective, previous, ChatColor.GREEN.toString() + ChatColor.BOLD + "SERVER", 4);
         addLine(objective, previous, ChatColor.GRAY + "play.emeraldsmp.net", 3);
         addLine(objective, previous, ChatColor.DARK_GREEN + "────────────", 2);
         addLine(objective, previous, ChatColor.GREEN + "💚 Emerald SMP", 1);
