@@ -115,6 +115,13 @@ public final class DrillManager implements Listener {
         while(s.xp>=req){s.xp-=req;s.level++;if(s.level>plugin.getConfig().getLong("emerald-miner.levels-per-tier",10)&&s.tier<5){s.tier++;s.level=1;}}
         save();
     }
+    private int weightedShardReward(Random rng){
+        int roll=rng.nextInt(100);
+        if(roll<40)return 1;       // 40%
+        if(roll<60)return 2;       // 20%
+        if(roll<75)return 3;       // 15%
+        if(roll<85)return 4;       // 10%
+        return 5;                  // 15%?\n    }
     private void gainerReward(Player p,Stats s){
         long min=Math.max(1,plugin.getConfig().getLong("emerald-miner.gainer.min-blocks",1));
         long max=Math.max(min,plugin.getConfig().getLong("emerald-miner.gainer.max-blocks",128));
@@ -123,7 +130,8 @@ public final class DrillManager implements Listener {
         if(s.gainerProgress>=s.gainerTarget){
             int lo=(int)Math.max(1,plugin.getConfig().getLong("emerald-miner.gainer.min-shards",1));
             int hi=(int)Math.max(lo,plugin.getConfig().getLong("emerald-miner.gainer.max-shards",5));
-            int reward=lo+random.nextInt(hi-lo+1); s.shardsEarned+=reward;s.shardTriggers++; s.gainerProgress=0;s.gainerTarget=min+random.nextLong(max-min+1);
+            int reward=weightedShardReward(random);
+            s.shardsEarned+=reward;s.shardTriggers++; s.gainerProgress=0;s.gainerTarget=min+random.nextLong(max-min+1);
             UUID u=p.getUniqueId();long cur=plugin.getPlayerDataManager().getEmeraldShards(u);
             plugin.getPlayerDataManager().setEmeraldShards(u,cur+reward);
             p.sendMessage(ChatColor.GREEN+"💚 +"+reward+" Emerald Shards");
