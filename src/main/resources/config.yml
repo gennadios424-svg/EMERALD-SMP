@@ -20,6 +20,8 @@ messages:
     cooldown: "&cYou must wait &f%time%&c before using RTP again."
     failed: "&cCould not find a safe RTP location. Please try again."
     not-allowed: "&cRTP is not allowed in this world."
+    homes:
+      countdown: "&aTeleporting to &f%home% &ain &f%time%&a..."
 
 # Curated player shop.
 # buy: -1 means the existing Worth buy value is used automatically.
@@ -165,6 +167,7 @@ shop:
 # Add world names to the list to allow RTP in those worlds.
 # Empty worlds list = RTP is allowed in every loaded world.
 rtp:
+  countdown: 5
   min-distance: 500
   max-distance: 5000
   cooldown: 60
@@ -172,3 +175,9 @@ rtp:
     - world
     - world_nether
     - world_the_end
+
+
+# /homes settings.
+homes:
+  max: 3
+  teleport-countdown: 3
