@@ -23,8 +23,11 @@ public final class ShopManager {
 
     public void reload() { views.clear(); }
 
-    public void openMain(Player p) {
-        Inventory inv = plugin.getServer().createInventory(null, 27, "§2§l💚 EMERALD SMP SHOP");
+    public void openMain(Player p) { openMain(p, false); }
+
+    public void openMain(Player p, boolean sellMode) {
+        Inventory inv = plugin.getServer().createInventory(null, 27,
+                sellMode ? "§2§l💚 EMERALD SMP SELL" : "§2§l💚 EMERALD SMP SHOP");
         int[] categorySlots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 23, 24, 25};
         WorthCategory[] categories = WorthCategory.values();
         for (int i = 0; i < categorySlots.length && i < categories.length; i++) {
@@ -33,7 +36,7 @@ public final class ShopManager {
                     List.of("§7Browse items in this category")));
         }
         inv.setItem(22, icon("BARRIER", "§cClose", List.of()));
-        views.put(p.getUniqueId(), new ShopView(false, null, 0, null));
+        views.put(p.getUniqueId(), new ShopView(sellMode, null, 0, null));
         p.openInventory(inv);
     }
 
