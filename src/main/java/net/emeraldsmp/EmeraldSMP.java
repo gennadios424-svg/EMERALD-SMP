@@ -6,6 +6,7 @@ import net.emeraldsmp.commands.EmeraldCommand;
 import net.emeraldsmp.commands.PayCommand;
 import net.emeraldsmp.commands.RtpCommand;
 import net.emeraldsmp.data.PlayerDataManager;
+import net.emeraldsmp.display.ServerDisplayManager;
 import net.emeraldsmp.listeners.PlayerDataListener;
 import net.emeraldsmp.managers.ConfigManager;
 import net.emeraldsmp.managers.EconomyManager;
@@ -29,6 +30,8 @@ public final class EmeraldSMP extends JavaPlugin {
     private ShopManager shopManager;
     private WorthManager worthManager;
     private WorthListener worthListener;
+    private ServerDisplayManager displayManager;
+    private RtpCommand rtpCommand;
 
     @Override public void onEnable(){try{
         configManager=new ConfigManager(this);
@@ -50,12 +53,18 @@ public final class EmeraldSMP extends JavaPlugin {
         register("shop",new ShopCommand(this),null);
         register("sell",new net.emeraldsmp.shop.SellCommand(this),null);
         register("worth",new WorthCommand(this),new WorthCommand(this));
-        register("rtp",new RtpCommand(this),null);
+        rtpCommand=new RtpCommand(this);
+        register("rtp",rtpCommand,null);
 
         getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
         getServer().getPluginManager().registerEvents(new ShopListener(this),this);
         worthListener=new WorthListener(this);
         getServer().getPluginManager().registerEvents(worthListener,this);
+        getServer().getPluginManager().registerEvents(rtpCommand,this);
+
+        displayManager=new ServerDisplayManager(this);
+        displayManager.start();
+
         getLogger().info("EmeraldSMP has been enabled!");
         getLogger().info("Stage 2A worth database loaded: "+worthManager.all().size()+" supported items.");
     }catch(Exception ex){getLogger().log(Level.SEVERE,"ERROR: EmeraldSMP could not start safely.",ex);getServer().getPluginManager().disablePlugin(this);}}
@@ -76,4 +85,5 @@ public final class EmeraldSMP extends JavaPlugin {
     public EconomyManager getEconomyManager(){return economyManager;}
     public ShopManager getShopManager(){return shopManager;}
     public WorthManager getWorthManager(){return worthManager;}
+    public ServerDisplayManager getDisplayManager(){return displayManager;}
 }
