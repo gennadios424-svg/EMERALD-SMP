@@ -40,6 +40,7 @@ public final class AfkManager {
     }
 
     public boolean isAfk(UUID id) { return afk.getOrDefault(id, false); }
+    public EmeraldSMP getPlugin() { return plugin; }
 
     public void toggle(Player p) {
         if (isAfk(p.getUniqueId())) {
