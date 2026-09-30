@@ -205,7 +205,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     @EventHandler
     public void chat(AsyncPlayerChatEvent e) {
         Player p = e.getPlayer();
-        if (!searchWaiting.remove(p.getUniqueId()).equals("order")) return;
+        String mode = searchWaiting.remove(p.getUniqueId());\n        if (!"order".equals(mode)) return;
         e.setCancelled(true);
         String query = e.getMessage().trim();
         Bukkit.getScheduler().runTask(plugin, () -> {
