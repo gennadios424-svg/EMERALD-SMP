@@ -57,7 +57,7 @@ public final class SpawnerManager implements Listener {
             try{
                 String path="spawners."+key;
                 Data d=new Data(y.getString(path+".world","world"),y.getInt(path+".x"),y.getInt(path+".y"),y.getInt(path+".z"),UUID.fromString(y.getString(path+".owner")));
-                d.bones=y.getLong(path+".drops.bones"); d.arrows=y.getLong(path+".drops.arrows"); d.bows=y.getLong(path+".drops.bows"); d.xp=y.getLong(path+".stored-xp");
+                d.amount=Math.max(1,y.getInt(path+".amount",1)); d.bones=y.getLong(path+".drops.bones"); d.arrows=y.getLong(path+".drops.arrows"); d.bows=y.getLong(path+".drops.bows"); d.xp=y.getLong(path+".stored-xp");
                 d.totalSpawned=y.getLong(path+".statistics.total-spawned"); d.activeMillis=y.getLong(path+".statistics.active-millis"); d.moneyGenerated=y.getLong(path+".statistics.money-generated");
                 d.autoSell=y.getBoolean(path+".auto-sell",true); d.collectXp=y.getBoolean(path+".collect-xp",true);
                 d.bonesEnabled=y.getBoolean(path+".preferences.bones",true); d.arrowsEnabled=y.getBoolean(path+".preferences.arrows",true); d.bowsEnabled=y.getBoolean(path+".preferences.bows",true);
@@ -137,23 +137,57 @@ public final class SpawnerManager implements Listener {
     @EventHandler public void place(BlockPlaceEvent e){
         if(!isSpawnerItem(e.getItemInHand()) || e.getBlockPlaced().getType()!=Material.SPAWNER)return;
         Block b=e.getBlockPlaced(); CreatureSpawner state=(CreatureSpawner)b.getState();
-        state.setSpawnedType(org.bukkit.entity.EntityType.SKELETON); state.setSpawnCount(0); state.setMinSpawnDelay(Integer.MAX_VALUE); state.setMaxSpawnDelay(Integer.MAX_VALUE); state.update(true,false);
-        Data d=new Data(b.getWorld().getName(),b.getX(),b.getY(),b.getZ(),e.getPlayer().getUniqueId()); spawners.put(d.key(),d); save();
+        state.setSpawnedType(org.bukkit.entity.EntityType.SKELETON); state.setSpawnCount(0);
+        state.setMinSpawnDelay(Integer.MAX_VALUE); state.setMaxSpawnDelay(Integer.MAX_VALUE); state.setDelay(Integer.MAX_VALUE);
+        state.getPersistentDataContainer().set(keys.type,PersistentDataType.STRING,TYPE_SKELETON);
+        state.getPersistentDataContainer().set(keys.stack,PersistentDataType.INTEGER,d.amount);
+        state.update(true,false);
+        Data d=new Data(b.getWorld().getName(),b.getX(),b.getY(),b.getZ(),e.getPlayer().getUniqueId()); spawners.put(d.key(),d); markBlock(d); save();
         e.getPlayer().sendMessage(ChatColor.GREEN+"Skeleton Spawner placed.");
     }
 
-    @EventHandler public void interact(PlayerInteractEvent e){
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false) public void interact(PlayerInteractEvent e){
         if(e.getAction()!=Action.RIGHT_CLICK_BLOCK)return;
-        Data d=spawners.get(key(e.getClickedBlock())); if(d==null)return;
+        Block clicked=e.getClickedBlock(); if(clicked==null||clicked.getType()!=Material.SPAWNER)return;
+        Data d=spawners.get(key(clicked)); if(d==null)return;
+        Player p=e.getPlayer();
+        if(isSpawnerItem(e.getItem())){
+            if(!d.owner.equals(p.getUniqueId())&&!p.hasPermission("emerald.admin")){
+                e.setCancelled(true); p.sendMessage(ChatColor.RED+"Only the owner can add to this spawner stack."); return;
+            }
+            e.setCancelled(true);
+            ItemStack hand=e.getItem();
+            if(hand.getAmount()>1) hand.setAmount(hand.getAmount()-1);
+            else if(e.getHand()==EquipmentSlot.OFF_HAND) p.getInventory().setItemInOffHand(null);
+            else p.getInventory().setItemInMainHand(null);
+            d.amount++;
+            markBlock(d); save(); open(p,d);
+            p.sendMessage(ChatColor.GREEN+"Spawner stack increased to "+d.amount+"x.");
+            return;
+        }
         e.setCancelled(true);
-        if(!d.owner.equals(e.getPlayer().getUniqueId())&&!e.getPlayer().hasPermission("emerald.admin")){e.getPlayer().sendMessage(ChatColor.RED+"Only the owner can manage this spawner.");return;}
-        open(e.getPlayer(),d);
+        if(!d.owner.equals(p.getUniqueId())&&!p.hasPermission("emerald.admin")){
+            p.sendMessage(ChatColor.RED+"Only the owner can manage this spawner."); return;
+        }
+        open(p,d);
     }
 
-    @EventHandler public void breakBlock(BlockBreakEvent e){
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false) public void breakBlock(BlockBreakEvent e){
         Data d=spawners.get(key(e.getBlock())); if(d==null)return;
+        Player p=e.getPlayer();
+        if(!d.owner.equals(p.getUniqueId())&&!p.hasPermission("emerald.admin")){
+            e.setCancelled(true); p.sendMessage(ChatColor.RED+"Only the owner can break this spawner."); return;
+        }
         e.setCancelled(true);
-        e.getPlayer().sendMessage(ChatColor.RED+"Use the spawner GUI to pick up this spawner.");
+        e.getBlock().setType(Material.AIR,false);
+        spawners.remove(d.key());
+        give(p,Material.SPAWNER,d.amount);
+        give(p,Material.BONE,d.bones); give(p,Material.ARROW,d.arrows); give(p,Material.BOW,d.bows);
+        if(d.collectXp&&d.xp>0)p.giveExp((int)Math.min(Integer.MAX_VALUE,d.xp));
+        d.bones=d.arrows=d.bows=d.xp=0;
+        openSpawners.values().removeIf(v->v.equals(d.key()));
+        save();
+        p.sendMessage(ChatColor.GREEN+"Skeleton Spawner x"+d.amount+" broken and returned.");
     }
 
     private String key(Block b){return b.getWorld().getName()+":"+b.getX()+":"+b.getY()+":"+b.getZ();}
@@ -170,7 +204,7 @@ public final class SpawnerManager implements Listener {
         inv.setItem(37,item(d.autoSell?Material.EMERALD:Material.REDSTONE,"§f💰 Auto Sell: "+(d.autoSell?"§aON":"§cOFF"),List.of("§7Uses existing /worth values")));
         inv.setItem(39,item(d.collectXp?Material.EXPERIENCE_BOTTLE:Material.GLASS_BOTTLE,"§f✨ XP Collection: "+(d.collectXp?"§aON":"§cOFF"),List.of("§7Stored XP: §f"+d.xp)));
         inv.setItem(41,item(Material.CHEST,"§b📦 Collect Drops",List.of("§7Collect all stored item drops")));
-        inv.setItem(43,item(Material.BOOK,"§f📊 Statistics",List.of("§7Total Spawned: §f"+d.totalSpawned,"§7Time Active: §f"+formatTime(d.activeMillis),"§7Money Generated: §f"+plugin.getEconomyManager().format(d.moneyGenerated))));
+        inv.setItem(43,item(Material.BOOK,"§f📊 Statistics",List.of("§7Stack Amount: §f"+d.amount+"x","§7Total Spawned: §f"+d.totalSpawned,"§7Time Active: §f"+formatTime(d.activeMillis),"§7Money Generated: §f"+plugin.getEconomyManager().format(d.moneyGenerated))));
         inv.setItem(49,item(Material.BARRIER,"§cPickup Spawner",List.of("§7Stored drops and XP will be given to you")));
         openSpawners.put(p.getUniqueId(), d.key());
         p.openInventory(inv);
