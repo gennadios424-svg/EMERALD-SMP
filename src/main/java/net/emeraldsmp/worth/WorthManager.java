@@ -13,7 +13,6 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public final class WorthManager {
     private static final Set<Material> EXCLUDED = EnumSet.of(
@@ -22,7 +21,9 @@ public final class WorthManager {
             Material.COMMAND_BLOCK, Material.CHAIN_COMMAND_BLOCK, Material.REPEATING_COMMAND_BLOCK,
             Material.COMMAND_BLOCK_MINECART, Material.JIGSAW, Material.STRUCTURE_BLOCK,
             Material.STRUCTURE_VOID, Material.END_PORTAL, Material.END_GATEWAY,
-            Material.NETHER_PORTAL, Material.FIRE, Material.SOUL_FIRE
+            Material.NETHER_PORTAL, Material.FIRE, Material.SOUL_FIRE,
+            Material.SPAWNER, Material.END_PORTAL_FRAME, Material.REINFORCED_DEEPSLATE,
+            Material.BUDDING_AMETHYST, Material.TRIAL_SPAWNER, Material.VAULT
     );
     private final EmeraldSMP plugin;
     private final File file;
@@ -48,9 +49,14 @@ public final class WorthManager {
                 Material m=Material.matchMaterial(key);
                 if(m==null||!isSupported(m)){ plugin.getLogger().warning("[Worth] Ignoring invalid/unsupported material: "+key); continue; }
                 Object raw=worth.get(key); long value;
-                try { value=raw instanceof Number n?n.longValue():new BigDecimal(String.valueOf(raw)).longValueExact(); }
+                try { value=new BigDecimal(String.valueOf(raw)).longValueExact(); }
                 catch(Exception ex){ plugin.getLogger().warning("[Worth] Invalid price for "+key+": "+raw+" (previous value kept)"); continue; }
                 if(value<0){plugin.getLogger().warning("[Worth] Negative price for "+key+": "+value+" (previous value kept)");continue;}
+                int stackSize=m.getMaxStackSize();
+                if(stackSize>0 && value>Long.MAX_VALUE/stackSize){
+                    plugin.getLogger().warning("[Worth] Price for "+key+" is too large for safe stack multiplication: "+value+" (previous value kept)");
+                    continue;
+                }
                 String cn=next.getString("categories."+key,defaultCategory(m).name());
                 WorthCategory cat; try{cat=WorthCategory.valueOf(cn.toUpperCase(Locale.ROOT));}catch(Exception ex){cat=defaultCategory(m);}
                 parsed.put(m,new WorthEntry(m,value,cat,next.getBoolean("enabled."+key,true)));
