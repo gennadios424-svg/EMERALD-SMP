@@ -32,11 +32,16 @@ public final class SpawnerManager implements Listener {
 
     private static final class NamespacedKeyHolder {
         final NamespacedKey type;
-        NamespacedKeyHolder(EmeraldSMP plugin) { type = new NamespacedKey(plugin, "emerald-spawner"); }
+        final NamespacedKey stack;
+        NamespacedKeyHolder(EmeraldSMP plugin) {
+            type = new NamespacedKey(plugin, "emerald-spawner");
+            stack = new NamespacedKey(plugin, "emerald-spawner-stack");
+        }
     }
 
     public static final class Data {
         String world; int x,y,z; UUID owner;
+        int amount = 1;
         long bones, arrows, bows, xp, totalSpawned, activeMillis, moneyGenerated, lastCycle;
         boolean autoSell=true, collectXp=true, bonesEnabled=true, arrowsEnabled=true, bowsEnabled=true;
         Data(String world,int x,int y,int z,UUID owner) { this.world=world;this.x=x;this.y=y;this.z=z;this.owner=owner;this.lastCycle=System.currentTimeMillis(); }
@@ -70,7 +75,7 @@ public final class SpawnerManager implements Listener {
         YamlConfiguration y=new YamlConfiguration();
         for(Data d:spawners.values()){
             String p="spawners."+d.key();
-            y.set(p+".world",d.world); y.set(p+".x",d.x); y.set(p+".y",d.y); y.set(p+".z",d.z); y.set(p+".owner",d.owner.toString());
+            y.set(p+".world",d.world); y.set(p+".x",d.x); y.set(p+".y",d.y); y.set(p+".z",d.z); y.set(p+".owner",d.owner.toString()); y.set(p+".amount",d.amount);
             y.set(p+".drops.bones",d.bones); y.set(p+".drops.arrows",d.arrows); y.set(p+".drops.bows",d.bows); y.set(p+".stored-xp",d.xp);
             y.set(p+".auto-sell",d.autoSell); y.set(p+".collect-xp",d.collectXp);
             y.set(p+".preferences.bones",d.bonesEnabled); y.set(p+".preferences.arrows",d.arrowsEnabled); y.set(p+".preferences.bows",d.bowsEnabled);
@@ -80,6 +85,7 @@ public final class SpawnerManager implements Listener {
     }
 
     public void start() {
+        Bukkit.getScheduler().runTask(plugin,this::restoreMarkers);
         taskId=Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin,this::tick,20L,20L);
     }
     public void stop(){if(taskId!=-1)Bukkit.getScheduler().cancelTask(taskId);save();}
@@ -91,7 +97,7 @@ public final class SpawnerManager implements Listener {
             long elapsed=now-d.lastCycle;
             d.activeMillis+=Math.max(0,elapsed); d.lastCycle=now;
             long interval=plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12L)*1000L;
-            int amount=plugin.getConfig().getInt("spawners.skeleton.amount",8);
+            int amount=plugin.getConfig().getInt("spawners.skeleton.amount",8) * Math.max(1,d.amount);
             if(interval<1000)interval=1000; if(amount<1)amount=1;
             int cycles=(int)Math.min(10,elapsed/interval);
             if(cycles<=0)continue;
@@ -127,12 +133,29 @@ public final class SpawnerManager implements Listener {
     public ItemStack createItem(int amount){
         ItemStack item=new ItemStack(Material.SPAWNER,Math.max(1,Math.min(64,amount)));
         ItemMeta meta=item.getItemMeta(); meta.setDisplayName("§a🧟 Skeleton Spawner");
-        meta.setLore(List.of("§7Produces §f" + plugin.getConfig().getInt("spawners.skeleton.amount", 8) + " Skeletons §7every §f" + plugin.getConfig().getLong("spawners.skeleton.interval-seconds", 12) + "s","§7Right-click to configure","§8Emerald SMP"));
+        meta.setLore(List.of("§7Produces §f" + (plugin.getConfig().getInt("spawners.skeleton.amount", 8)*Math.max(1,amount)) + " Skeletons §7every §f" + plugin.getConfig().getLong("spawners.skeleton.interval-seconds", 12) + "s","§7Stack Amount: §f"+amount+"x","§7Right-click to configure","§8Emerald SMP"));
         meta.getPersistentDataContainer().set(keys.type,PersistentDataType.STRING,TYPE_SKELETON);
+        meta.getPersistentDataContainer().set(keys.stack,PersistentDataType.INTEGER,Math.max(1,amount));
         item.setItemMeta(meta); return item;
     }
 
     private boolean isSpawnerItem(ItemStack item){return item!=null&&item.getType()==Material.SPAWNER&&item.hasItemMeta()&&item.getItemMeta().getPersistentDataContainer().has(keys.type,PersistentDataType.STRING);}
+    private int getItemStackAmount(ItemStack item){
+        if(!isSpawnerItem(item)) return 1;
+        Integer v=item.getItemMeta().getPersistentDataContainer().get(keys.stack,PersistentDataType.INTEGER);
+        return v==null?1:Math.max(1,v);
+    }
+    private void markBlock(Data d){
+        Location loc=d.location(); if(loc==null||loc.getBlock().getType()!=Material.SPAWNER)return;
+        CreatureSpawner state=(CreatureSpawner)loc.getBlock().getState();
+        state.setSpawnedType(org.bukkit.entity.EntityType.SKELETON);
+        state.setSpawnCount(0);
+        state.setMinSpawnDelay(Integer.MAX_VALUE); state.setMaxSpawnDelay(Integer.MAX_VALUE); state.setDelay(Integer.MAX_VALUE);
+        state.getPersistentDataContainer().set(keys.type,PersistentDataType.STRING,TYPE_SKELETON);
+        state.getPersistentDataContainer().set(keys.stack,PersistentDataType.INTEGER,d.amount);
+        state.update(true,false);
+    }
+    private void restoreMarkers(){for(Data d:spawners.values())markBlock(d);}
 
     @EventHandler public void place(BlockPlaceEvent e){
         if(!isSpawnerItem(e.getItemInHand()) || e.getBlockPlaced().getType()!=Material.SPAWNER)return;
@@ -142,7 +165,9 @@ public final class SpawnerManager implements Listener {
         state.getPersistentDataContainer().set(keys.type,PersistentDataType.STRING,TYPE_SKELETON);
         state.getPersistentDataContainer().set(keys.stack,PersistentDataType.INTEGER,d.amount);
         state.update(true,false);
-        Data d=new Data(b.getWorld().getName(),b.getX(),b.getY(),b.getZ(),e.getPlayer().getUniqueId()); spawners.put(d.key(),d); markBlock(d); save();
+        Data d=new Data(b.getWorld().getName(),b.getX(),b.getY(),b.getZ(),e.getPlayer().getUniqueId());
+        d.amount=Math.max(1,getItemStackAmount(e.getItemInHand()));
+        spawners.put(d.key(),d); markBlock(d); save();
         e.getPlayer().sendMessage(ChatColor.GREEN+"Skeleton Spawner placed.");
     }
 
@@ -158,8 +183,7 @@ public final class SpawnerManager implements Listener {
             e.setCancelled(true);
             ItemStack hand=e.getItem();
             if(hand.getAmount()>1) hand.setAmount(hand.getAmount()-1);
-            else if(e.getHand()==EquipmentSlot.OFF_HAND) p.getInventory().setItemInOffHand(null);
-            else p.getInventory().setItemInMainHand(null);
+            else hand.setAmount(0);
             d.amount++;
             markBlock(d); save(); open(p,d);
             p.sendMessage(ChatColor.GREEN+"Spawner stack increased to "+d.amount+"x.");
@@ -239,15 +263,18 @@ public final class SpawnerManager implements Listener {
         d.bones=d.arrows=d.bows=0;p.sendMessage(ChatColor.GREEN+"Collected spawner drops.");
     }
 
+    private void giveSpawnerItems(Player p,int amount){
+        int remaining=Math.max(0,amount); while(remaining>0){int n=Math.min(64,remaining); giveItem(p,createItem(n)); remaining-=n;}
+    }
+    private void giveItem(Player p,ItemStack item){Map<Integer,ItemStack> left=p.getInventory().addItem(item);for(ItemStack stack:left.values())p.getWorld().dropItemNaturally(p.getLocation(),stack);}
+
     private void pickup(Player p,Data d){
         collect(p,d); Location l=d.location(); if(l!=null)l.getBlock().setType(Material.AIR);
-        spawners.remove(d.key()); openSpawners.remove(p.getUniqueId()); p.getInventory().addItem(createItem(1)); p.closeInventory(); save();
+        spawners.remove(d.key()); openSpawners.remove(p.getUniqueId()); giveSpawnerItems(p,d.amount); p.closeInventory(); save();
         p.sendMessage(ChatColor.GREEN+"Spawner picked up.");
     }
 
-    private void give(Player p,Material material,long amount){
-        while(amount>0){int n=(int)Math.min(64,amount);Map<Integer,ItemStack> left=p.getInventory().addItem(new ItemStack(material,n));amount-=n;for(ItemStack stack:left.values())p.getWorld().dropItemNaturally(p.getLocation(),stack);}
-    }
+    private void give(Player p,Material material,long amount){while(amount>0){int n=(int)Math.min(64,amount);giveItem(p,new ItemStack(material,n));amount-=n;}}
 
     private String formatTime(long ms){long sec=ms/1000;long h=sec/3600;long m=(sec%3600)/60;long s=sec%60;return h+"h "+m+"m "+s+"s";}
 }
