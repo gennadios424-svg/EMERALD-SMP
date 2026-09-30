@@ -66,12 +66,23 @@ public final class AuctionCommand implements org.bukkit.command.CommandExecutor,
             AuctionManager.Listing x = ls.get(i);
             ItemStack display = x.item().clone();
             ItemMeta m = display.getItemMeta();
-            m.setLore(List.of("§7Amount: §f" + x.amount(),
-                "§7Price: §6" + plugin.getEconomyManager().format(x.price()),
-                "§7Per Item: §6" + formatPerItem(x.price(), x.amount()),
-                "§7Seller: §f" + x.sellerName(), "",
-                x.seller().equals(p.getUniqueId()) ? "§cYou cannot buy your own listing" : "§aClick to purchase"));
-            display.setItemMeta(m); inv.setItem(i - from, display);
+            if (m != null) {
+                List<String> lore = new ArrayList<>();
+                lore.add("");
+                lore.add("§8§m────────────────");
+                lore.add("§a📦 Amount: §f" + x.amount());
+                lore.add("§6💰 Total Price: §f" + plugin.getEconomyManager().format(x.price()));
+                lore.add("§e💵 Per Item: §f" + formatPerItem(x.price(), x.amount()));
+                lore.add("§b👤 Seller: §f" + x.sellerName());
+                lore.add("§8§m────────────────");
+                lore.add("");
+                lore.add(x.seller().equals(p.getUniqueId())
+                    ? "§c§l✖ Your own listing"
+                    : "§a§l➜ Click to purchase");
+                m.setLore(lore);
+                display.setItemMeta(m);
+            }
+            inv.setItem(i - from, display);
         }
         inv.setItem(45, button(Material.NAME_TAG, "§e§lSEARCH", List.of(v.query.isBlank() ? "§7Search item names" : "§7Current: §f" + v.query, "§7Partial names supported")));
         inv.setItem(46, button(Material.HOPPER, "§b§lFILTER: " + v.category.label, List.of("§7Click to cycle categories")));
@@ -141,7 +152,11 @@ public final class AuctionCommand implements org.bukkit.command.CommandExecutor,
 
     private boolean hasInventorySpaceFor(Player p, ItemStack item) {
         int free = 0;
-        for (ItemStack it : p.getInventory().getStorageContents()) { if (it == null || it.getType().isAir()) free += item.getMaxStackSize(); else if (it.isSimilar(item)) free += item.getMaxStackSize() - it.getAmount(); if (free >= item.getAmount()) return true; }
+        for (ItemStack it : p.getInventory().getStorageContents()) {
+            if (it == null || it.getType().isAir()) free += item.getMaxStackSize();
+            else if (it.isSimilar(item)) free += item.getMaxStackSize() - it.getAmount();
+            if (free >= item.getAmount()) return true;
+        }
         return false;
     }
 
