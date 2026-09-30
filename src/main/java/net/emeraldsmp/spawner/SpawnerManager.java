@@ -96,8 +96,13 @@ public final class SpawnerManager implements Listener {
         if(d.bowsEnabled){d.generatedBows+=bows;d.bows+=bows;}
         if(d.collectXp)d.xp+=produced*5L;
         if(d.autoSell){
-            long money=plugin.getWorthManager().value(Material.BONE,(int)Math.min(Integer.MAX_VALUE,bones))+plugin.getWorthManager().value(Material.ARROW,(int)Math.min(Integer.MAX_VALUE,arrows))+plugin.getWorthManager().value(Material.BOW,(int)Math.min(Integer.MAX_VALUE,bows));
-            if(money>0){String username=Bukkit.getOfflinePlayer(d.owner).getName();if(plugin.getEconomyManager().depositToUuid(d.owner,money,username==null?"Unknown":username)){d.moneyGenerated+=money;d.bones-=bones;d.arrows-=arrows;d.bows-=bows;}}
+            long sellBones=d.bonesEnabled?bones:0L;
+            long sellArrows=d.arrowsEnabled?arrows:0L;
+            long sellBows=d.bowsEnabled?bows:0L;
+            long money=plugin.getWorthManager().value(Material.BONE,(int)Math.min(Integer.MAX_VALUE,sellBones))
+                    +plugin.getWorthManager().value(Material.ARROW,(int)Math.min(Integer.MAX_VALUE,sellArrows))
+                    +plugin.getWorthManager().value(Material.BOW,(int)Math.min(Integer.MAX_VALUE,sellBows));
+            if(money>0){String username=Bukkit.getOfflinePlayer(d.owner).getName();if(plugin.getEconomyManager().depositToUuid(d.owner,money,username==null?"Unknown":username)){d.moneyGenerated+=money;d.bones-=sellBones;d.arrows-=sellArrows;d.bows-=sellBows;}}
         }
     }
 
@@ -156,6 +161,7 @@ public final class SpawnerManager implements Listener {
         inv.setItem(21,item(Material.ARROW,"§f🏹 Arrows §a"+d.arrows,List.of("§7Stored drops","§7Generated total: §f"+d.generatedArrows)));
         inv.setItem(23,item(Material.BOW,"§f🏹 Bows §a"+d.bows,List.of("§7Stored drops","§7Generated total: §f"+d.generatedBows)));
         inv.setItem(25,item(Material.EXPERIENCE_BOTTLE,"§d✨ Stored XP §a"+d.xp,List.of("§7Real stored experience")));
+        inv.setItem(27,item(Material.DROPPER,"§e📤 DROP ITEMS",List.of("§7Drop all stored Bones, Arrows and Bows","§7Directly in front of you")));
         inv.setItem(29,item(Material.CHEST,"§a📦 COLLECT DROPS",List.of("§7Collect all stored Bones, Arrows and Bows")));
         inv.setItem(31,item(d.autoSell?Material.EMERALD:Material.REDSTONE,"§f💰 AUTO SELL: "+(d.autoSell?"§aON":"§cOFF"),List.of("§7Generated drops are sold instantly","§7Uses existing /worth values")));
         inv.setItem(33,item(Material.EXPERIENCE_BOTTLE,"§d✨ COLLECT XP",List.of("§7Stored XP: §f"+d.xp,"§7Click to receive it")));
@@ -181,6 +187,7 @@ public final class SpawnerManager implements Listener {
         if(title.equals(TITLE)){
             e.setCancelled(true); Data d=getOpen(p); if(d==null)return;
             switch(e.getRawSlot()){
+                case 27 -> dropItems(p,d);
                 case 29 -> collect(p,d);
                 case 31 -> {d.autoSell=!d.autoSell;open(p,d);}
                 case 33 -> collectXp(p,d);
@@ -203,6 +210,18 @@ public final class SpawnerManager implements Listener {
     }
     private Data getOpen(Player p){String k=openSpawners.get(p.getUniqueId());return k==null?null:spawners.get(k);}
     private void collect(Player p,Data d){give(p,Material.BONE,d.bones);give(p,Material.ARROW,d.arrows);give(p,Material.BOW,d.bows);d.bones=d.arrows=d.bows=0;p.sendMessage(ChatColor.GREEN+"Collected all stored spawner drops.");}
+    private void dropItems(Player p,Data d){
+        Location dropLocation=p.getLocation().clone().add(p.getLocation().getDirection().normalize().multiply(1.5));
+        dropStored(p.getWorld(),dropLocation,Material.BONE,d.bones);
+        dropStored(p.getWorld(),dropLocation,Material.ARROW,d.arrows);
+        dropStored(p.getWorld(),dropLocation,Material.BOW,d.bows);
+        d.bones=d.arrows=d.bows=0;
+        p.sendMessage(ChatColor.GREEN+"Dropped all stored spawner items in front of you.");
+    }
+    private void dropStored(World world,Location location,Material material,long amount){
+        while(amount>0){int n=(int)Math.min(64,amount);world.dropItem(location,new ItemStack(material,n));amount-=n;}
+    }
+
     private void collectXp(Player p,Data d){if(d.xp<=0){p.sendMessage(ChatColor.YELLOW+"This spawner has no stored XP.");return;}p.giveExp((int)Math.min(Integer.MAX_VALUE,d.xp));d.xp=0;p.sendMessage(ChatColor.GREEN+"Collected stored XP.");}
     private void giveSpawnerItems(Player p,int amount){int remaining=Math.max(0,amount);while(remaining>0){int n=Math.min(64,remaining);giveItem(p,createItem(n));remaining-=n;}}
     private void giveItem(Player p,ItemStack item){Map<Integer,ItemStack> left=p.getInventory().addItem(item);for(ItemStack stack:left.values())p.getWorld().dropItemNaturally(p.getLocation(),stack);}
