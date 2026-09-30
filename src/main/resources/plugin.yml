@@ -14,15 +14,9 @@ commands:
   balance:
     description: Shows your Emerald balance
     usage: /balance
-    aliases: [bal, money]
-    permission: emerald.command
-  bal:
-    description: Shows your Emerald balance
-    usage: /bal
-    permission: emerald.command
-  money:
-    description: Shows your Emerald balance
-    usage: /money
+    aliases:
+      - bal
+      - money
     permission: emerald.command
   pay:
     description: Pay another online player
@@ -38,7 +32,7 @@ permissions:
     description: Allows use of Emerald SMP commands
     default: true
   emerald.admin:
-    description: Allows administrative Emerald SMP commands
+    description: Allows administrative economy commands
     default: op
     children:
       emerald.command: true
