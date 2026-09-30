@@ -8,16 +8,14 @@ import org.bukkit.entity.Player;
 
 public final class SellCommand implements CommandExecutor {
     private final EmeraldSMP plugin;
-
     public SellCommand(EmeraldSMP plugin) { this.plugin = plugin; }
 
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("Only players can use /sell.");
             return true;
         }
-        plugin.getShopManager().openMain(player, true);
+        plugin.getShopManager().openSell(player);
         return true;
     }
 }
