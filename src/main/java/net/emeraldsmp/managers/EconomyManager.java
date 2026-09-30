@@ -87,7 +87,27 @@ public final class EconomyManager {
         return data;
     }
 
+    /**
+     * Formats the actual money balance for display only.
+     * The stored value remains a precise long and is never converted to shards.
+     */
     public String format(long amount) {
-        return "💚 " + String.format("%,d", amount) + " Emerald Shards";
+        return plugin.getConfigManager().getConfig().getString("economy.currency-symbol", "$") + formatCompact(amount);
+    }
+
+    /** Visual-only compact money formatter: K, M, B, T. */
+    public String formatCompact(long amount) {
+        final String sign = amount < 0 ? "-" : "";
+        double value = Math.abs((double) amount);
+        String suffix = "";
+        if (value >= 1_000_000_000_000D) { value /= 1_000_000_000_000D; suffix = "T"; }
+        else if (value >= 1_000_000_000D) { value /= 1_000_000_000D; suffix = "B"; }
+        else if (value >= 1_000_000D) { value /= 1_000_000D; suffix = "M"; }
+        else if (value >= 1_000D) { value /= 1_000D; suffix = "K"; }
+
+        if (suffix.isEmpty()) return sign + Long.toString(Math.abs(amount));
+        if (value >= 100D) return sign + String.format(java.util.Locale.US, "%.0f%s", value, suffix);
+        if (value >= 10D) return sign + String.format(java.util.Locale.US, "%.1f%s", value, suffix);
+        return sign + String.format(java.util.Locale.US, "%.2f%s", value, suffix);
     }
 }
