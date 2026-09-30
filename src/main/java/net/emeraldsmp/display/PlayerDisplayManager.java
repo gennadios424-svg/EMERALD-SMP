@@ -25,7 +25,7 @@ public final class PlayerDisplayManager {
             "§r",
             "§6💰 Money: §f$"+String.format("%,d",plugin.getEconomyManager().getBalance(p.getUniqueId())),
             "§a👥 Players: §f"+Bukkit.getOnlinePlayers().size(),
-            "§c⚔ Kills: §f"+kills",
+            "§c⚔ Kills: §f"+kills,
             "§r§7play.emeraldsmp.net"
         };
         int score=lines.length;
