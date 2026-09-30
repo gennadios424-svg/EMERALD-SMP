@@ -1,8 +1,8 @@
 name: EmeraldSMP
-version: '1.1'
+version: '1.2'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP economy, worth database, shop, RTP, orders and coin flips
+description: Emerald SMP economy, worth database, shop, RTP, orders, coin flips, auction house and homes
 commands:
   emerald:
     description: Emerald SMP foundation command
@@ -48,6 +48,18 @@ commands:
   ah:
     description: Opens the Auction House
     usage: /ah [sell]
+    permission: emerald.command
+  sethome:
+    description: Save your current location as a home
+    usage: /sethome [name]
+    permission: emerald.command
+  home:
+    description: Open your homes or teleport to a named home
+    usage: /home [name]
+    permission: emerald.command
+  delhome:
+    description: Delete a saved home
+    usage: /delhome <name>
     permission: emerald.command
 permissions:
   emerald.command:
