@@ -40,7 +40,8 @@ public final class WorthListener implements Listener {
                 || e.getClick() == ClickType.SWAP_OFFHAND || e.getClick() == ClickType.DROP
                 || e.getClick() == ClickType.CONTROL_DROP) return;
 
-        plugin.getWorthManager().click(p, slot);
+        if (info && slot != 22) { plugin.getWorthManager().click(p, slot); }
+        else plugin.getWorthManager().click(p, slot);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
