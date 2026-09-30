@@ -20,79 +20,55 @@ public final class WorthListener implements Listener {
     private final EmeraldSMP plugin;
     private final Map<UUID, Boolean> waitingForSearch = new ConcurrentHashMap<>();
 
-    public WorthListener(EmeraldSMP plugin) {
-        this.plugin = plugin;
-    }
+    public WorthListener(EmeraldSMP plugin) { this.plugin = plugin; }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void click(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-
         String title = ChatColor.stripColor(e.getView().getTitle());
-        boolean browser = title.startsWith("💚 WORTH");
-        boolean info = e.getView().getTopInventory().getSize() == 27
-                && title.startsWith("💚 ")
-                && e.getRawSlot() == 22;
+        if (!title.startsWith("💚 WORTH")) return;
 
-        if (!browser && !info) return;
+        int slot = e.getRawSlot();
+        int topSize = e.getView().getTopInventory().getSize();
+        if (slot < 0 || slot >= topSize) return;
 
         e.setCancelled(true);
 
-        if (e.getClick() == ClickType.DOUBLE_CLICK
-                || e.getClick() == ClickType.NUMBER_KEY
-                || e.getClick() == ClickType.SWAP_OFFHAND
-                || e.getClick() == ClickType.DROP
-                || e.getClick() == ClickType.CONTROL_DROP) {
-            return;
-        }
-
-        int topSize = e.getView().getTopInventory().getSize();
-        int slot = e.getRawSlot();
-        if (slot < 0 || slot >= topSize) return;
+        if (e.getClick() == ClickType.DOUBLE_CLICK || e.getClick() == ClickType.NUMBER_KEY
+                || e.getClick() == ClickType.SWAP_OFFHAND || e.getClick() == ClickType.DROP
+                || e.getClick() == ClickType.CONTROL_DROP) return;
 
         plugin.getWorthManager().click(p, slot);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void drag(InventoryDragEvent e) {
         String title = ChatColor.stripColor(e.getView().getTitle());
-        if (title.startsWith("💚 WORTH") || title.startsWith("💚 ")) {
-            e.setCancelled(true);
-        }
+        if (title.startsWith("💚 WORTH")) e.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void searchChat(AsyncPlayerChatEvent e) {
         UUID id = e.getPlayer().getUniqueId();
         if (waitingForSearch.remove(id) == null) return;
-
         e.setCancelled(true);
         String query = e.getMessage().trim();
         Player p = e.getPlayer();
-
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (query.equalsIgnoreCase("cancel")) {
                 plugin.getMessageService().send(p, "&7Search cancelled.");
                 plugin.getWorthManager().reopenCurrent(p);
-                return;
-            }
-            plugin.getWorthManager().searchCurrent(p, query);
+            } else plugin.getWorthManager().searchCurrent(p, query);
         });
     }
 
     public void beginSearch(Player p) {
         waitingForSearch.put(p.getUniqueId(), true);
-        plugin.getMessageService().send(
-                p,
-                "&eType an item name in chat to search the Worth database. Type &fcancel &eto stop."
-        );
+        plugin.getMessageService().send(p, "&eType an item name in chat to search the Worth database. Type &fcancel &eto stop.");
     }
 
     @EventHandler
     public void close(InventoryCloseEvent e) {
-        // Keep Worth ViewState when switching between browser/info/page inventories.
-        // openInventory() can fire InventoryCloseEvent for the old screen, and
-        // clearing state here breaks Previous/Next navigation.
         waitingForSearch.remove(e.getPlayer().getUniqueId());
     }
 }
