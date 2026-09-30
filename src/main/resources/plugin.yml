@@ -1,8 +1,8 @@
 name: EmeraldSMP
-version: '1.0'
+version: '1.1'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP economy, worth database and shop
+description: Emerald SMP economy, worth database, shop, RTP, orders and coin flips
 commands:
   emerald:
     description: Emerald SMP foundation command
@@ -36,6 +36,14 @@ commands:
   rtp:
     description: Teleports you to a random safe location
     usage: /rtp
+    permission: emerald.command
+  order:
+    description: Opens player-to-player item orders
+    usage: /order
+    permission: emerald.command
+  cf:
+    description: Opens coin flip
+    usage: /cf
     permission: emerald.command
 permissions:
   emerald.command:
