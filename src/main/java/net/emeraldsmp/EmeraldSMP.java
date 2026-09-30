@@ -26,6 +26,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private RtpCommand rtpCommand;
     private ServerUI serverUI;
     private AuctionManager auctionManager;
+    private HomeCommand homeCommand;
 
     @Override public void onEnable() {
         try {
@@ -48,6 +49,10 @@ public final class EmeraldSMP extends JavaPlugin {
             CoinFlipCommand cf=new CoinFlipCommand(this);register("cf",cf,null);
             auctionManager=new AuctionManager(this);
             AuctionCommand ah=new AuctionCommand(this,auctionManager);register("ah",ah,null);
+            homeCommand=new HomeCommand(this);
+            register("sethome",homeCommand,homeCommand);
+            register("home",homeCommand,homeCommand);
+            register("delhome",homeCommand,homeCommand);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
             getServer().getPluginManager().registerEvents(new ShopListener(this),this);
@@ -56,6 +61,7 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(order,this);
             getServer().getPluginManager().registerEvents(cf,this);
             getServer().getPluginManager().registerEvents(ah,this);
+            getServer().getPluginManager().registerEvents(homeCommand,this);
 
             serverUI=new ServerUI(this);
             getServer().getPluginManager().registerEvents(serverUI,this);
