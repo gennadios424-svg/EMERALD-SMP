@@ -151,6 +151,7 @@ public final class HomeCommand implements org.bukkit.command.CommandExecutor, or
         cancelTeleport(u, false);
         int seconds = Math.max(1, plugin.getConfig().getInt("homes.teleport-countdown", 3));
         countdownStarts.put(u, p.getLocation().clone());
+        plugin.getMessageService().sendRaw(p, "&e⚠ &cDon't move while teleporting!");
 
         BukkitTask task = new org.bukkit.scheduler.BukkitRunnable() {
             int remaining = seconds;
@@ -188,7 +189,7 @@ public final class HomeCommand implements org.bukkit.command.CommandExecutor, or
                     "&aTeleporting to &f%home% &ain &f%time%&a...")
                     .replace("%home%", key)
                     .replace("%time%", String.valueOf(remaining));
-                player.sendActionBar(msg);
+                player.sendActionBar(plugin.getMessageService().color(msg));
                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, .7f, 1f + remaining * .08f);
                 remaining--;
             }
@@ -240,7 +241,7 @@ public final class HomeCommand implements org.bukkit.command.CommandExecutor, or
 
         if (notify) {
             Player p = Bukkit.getPlayer(u);
-            if (p != null) p.sendMessage("§cHome teleport cancelled because you moved.");
+            if (p != null) p.sendMessage("§cTeleport cancelled because you moved.");
         }
     }
 
