@@ -31,6 +31,12 @@ public final class WorthManager {
     public void click(Player p,int slot){
         ViewState s=views.get(p.getUniqueId());
         if(s==null)return;
+        String openTitle=org.bukkit.ChatColor.stripColor(p.getOpenInventory().getTitle());
+        if(openTitle.startsWith("💚 WORTH INFO") && slot==22){
+            openBrowser(p,s.query,s.page,s.filter,s.sort);
+            return;
+        }
+        if(openTitle.startsWith("💚 WORTH INFO")) return;
         if(slot>=0&&slot<45){
             int idx=s.page*45+slot;
             if(idx>=0&&idx<s.results.size()){
