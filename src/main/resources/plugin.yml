@@ -2,7 +2,7 @@ name: EmeraldSMP
 version: '1.0'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP economy and shop
+description: Emerald SMP economy, worth database and shop
 commands:
   emerald:
     description: Emerald SMP foundation command
@@ -24,6 +24,10 @@ commands:
   shop:
     description: Opens the Emerald SMP shop
     usage: /shop
+    permission: emerald.command
+  worth:
+    description: Opens the Emerald SMP item worth browser
+    usage: /worth [search]
     permission: emerald.command
 permissions:
   emerald.command:
