@@ -25,6 +25,10 @@ commands:
     description: Opens the Emerald SMP shop
     usage: /shop
     permission: emerald.command
+  sell:
+    description: Opens the Emerald SMP sell menu
+    usage: /sell
+    permission: emerald.command
   worth:
     description: Opens the Emerald SMP item worth browser
     usage: /worth [search]
