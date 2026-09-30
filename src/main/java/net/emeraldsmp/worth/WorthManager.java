@@ -89,6 +89,20 @@ public final class WorthManager {
         openBrowser(p, s.query, s.page, s.filter, s.sort);
     }
 
+    public long sellValue(Material material, int amount) {
+        WorthEntry entry = entries.get(material);
+        if (entry == null || !entry.enabled() || amount < 0) return 0;
+        double multiplier = plugin.getConfig().getDouble("economy.sell-multiplier", 0.50D);
+        multiplier = Math.max(0D, multiplier);
+        return (long) Math.floor(entry.worth() * amount * multiplier);
+    }
+
+    public long buyValue(Material material, int amount) {
+        WorthEntry entry = entries.get(material);
+        if (entry == null || !entry.enabled() || amount < 0) return 0;
+        return Math.multiplyExact(entry.worth(), (long) amount);
+    }
+
     public void clear(Player p){views.remove(p.getUniqueId());}
     private Comparator<WorthEntry> comparator(WorthSort sort){return switch(sort){case NAME_ASC->Comparator.comparing(e->pretty(e.material()),String.CASE_INSENSITIVE_ORDER);case WORTH_ASC->Comparator.comparingLong(WorthEntry::worth).thenComparing(e->pretty(e.material()),String.CASE_INSENSITIVE_ORDER);case WORTH_DESC->Comparator.comparingLong(WorthEntry::worth).reversed().thenComparing(e->pretty(e.material()),String.CASE_INSENSITIVE_ORDER);case CATEGORY->Comparator.comparing((WorthEntry e)->e.category().displayName(),String.CASE_INSENSITIVE_ORDER).thenComparing(e->pretty(e.material()),String.CASE_INSENSITIVE_ORDER);};}
     private ItemStack display(WorthEntry e,boolean info){ItemStack i=new ItemStack(e.material());ItemMeta m=i.getItemMeta();m.setDisplayName("§f"+pretty(e.material()));m.setLore(List.of("§aWorth: §f$"+e.worth()+" §7/ item","§7Category: §f"+e.category().displayName(),"§7Stack Worth: §f$"+e.stackWorth(),info?"":"§8Click for more information"));i.setItemMeta(m);return i;}
