@@ -22,7 +22,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     public OrderCommand(EmeraldSMP plugin){this.plugin=plugin;}
     @Override public boolean onCommand(org.bukkit.command.CommandSender s, org.bukkit.command.Command c,String l,String[] a){
         if(!(s instanceof Player p)){s.sendMessage("Only players can use /order.");return true;}
-        if(a.length==1 && a[0].equalsIgnoreCase("cancel")){creating.remove(p.getUniqueId());p.sendMessage("§cOrder creation cancelled.");return true;}
+        if(a.length==1 && a[0].equalsIgnoreCase("cancel")){p.sendMessage("§cOrder creation cancelled.");return true;}
         if(a.length==4 && a[0].equalsIgnoreCase("create")){
             Material m=Material.matchMaterial(a[1]);
             int amount=parseInt(a[2]); long price=plugin.getEconomyManager().parseAmount(a[3]);
