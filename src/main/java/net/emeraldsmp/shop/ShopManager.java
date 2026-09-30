@@ -21,12 +21,12 @@ public final class ShopManager {
     public static final String SELL_GUI = "sell_gui";
 
     private static final int ITEMS_PER_PAGE = 45;
-    private static final int[] CATEGORY_SLOTS = {10, 11, 12, 13, 14, 15};
-    private static final String[] CATEGORY_KEYS = {"blocks", "cpvp", "redstone", "food", "farm", "end"};
-    private static final String[] CATEGORY_NAMES = {"§a🧱 Blocks", "§c⚔ CPVP", "§c🔴 Redstone", "§6🍖 Food", "§2🌾 Farm", "§5🟢 End"};
+    private static final int[] CATEGORY_SLOTS = {10, 11, 12, 13, 14, 15, 16};
+    private static final String[] CATEGORY_KEYS = {"blocks", "cpvp", "redstone", "food", "farm", "end", "spawners"};
+    private static final String[] CATEGORY_NAMES = {"§a🧱 Blocks", "§c⚔ CPVP", "§c🔴 Redstone", "§6🍖 Food", "§2🌾 Farm", "§5🟢 End", "§a🧟 Spawners"};
     private static final Material[] CATEGORY_ICONS = {
             Material.STONE, Material.NETHERITE_SWORD, Material.REDSTONE,
-            Material.COOKED_BEEF, Material.WHEAT, Material.ENDER_CHEST
+            Material.COOKED_BEEF, Material.WHEAT, Material.ENDER_CHEST, Material.SPAWNER
     };
 
     private final EmeraldSMP plugin;
@@ -77,7 +77,8 @@ public final class ShopManager {
 
     public void openItem(Player p, ShopItem item, String categoryKey, int page) {
         Inventory inv = plugin.getServer().createInventory(null, 27, "§2§l💚 BUY ITEM");
-        ItemStack display = new ItemStack(item.material());
+        ItemStack display = item.key().equalsIgnoreCase("spawner_skeleton")
+                ? plugin.getSpawnerManager().createItem(1) : new ItemStack(item.material());
         ItemMeta meta = display.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(item.displayName());
@@ -225,6 +226,7 @@ public final class ShopManager {
 
     public boolean buy(Player p, ShopItem item, int qty) {
         if (qty <= 0 || item == null) return false;
+        if (item.key().equalsIgnoreCase("spawner_skeleton")) return buySpawnerWithShards(p, qty);
         long unit = item.buyPrice();
         if (unit <= 0) return false;
         long total;
@@ -240,6 +242,20 @@ public final class ShopManager {
         Map<Integer, ItemStack> left = p.getInventory().addItem(new ItemStack(item.material(), qty));
         if (!left.isEmpty()) {
             plugin.getEconomyManager().deposit(p.getUniqueId(), total);
+            return false;
+        }
+        return true;
+    }
+
+    private boolean buySpawnerWithShards(Player p, int qty) {
+        long total;
+        try { total = Math.multiplyExact(1500L, (long) qty); }
+        catch (ArithmeticException ex) { return false; }
+        if (qty > 64 || !hasSpace(p, Material.SPAWNER, 1)) return false;
+        if (!plugin.getPlayerDataManager().withdrawEmeraldShards(p.getUniqueId(), total)) return false;
+        Map<Integer, ItemStack> left = p.getInventory().addItem(plugin.getSpawnerManager().createItem(qty));
+        if (!left.isEmpty()) {
+            plugin.getPlayerDataManager().setEmeraldShards(p.getUniqueId(), plugin.getPlayerDataManager().getEmeraldShards(p.getUniqueId()) + total);
             return false;
         }
         return true;
@@ -288,7 +304,8 @@ public final class ShopManager {
     }
 
     private ItemStack shopDisplay(ShopItem item) {
-        ItemStack stack = new ItemStack(item.material());
+        ItemStack stack = item.key().equalsIgnoreCase("spawner_skeleton")
+                ? plugin.getSpawnerManager().createItem(1) : new ItemStack(item.material());
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             List<String> lore = new ArrayList<>();
