@@ -19,7 +19,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 public final class AfkListener implements Listener {
     private final AfkManager manager;
     public AfkListener(AfkManager manager) { this.manager = manager; }
-    private net.emeraldsmp.EmeraldSMP managerPlugin() { try { java.lang.reflect.Field f=AfkManager.class.getDeclaredField("plugin"); f.setAccessible(true); return (net.emeraldsmp.EmeraldSMP) f.get(manager); } catch(Exception ex) { throw new IllegalStateException(ex); } }
 
     @EventHandler public void join(PlayerJoinEvent e) { manager.join(e.getPlayer()); }
     @EventHandler public void quit(PlayerQuitEvent e) { manager.quit(e.getPlayer()); }
@@ -35,7 +34,7 @@ public final class AfkListener implements Listener {
     }
 
     @EventHandler(priority=EventPriority.MONITOR, ignoreCancelled=true)
-    public void chat(AsyncPlayerChatEvent e) { org.bukkit.Bukkit.getScheduler().runTask(managerPlugin(), () -> manager.touch(e.getPlayer())); }
+    public void chat(AsyncPlayerChatEvent e) { org.bukkit.Bukkit.getScheduler().runTask(manager.getPlugin(), () -> manager.touch(e.getPlayer())); }
 
     @EventHandler(priority=EventPriority.MONITOR, ignoreCancelled=true)
     public void command(PlayerCommandPreprocessEvent e) { if (e.getMessage().equalsIgnoreCase("/afk") || e.getMessage().toLowerCase().startsWith("/afk ")) return; manager.touch(e.getPlayer()); }
