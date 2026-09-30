@@ -20,17 +20,20 @@ public final class ShopListener implements Listener {
     public void click(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         String title = ChatColor.stripColor(e.getView().getTitle());
-        if (!title.contains("EMERALD SMP SHOP") && !title.startsWith("💚 SHOP") && !title.startsWith("💚 SELL")
+        if (!title.contains("EMERALD SMP SHOP") && !title.contains("EMERALD SMP SELL") && !title.startsWith("💚 SHOP") && !title.startsWith("💚 SELL")
                 && !title.equals("💚 BUY ITEM") && !title.equals("💚 SELL ITEM")) return;
 
         e.setCancelled(true);
         int slot = e.getRawSlot();
         if (slot < 0 || slot >= e.getView().getTopInventory().getSize()) return;
 
-        if (title.contains("EMERALD SMP SHOP")) {
+        if (title.contains("EMERALD SMP SHOP") || title.contains("EMERALD SMP SELL")) {
             if (slot == 22) { p.closeInventory(); return; }
             WorthCategory category = categoryAt(slot);
-            if (category != null) plugin.getShopManager().openCategory(p, category, 0, false);
+            if (category != null) {
+                boolean sellMode = title.contains("EMERALD SMP SELL");
+                plugin.getShopManager().openCategory(p, category, 0, sellMode);
+            }
             return;
         }
 
@@ -38,7 +41,7 @@ public final class ShopListener implements Listener {
         if (view == null) return;
 
         if (title.startsWith("💚 SHOP") || title.startsWith("💚 SELL")) {
-            if (slot == 45) { plugin.getShopManager().openMain(p); return; }
+            if (slot == 45) { plugin.getShopManager().openMain(p, view.sellMode()); return; }
             if (slot == 53) { p.closeInventory(); return; }
             if (slot == 48 && view.page() > 0) {
                 plugin.getShopManager().openCategory(p, view.category(), view.page() - 1, view.sellMode());
@@ -87,7 +90,7 @@ public final class ShopListener implements Listener {
     @EventHandler
     public void drag(InventoryDragEvent e) {
         String title = ChatColor.stripColor(e.getView().getTitle());
-        if (title.contains("EMERALD SMP SHOP") || title.startsWith("💚 SHOP")
+        if (title.contains("EMERALD SMP SHOP") || title.contains("EMERALD SMP SELL") || title.startsWith("💚 SHOP")
                 || title.startsWith("💚 SELL") || title.equals("💚 BUY ITEM") || title.equals("💚 SELL ITEM")) {
             e.setCancelled(true);
         }
