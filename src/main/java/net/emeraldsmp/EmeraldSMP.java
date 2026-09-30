@@ -4,6 +4,7 @@ import net.emeraldsmp.commands.BalanceCommand;
 import net.emeraldsmp.commands.EcoCommand;
 import net.emeraldsmp.commands.EmeraldCommand;
 import net.emeraldsmp.commands.PayCommand;
+import net.emeraldsmp.commands.RtpCommand;
 import net.emeraldsmp.data.PlayerDataManager;
 import net.emeraldsmp.listeners.PlayerDataListener;
 import net.emeraldsmp.managers.ConfigManager;
@@ -49,6 +50,7 @@ public final class EmeraldSMP extends JavaPlugin {
         register("shop",new ShopCommand(this),null);
         register("sell",new net.emeraldsmp.shop.SellCommand(this),null);
         register("worth",new WorthCommand(this),new WorthCommand(this));
+        register("rtp",new RtpCommand(this),null);
 
         getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
         getServer().getPluginManager().registerEvents(new ShopListener(this),this);
