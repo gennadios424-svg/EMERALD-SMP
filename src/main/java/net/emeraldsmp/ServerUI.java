@@ -11,6 +11,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
+
 import java.util.*;
 
 public final class ServerUI implements Listener {
@@ -32,6 +33,7 @@ public final class ServerUI implements Listener {
         for (Player p : Bukkit.getOnlinePlayers()) {
             p.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
             p.setPlayerListHeaderFooter("", "");
+            p.setPlayerListName(p.getName());
         }
         boards.clear();
         oldEntries.clear();
@@ -48,15 +50,16 @@ public final class ServerUI implements Listener {
     }
 
     private void setupTab(Player p) {
+        int online = Bukkit.getOnlinePlayers().size();
         p.setPlayerListHeaderFooter(
-            ChatColor.DARK_GREEN + "" + ChatColor.BOLD + "💚 EMERALD SMP",
-            ChatColor.GRAY + "Player: " + ChatColor.WHITE + p.getName()
-                + ChatColor.DARK_GRAY + "  •  " + ChatColor.GRAY + "Online: "
-                + ChatColor.WHITE + Bukkit.getOnlinePlayers().size()
-                + ChatColor.DARK_GRAY + "  •  " + ChatColor.GRAY + "Ping: "
-                + ChatColor.WHITE + p.getPing() + "ms"
+            "\n" + ChatColor.GREEN + ChatColor.BOLD + "💚 EMERALD SMP" + ChatColor.RESET
+                + ChatColor.DARK_GREEN + "  •  " + ChatColor.GRAY + "Survival Economy",
+            ChatColor.DARK_GREEN + "play.emeraldsmp.net" + ChatColor.DARK_GRAY + "  •  "
+                + ChatColor.GRAY + "Online: " + ChatColor.WHITE + online + ChatColor.DARK_GRAY + "  •  "
+                + ChatColor.GRAY + "Your Ping: " + ChatColor.WHITE + p.getPing() + "ms" + "\n"
         );
-        p.setPlayerListName(ChatColor.GREEN + p.getName() + ChatColor.DARK_GRAY + " • " + ChatColor.GRAY + p.getPing() + "ms");
+        p.setPlayerListName(ChatColor.GREEN + "💚 " + ChatColor.WHITE + p.getName()
+            + ChatColor.DARK_GRAY + "  •  " + ChatColor.GRAY + p.getPing() + "ms");
     }
 
     private void updateAll() {
@@ -66,21 +69,32 @@ public final class ServerUI implements Listener {
     private void update(Player p) {
         setupTab(p);
         Scoreboard board = boards.computeIfAbsent(p.getUniqueId(), k -> Bukkit.getScoreboardManager().getNewScoreboard());
-        Objective old = board.getObjective("emerald");
-        if (old == null) {
-            old = board.registerNewObjective("emerald", "dummy", ChatColor.DARK_GREEN + "" + ChatColor.BOLD + "💚 EMERALD SMP");
-            old.setDisplaySlot(DisplaySlot.SIDEBAR);
+        Objective objective = board.getObjective("emerald");
+        if (objective == null) {
+            objective = board.registerNewObjective("emerald", "dummy",
+                ChatColor.GREEN + ChatColor.BOLD + "💚 EMERALD SMP");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         }
+
         Set<String> previous = oldEntries.computeIfAbsent(p.getUniqueId(), k -> new HashSet<>());
         for (String entry : previous) board.resetScores(entry);
         previous.clear();
 
-        addLine(old, previous, ChatColor.GRAY + "Server Information", 6);
-        addLine(old, previous, ChatColor.GREEN + "💰 Money: " + ChatColor.WHITE + plugin.getEconomyManager().format(plugin.getEconomyManager().getBalance(p.getUniqueId())), 5);
-        addLine(old, previous, ChatColor.GREEN + "👥 Players: " + ChatColor.WHITE + Bukkit.getOnlinePlayers().size(), 4);
-        addLine(old, previous, ChatColor.GREEN + "⚔ Kills: " + ChatColor.WHITE + p.getStatistic(org.bukkit.Statistic.PLAYER_KILLS), 3);
-        addLine(old, previous, ChatColor.DARK_GRAY + " ", 2);
-        addLine(old, previous, ChatColor.GRAY + "emeraldsmp", 1);
+        int online = Bukkit.getOnlinePlayers().size();
+        long balance = plugin.getEconomyManager().getBalance(p.getUniqueId());
+        String money = plugin.getEconomyManager().format(balance);
+        int kills = p.getStatistic(org.bukkit.Statistic.PLAYER_KILLS);
+
+        addLine(objective, previous, ChatColor.DARK_GREEN + "────────────", 9);
+        addLine(objective, previous, ChatColor.GREEN + "💰 Money: " + ChatColor.WHITE + money, 8);
+        addLine(objective, previous, ChatColor.GREEN + "👥 Online: " + ChatColor.WHITE + online, 7);
+        addLine(objective, previous, ChatColor.GREEN + "⚔ Kills: " + ChatColor.WHITE + kills, 6);
+        addLine(objective, previous, ChatColor.DARK_GRAY + " ", 5);
+        addLine(objective, previous, ChatColor.GREEN + ChatColor.BOLD + "SERVER", 4);
+        addLine(objective, previous, ChatColor.GRAY + "play.emeraldsmp.net", 3);
+        addLine(objective, previous, ChatColor.DARK_GREEN + "────────────", 2);
+        addLine(objective, previous, ChatColor.GREEN + "💚 Emerald SMP", 1);
+
         p.setScoreboard(board);
     }
 
