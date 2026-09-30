@@ -35,7 +35,7 @@ public final class HomeCommand implements org.bukkit.command.CommandExecutor, or
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
         if (!(sender instanceof Player p)) {
-            p.sendMessage("§cOnly players can use home commands.");
+            sender.sendMessage("§cOnly players can use home commands.");
             return true;
         }
         switch (command.getName().toLowerCase(Locale.ROOT)) {
