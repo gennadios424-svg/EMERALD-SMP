@@ -186,3 +186,9 @@ rtp:
 homes:
   max: 3
   teleport-countdown: 3
+
+# Custom Emerald SMP spawners.
+spawners:
+  skeleton:
+    amount: 8
+    interval-seconds: 12
