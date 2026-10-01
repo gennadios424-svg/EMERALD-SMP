@@ -15,18 +15,15 @@ public final class ShopListener implements Listener {
     public void click(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
+            // /sell is a selection/confirmation menu only. The player's inventory is
+            // never used as a drag-and-drop sell container, and nothing sells on open.
+            // Every sale requires selecting an item, selecting a quantity, and pressing
+            // the explicit CONFIRM SALE button.
+            e.setCancelled(true);
             int slot = e.getRawSlot();
-            // Only the five control-row slots are protected. The 45-slot sell area is
-            // a real inventory: normal clicks, shift-clicks, number-key swaps and
-            // drag/drop are intentionally allowed so players can manage their items.
-            if (slot >= 45 || slot < 0) {
-                e.setCancelled(true);
+            if (slot >= 0 && slot < e.getView().getTopInventory().getSize()) {
                 plugin.getShopManager().handleSellClick(p, slot);
-                return;
             }
-            // For clicks originating in the player's bottom inventory, shift-click
-            // transfers into the sell area normally. Do not cancel it.
-            Bukkit.getScheduler().runTask(plugin, () -> plugin.getShopManager().refreshSellDisplay(p));
             return;
         }
 
