@@ -14,6 +14,15 @@ public final class ShopListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void click(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (plugin.getManualSellManager().isOpen(p, e.getView().getTopInventory())) {
+            e.setCancelled(true);
+            int slot = e.getRawSlot();
+            if (slot >= 0 && slot < e.getView().getTopInventory().getSize()) {
+                plugin.getManualSellManager().handleClick(p, slot);
+            }
+            return;
+        }
+
         if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
             int slot = e.getRawSlot();
             // Only the five control-row slots are protected. The 45-slot sell area is
@@ -88,11 +97,15 @@ public final class ShopListener implements Listener {
 
     @EventHandler
     public void close(InventoryCloseEvent e) {
-        if (e.getPlayer() instanceof Player p && plugin.getShopManager().isSellInventory(p, e.getInventory())) plugin.getShopManager().closeSell(p);
+        if (e.getPlayer() instanceof Player p) {
+            if (plugin.getManualSellManager().isOpen(p, e.getInventory())) plugin.getManualSellManager().close(p);
+            else if (plugin.getShopManager().isSellInventory(p, e.getInventory())) plugin.getShopManager().closeSell(p);
+        }
     }
 
     @EventHandler
     public void quit(PlayerQuitEvent e) {
+        plugin.getManualSellManager().close(e.getPlayer());
         plugin.getShopManager().returnSellItems(e.getPlayer());
     }
 
