@@ -11,6 +11,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import java.lang.reflect.Method;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -93,7 +94,7 @@ public final class CombatManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPvPDamage(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Player victim)) return;
-        Player attacker = resolveAttacker(event.getDamager());
+        Player attacker = resolveAttacker(event);
         if (attacker == null || attacker.getUniqueId().equals(victim.getUniqueId())) return;
         if (!attacker.isOnline() || !victim.isOnline()) return;
         tagBoth(attacker, victim);
