@@ -3,6 +3,7 @@ package net.emeraldsmp.crates;
 import org.bukkit.*;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import java.util.*;
 
 public final class CrateCommand implements CommandExecutor,TabCompleter{
@@ -31,11 +32,9 @@ public final class CrateCommand implements CommandExecutor,TabCompleter{
         return true;
     }
     @Override public List<String> onTabComplete(CommandSender sender,Command command,String alias,String[] args){
-        if(labelKey(alias)){}
         if(args.length==1)return List.of("give","place","remove","edit");
         if(args.length==2&&(args[0].equalsIgnoreCase("place")||args[0].equalsIgnoreCase("edit")))return TYPES;
         if(args.length==3&&args[0].equalsIgnoreCase("give"))return TYPES;
         return List.of();
     }
-    private boolean labelKey(String s){return "keyall".equalsIgnoreCase(s);}
 }
