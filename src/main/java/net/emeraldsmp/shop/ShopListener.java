@@ -9,6 +9,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryAction;
 
 public final class ShopListener implements Listener {
     private final EmeraldSMP plugin;
@@ -20,14 +21,22 @@ public final class ShopListener implements Listener {
 
         if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
             int slot = e.getRawSlot();
-            if (slot >= 0 && slot < 54) {
-                if (slot >= 45) {
-                    e.setCancelled(true);
-                    plugin.getShopManager().handleSellClick(p, slot);
-                }
-                // Slots 0-44 are intentionally NOT cancelled: the player must be able
-                // to place and remove items in the sell area.
+
+            // Footer is read-only. Shift-click / hotbar-swap into or out of the
+            // sell inventory is blocked so the transaction can only contain
+            // deliberate items placed in slots 0-44.
+            if (slot >= 45 && slot < 54) {
+                e.setCancelled(true);
+                return;
             }
+            if (e.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
+                    || e.getAction() == InventoryAction.HOTBAR_SWAP
+                    || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD) {
+                e.setCancelled(true);
+                return;
+            }
+            // Normal clicks may move items between the player's inventory and
+            // sell slots 0-44. Bottom-inventory clicks are also allowed.
             return;
         }
 
@@ -95,10 +104,9 @@ public final class ShopListener implements Listener {
     public void drag(InventoryDragEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
-            boolean touchesBottom = e.getRawSlots().stream().anyMatch(s -> s >= e.getView().getTopInventory().getSize());
-            if (e.getRawSlots().stream().anyMatch(s -> s >= 45 && s < 54) || touchesBottom) {
-                e.setCancelled(true);
-            }
+            int topSize = e.getView().getTopInventory().getSize();
+            boolean invalid = e.getRawSlots().stream().anyMatch(s -> s >= topSize || (s >= 45 && s < 54));
+            if (invalid) e.setCancelled(true);
             return;
         }
 
@@ -107,10 +115,12 @@ public final class ShopListener implements Listener {
             e.setCancelled(true);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void close(InventoryCloseEvent e) {
         if (!(e.getPlayer() instanceof Player p)) return;
         if (plugin.getShopManager().isSellInventory(p, e.getInventory())) {
+            // ESC, the close button, or any other normal inventory close is the
+            // confirmation that sells the contents.
             plugin.getShopManager().closeSell(p);
         }
         plugin.getShopManager().view(p);
