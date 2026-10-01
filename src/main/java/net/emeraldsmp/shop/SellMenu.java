@@ -22,9 +22,21 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class SellMenu implements Listener {
-    private static final String TITLE = ChatColor.GOLD + "☀ Sunlight Sell";
+    private static final String TITLE = ChatColor.DARK_GREEN + "💚 EMERALD SELL";
     private static final int INPUT_SLOTS = 45;
     private static final int SELL_SLOT = 49;
+
+    /*
+     * These are visual/control slots only. The actual working sell container
+     * remains the same 54-slot inventory with slots 0-44 used for input.
+     * The frame occupies a few of those input slots, so those exact slots
+     * must be protected without disabling the rest of the container.
+     */
+    private static final int[] PROTECTED_SLOTS = {
+            0, 1, 2, 3, 4, 5, 6, 7, 8,
+            9, 17, 18, 26, 27, 35, 36, 44,
+            45, 46, 47, 48, 49, 50, 51, 52, 53
+    };
 
     private final EmeraldSMP plugin;
 
@@ -48,17 +60,17 @@ public final class SellMenu implements Listener {
     }
 
     private void frame(Inventory inventory) {
-        ItemStack side = item(Material.ORANGE_STAINED_GLASS_PANE, " ");
-        ItemStack accent = item(Material.YELLOW_STAINED_GLASS_PANE, ChatColor.GOLD + "☀");
+        ItemStack dark = item(Material.BLACK_STAINED_GLASS_PANE, " ");
+        ItemStack emerald = item(Material.GREEN_STAINED_GLASS_PANE, ChatColor.GREEN + "💚");
 
         for (int row = 0; row < inventory.getSize() / 9; row++) {
-            inventory.setItem(row * 9, side);
-            inventory.setItem(row * 9 + 8, side);
+            inventory.setItem(row * 9, dark);
+            inventory.setItem(row * 9 + 8, dark);
         }
 
         for (int slot = 0; slot < 9; slot++) {
-            inventory.setItem(slot, accent);
-            inventory.setItem(inventory.getSize() - 9 + slot, accent);
+            inventory.setItem(slot, emerald);
+            inventory.setItem(inventory.getSize() - 9 + slot, emerald);
         }
     }
 
@@ -67,20 +79,20 @@ public final class SellMenu implements Listener {
 
         frame(inventory);
         inventory.setItem(45, item(
-                Material.SUNFLOWER,
-                ChatColor.GOLD + "☀ Sunlight Sell",
+                Material.EMERALD,
+                ChatColor.GREEN + "💚 Emerald Sell",
                 "",
                 ChatColor.GRAY + "Place items in the top 45 slots."
         ));
         inventory.setItem(SELL_SLOT, item(
-                Material.GOLD_INGOT,
+                Material.EMERALD_BLOCK,
                 ChatColor.GREEN + "SELL ALL",
                 "",
                 ChatColor.GRAY + "Shulkers are opened and their contents are sold too."
         ));
         inventory.setItem(53, item(
                 Material.BARRIER,
-                ChatColor.RED + "Close",
+                ChatColor.WHITE + "Close",
                 ChatColor.GRAY + "Items are returned to you."
         ));
 
@@ -144,12 +156,21 @@ public final class SellMenu implements Listener {
         }
 
         player.sendMessage(
-                ChatColor.GREEN + "☀ Sold items for "
+                ChatColor.GREEN + "💚 Sold items for "
                         + ChatColor.GOLD + "$" + money(total)
                         + ChatColor.GREEN + "!"
         );
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.25f);
         player.closeInventory();
+    }
+
+    private boolean isProtectedSlot(int rawSlot) {
+        for (int slot : PROTECTED_SLOTS) {
+            if (slot == rawSlot) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @EventHandler
@@ -170,11 +191,11 @@ public final class SellMenu implements Listener {
             return;
         }
 
-        if (rawSlot >= INPUT_SLOTS) {
+        // Lock only the visual/control slots. Real sell-input slots and the
+        // player's bottom inventory keep the existing working container model.
+        if (isProtectedSlot(rawSlot)) {
             event.setCancelled(true);
         }
-        // Intentionally do not cancel input-area clicks or bottom-inventory
-        // shift-clicks: this is the Sunlight container interaction model.
     }
 
     @EventHandler
@@ -184,7 +205,7 @@ public final class SellMenu implements Listener {
         }
 
         for (int rawSlot : event.getRawSlots()) {
-            if (rawSlot >= INPUT_SLOTS) {
+            if (isProtectedSlot(rawSlot)) {
                 event.setCancelled(true);
                 return;
             }
