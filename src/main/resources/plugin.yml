@@ -35,7 +35,7 @@ commands:
     permission: emerald.command
   setspawn:
     description: Sets the Emerald SMP spawn location
-    usage: /setspawn
+    usage: /setspawn [safe]
   worth:
     description: Opens the Emerald SMP item worth browser
     usage: /worth [search]
