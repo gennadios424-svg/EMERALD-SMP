@@ -10,6 +10,7 @@ import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 import org.bukkit.event.*;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -110,7 +111,7 @@ public final class SpawnerManager implements Listener {
                 plugin.getLogger().warning("Skipped invalid spawner entry: " + k);
             }
         }
-        Bukkit.getScheduler().runTask(plugin, this::refreshLoadedHolograms);
+        Bukkit.getScheduler().runTask(plugin, this::removeAllHolograms);
     }
 
     public synchronized void save() {
@@ -149,7 +150,6 @@ public final class SpawnerManager implements Listener {
             if (cycles <= 0) continue;
             d.lastCycle += cycles * interval;
             produce(d, productionPerCycle(d.type, d.amount), cycles);
-            updateHologram(d);
             changed = true;
         }
         if (changed) save();
@@ -268,7 +268,6 @@ public final class SpawnerManager implements Listener {
         spawners.put(d.key(), d);
         configurePhysicalSpawner(d);
         save();
-        spawnHologram(d);
         open(p, d);
         p.sendMessage("§a🧟 Emerald " + pretty(type) + " Spawner placed.");
     }
@@ -299,7 +298,7 @@ public final class SpawnerManager implements Listener {
             if (added <= 0) { p.sendMessage("§cSpawner stack is already at 64x."); return; }
             d.amount = newAmount;
             e.getItem().setAmount(Math.max(0, e.getItem().getAmount() - 1));
-            configurePhysicalSpawner(d); save(); updateHologram(d); open(p, d);
+            configurePhysicalSpawner(d); save(); open(p, d);
             return;
         }
         if (!canManage(p, d)) { p.sendMessage("§cOnly the spawner owner can manage this spawner."); return; }
@@ -347,6 +346,7 @@ public final class SpawnerManager implements Listener {
         inv.setItem(4, item(iconFor(d.type), "§a§l🧟 " + pretty(d.type) + " SPAWNER", List.of("§7Emerald SMP custom spawner", "§fStack: §a" + d.amount + "x", "§e⚡ Production: §f" + rate + " " + pretty(d.type) + "s / " + (intervalMillis(d.type) / 1000L) + "s")));
         inv.setItem(13, item(Material.CHEST, "§a§l📦 STORED DROPS", storedLore(d)));
         inv.setItem(22, item(Material.EMERALD_BLOCK, "§a§l📦 COLLECT", List.of("§7Collect every stored physical drop", "§7Only items that fit are removed", "§8No auto-sell • No automatic money")));
+        inv.setItem(23, item(Material.CHEST, "§a§l📦 DROP ALL", List.of("§7Drop all stored items into the world", "§7Items appear safely in front of you", "§8Uses normal Minecraft stack sizes")));
         inv.setItem(31, item(Material.COMPARATOR, "§b§l⚙ SETTINGS", List.of("§7Choose which drops are stored", "§8Settings are secondary")));
         inv.setItem(40, item(Material.BARRIER, "§c§l✕ CLOSE", List.of()));
         p.openInventory(inv);
@@ -389,11 +389,101 @@ public final class SpawnerManager implements Listener {
                 moved += before - after;
             }
             save();
-            updateHologram(d);
             open(p, d);
             if (moved > 0) p.sendMessage("§a📦 Collected §f" + fmt(moved) + " §aitem(s).");
             else p.sendMessage("§e📦 Inventory is full; stored drops remain untouched.");
         } finally { collecting.remove(k); }
+    }
+
+    private void dropAll(Player p, Data d) {
+        String k = d.key();
+        if (!collecting.add(k)) {
+            p.sendMessage("§e📦 Spawner transaction already processing.");
+            return;
+        }
+
+        Map<Material, Long> snapshot = new EnumMap<>(Material.class);
+        List<org.bukkit.entity.Item> spawned = new ArrayList<>();
+        try {
+            boolean any = false;
+            for (Material m : defaultDrops(d.type)) {
+                long amount = d.stored.getOrDefault(m, 0L);
+                if (amount > 0) any = true;
+                snapshot.put(m, amount);
+            }
+            if (!any) {
+                p.sendMessage("§e📦 There are no stored drops to release.");
+                return;
+            }
+
+            Location drop = findSafeDropLocation(p);
+            if (drop == null) {
+                p.sendMessage("§c❌ No safe drop location was found in front of you. Nothing was removed.");
+                return;
+            }
+
+            for (Material m : defaultDrops(d.type)) {
+                long left = snapshot.getOrDefault(m, 0L);
+                int max = Math.max(1, m.getMaxStackSize());
+                while (left > 0) {
+                    int amount = (int) Math.min((long) max, left);
+                    org.bukkit.entity.Item entity = p.getWorld().dropItem(drop.clone(), new ItemStack(m, amount));
+                    if (entity == null) throw new IllegalStateException("World rejected item spawn");
+                    spawned.add(entity);
+                    left -= amount;
+                }
+            }
+
+            for (Material m : defaultDrops(d.type)) d.stored.put(m, 0L);
+            if (!save()) {
+                throw new IllegalStateException("Spawner storage could not be saved");
+            }
+
+            p.sendMessage("§a📦 Dropped all stored items in front of you.");
+        } catch (Exception failure) {
+            for (org.bukkit.entity.Item entity : spawned) {
+                if (!entity.isDead()) entity.remove();
+            }
+            for (Map.Entry<Material, Long> entry : snapshot.entrySet()) {
+                d.stored.put(entry.getKey(), entry.getValue());
+            }
+            plugin.getLogger().warning("DROP ALL rolled back for " + d.key() + ": " + failure.getMessage());
+            p.sendMessage("§c❌ DROP ALL failed; stored drops were not removed.");
+        } finally {
+            collecting.remove(k);
+        }
+    }
+
+    private Location findSafeDropLocation(Player p) {
+        World world = p.getWorld();
+        Vector forward = p.getLocation().getDirection().clone();
+        forward.setY(0);
+        if (forward.lengthSquared() < 0.0001) return null;
+        forward.normalize();
+        Vector right = new Vector(-forward.getZ(), 0, forward.getX()).normalize();
+        int baseY = p.getLocation().getBlockY();
+
+        double[] distances = {1.25, 1.5, 1.75, 2.0, 2.25};
+        double[] laterals = {0.0, -0.35, 0.35, -0.65, 0.65};
+        for (double distance : distances) {
+            for (double lateral : laterals) {
+                Vector offset = forward.clone().multiply(distance).add(right.clone().multiply(lateral));
+                int bx = (int) Math.floor(p.getX() + offset.getX());
+                int bz = (int) Math.floor(p.getZ() + offset.getZ());
+                if (!world.isChunkLoaded(bx >> 4, bz >> 4)) continue;
+
+                for (int dy = -1; dy <= 1; dy++) {
+                    int by = baseY + dy;
+                    Block ground = world.getBlockAt(bx, by - 1, bz);
+                    Block feet = world.getBlockAt(bx, by, bz);
+                    Block head = world.getBlockAt(bx, by + 1, bz);
+                    if (!ground.getType().isSolid() || ground.isLiquid()) continue;
+                    if (!feet.isPassable() || !head.isPassable()) continue;
+                    return new Location(world, bx + 0.5, by + 0.15, bz + 0.5);
+                }
+            }
+        }
+        return null;
     }
 
     private long transfer(Player p, Material mat, long amount) {
@@ -425,6 +515,7 @@ public final class SpawnerManager implements Listener {
         if (title.equals(mainTitle(d.type))) {
             switch (e.getRawSlot()) {
                 case 22 -> collect(p, d);
+                case 23 -> dropAll(p, d);
                 case 31 -> settings(p, d);
                 case 40 -> p.closeInventory();
             }
@@ -455,41 +546,19 @@ public final class SpawnerManager implements Listener {
         open.remove(uuid);
     }
 
-    private void spawnHologram(Data d) {
-        Location base = d.holoLoc();
-        if (base == null || base.getWorld() == null || !base.getWorld().isChunkLoaded(d.x >> 4, d.z >> 4)) return;
-        removeHolograms(d);
-        String[] lines = holoLines(d);
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            Location at = base.clone().add(0, -i * 0.27, 0);
-            at.getWorld().spawn(at, ArmorStand.class, stand -> {
-                stand.setInvisible(true); stand.setMarker(true); stand.setGravity(false); stand.setInvulnerable(true); stand.setSilent(true); stand.setCustomNameVisible(true); stand.setCustomName(line);
-                stand.getPersistentDataContainer().set(hologramKey, PersistentDataType.STRING, d.key());
-            });
-        }
-    }
-
-    private String[] holoLines(Data d) {
-        long stored = d.stored.values().stream().mapToLong(Long::longValue).sum();
-        return new String[]{"§a§l🧟 " + pretty(d.type).toUpperCase(Locale.ROOT) + " SPAWNER", "§e⚡ " + productionPerCycle(d.type, d.amount) + " / " + (intervalMillis(d.type) / 1000L) + "s §8• §fStack " + d.amount + "x", "§7📦 Stored Drops: §f" + fmt(stored) + " §8• §f👆 Right-Click"};
-    }
-
-    private void updateHologram(Data d) { spawnHologram(d); }
-
     private void removeHolograms(Data d) {
         World w = Bukkit.getWorld(d.world); if (w == null) return;
         for (Entity entity : new ArrayList<>(w.getEntities())) if (entity instanceof ArmorStand as && d.key().equals(as.getPersistentDataContainer().get(hologramKey, PersistentDataType.STRING))) as.remove();
     }
 
-    private void refreshLoadedHolograms() {
-        for (World w : Bukkit.getWorlds()) for (Entity entity : new ArrayList<>(w.getEntities())) if (entity instanceof ArmorStand as && as.getPersistentDataContainer().has(hologramKey, PersistentDataType.STRING)) as.remove();
-        for (Data d : spawners.values()) spawnHologram(d);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void chunkLoad(org.bukkit.event.world.ChunkLoadEvent e) {
-        for (Data d : spawners.values()) if (d.world.equals(e.getWorld().getName()) && (d.x >> 4) == e.getChunk().getX() && (d.z >> 4) == e.getChunk().getZ()) spawnHologram(d);
+    private void removeAllHolograms() {
+        for (World w : Bukkit.getWorlds()) {
+            for (Entity entity : new ArrayList<>(w.getEntities())) {
+                if (entity instanceof ArmorStand as && as.getPersistentDataContainer().has(hologramKey, PersistentDataType.STRING)) {
+                    as.remove();
+                }
+            }
+        }
     }
 
     private static String normalizeType(String type) { return TYPES.contains(type == null ? "" : type.toLowerCase(Locale.ROOT)) ? type.toLowerCase(Locale.ROOT) : TYPE_SKELETON; }

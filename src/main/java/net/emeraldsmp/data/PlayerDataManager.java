@@ -46,6 +46,7 @@ public final class PlayerDataManager {
             long investmentEarnings = Math.max(0L, yaml.getLong("investment.earnings", 0L));
             boolean autoCollect = yaml.getBoolean("investment.auto-collect", false);
             data = new PlayerData(uuid, username == null ? yaml.getString("username", "Unknown") : username, firstJoin, System.currentTimeMillis(), balance, shards, investment, investmentEarnings, autoCollect);
+            data.setLastIp(yaml.getString("last-ip"));
         } else {
             long now = System.currentTimeMillis();
             long starting = Math.max(0L, plugin.getConfigManager().getConfig().getLong("economy.starting-balance", 0L));
@@ -58,6 +59,47 @@ public final class PlayerDataManager {
     }
 
     public synchronized PlayerData getLoaded(UUID uuid) { return loaded.get(uuid); }
+
+    /**
+     * Resolves a previously known player from Emerald SMP's persistent player-data files.
+     * Returns null when the name has never been recorded by this plugin.
+     */
+    public synchronized UUID resolveUuid(String username) {
+        if (username == null || username.isBlank()) return null;
+        Player online = plugin.getServer().getPlayerExact(username);
+        if (online != null) return online.getUniqueId();
+        String wanted = username.trim();
+        if (dataFolder == null || !dataFolder.isDirectory()) return null;
+        File[] files = dataFolder.listFiles((dir, name) -> name.toLowerCase(java.util.Locale.ROOT).endsWith(".yml"));
+        if (files == null) return null;
+        for (File f : files) {
+            try {
+                UUID uuid = UUID.fromString(f.getName().substring(0, f.getName().length() - 4));
+                YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
+                String stored = y.getString("username");
+                if (stored != null && stored.equalsIgnoreCase(wanted)) return uuid;
+            } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
+    public synchronized String getStoredUsername(UUID uuid) {
+        PlayerData data = loaded.get(uuid);
+        if (data != null && data.getUsername() != null && !data.getUsername().isBlank()) return data.getUsername();
+        File f = fileFor(uuid);
+        if (!f.exists()) return null;
+        String name = YamlConfiguration.loadConfiguration(f).getString("username");
+        return name == null || name.isBlank() ? null : name;
+    }
+
+    public synchronized String getStoredIp(UUID uuid) {
+        PlayerData data = loaded.get(uuid);
+        if (data != null && data.getLastIp() != null) return data.getLastIp();
+        File f = fileFor(uuid);
+        if (!f.exists()) return null;
+        String ip = YamlConfiguration.loadConfiguration(f).getString("last-ip");
+        return ip == null || ip.isBlank() ? null : ip;
+    }
 
     public synchronized long getEmeraldShards(UUID uuid) {
         PlayerData data = loaded.get(uuid);
@@ -133,6 +175,7 @@ public final class PlayerDataManager {
         yaml.set("username", data.getUsername());
         yaml.set("first-join", data.getFirstJoin());
         yaml.set("last-seen", data.getLastSeen());
+        yaml.set("last-ip", data.getLastIp());
         yaml.set("balance", data.getBalance());
         yaml.set("emerald-shards", data.getEmeraldShards());
         yaml.set("investment.amount", data.getInvestment());

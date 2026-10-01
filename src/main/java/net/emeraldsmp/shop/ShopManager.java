@@ -32,6 +32,7 @@ public final class ShopManager {
     private final Map<UUID, ShopView> views = new HashMap<>();
     private final Map<UUID, Inventory> sellInventories = new HashMap<>();
     private final Set<UUID> sellProcessing = new HashSet<>();
+    private final Set<UUID> buyProcessing = new HashSet<>();
 
     public ShopManager(EmeraldSMP plugin) { this.plugin = plugin; }
     public void reload() { views.clear(); }
@@ -202,14 +203,26 @@ public final class ShopManager {
     }
 
     public boolean buy(Player p, ShopItem item, int qty) {
-        if (item == null || qty <= 0 || qty > 64) return false;
-        long total;
-        try { total = Math.multiplyExact(item.buyPrice(), qty); } catch (ArithmeticException ex) { return false; }
-        if (total <= 0 || plugin.getEconomyManager().getBalance(p.getUniqueId()) < total || !hasSpace(p, item.material(), qty)) return false;
-        if (!plugin.getEconomyManager().withdraw(p.getUniqueId(), total)) return false;
-        Map<Integer, ItemStack> left = p.getInventory().addItem(new ItemStack(item.material(), qty));
-        if (!left.isEmpty()) { plugin.getEconomyManager().deposit(p.getUniqueId(), total); return false; }
-        return true;
+        UUID uuid = p.getUniqueId();
+        if (!buyProcessing.add(uuid)) return false;
+        try {
+            if (item == null || qty <= 0 || qty > 64) return false;
+            long total;
+            try { total = Math.multiplyExact(item.buyPrice(), qty); } catch (ArithmeticException ex) { return false; }
+            if (total <= 0 || plugin.getEconomyManager().getBalance(uuid) < total || !hasSpace(p, item.material(), qty)) return false;
+            if (!plugin.getEconomyManager().withdraw(uuid, total)) return false;
+            Map<Integer, ItemStack> left = p.getInventory().addItem(new ItemStack(item.material(), qty));
+            if (!left.isEmpty()) {
+                for (ItemStack leftover : left.values()) {
+                    p.getInventory().removeItem(leftover);
+                }
+                plugin.getEconomyManager().deposit(uuid, total);
+                return false;
+            }
+            return true;
+        } finally {
+            buyProcessing.remove(uuid);
+        }
     }
 
     private List<ShopItem> configuredItems(String key) {
@@ -217,10 +230,11 @@ public final class ShopManager {
         List<ShopItem> out = new ArrayList<>();
         for (Material m : mats) {
             WorthEntry w = plugin.getWorthManager().get(m);
-            if (w == null || !w.enabled()) continue;
+            if (m != Material.END_CRYSTAL && (w == null || !w.enabled())) continue;
+            long sellWorth = w == null ? 0L : w.worth();
             long buy = m == Material.END_CRYSTAL ? 500L : plugin.getWorthManager().buyValue(m, 1);
-            if (buy <= w.worth()) continue;
-            out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT), m, roleStyledName(m), buy, List.of("§7Buy: §a" + plugin.getEconomyManager().format(buy) + " §7/ item", "§7Sell: §a" + plugin.getEconomyManager().format(w.worth()) + " §7/ item", "§8Click for purchase amounts")));
+            if (buy <= sellWorth) continue;
+            out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT), m, roleStyledName(m), buy, List.of("§7Buy: §a" + plugin.getEconomyManager().format(buy) + " §7/ item", "§7Sell: §a" + plugin.getEconomyManager().format(sellWorth) + " §7/ item", "§8Click for purchase amounts")));
         }
         return out;
     }

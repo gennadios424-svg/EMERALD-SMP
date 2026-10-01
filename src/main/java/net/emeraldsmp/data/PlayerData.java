@@ -7,6 +7,7 @@ public final class PlayerData {
     private String username;
     private final long firstJoin;
     private long lastSeen;
+    private String lastIp;
     private long balance;
     private long emeraldShards;
     private long investment;
@@ -39,6 +40,8 @@ public final class PlayerData {
 
     public UUID getUuid() { return uuid; }
     public String getUsername() { return username; }
+    public String getLastIp() { return lastIp; }
+    public void setLastIp(String lastIp) { this.lastIp = (lastIp == null || lastIp.isBlank()) ? null : lastIp; }
     public void setUsername(String username) { this.username = username; }
     public long getFirstJoin() { return firstJoin; }
     public long getLastSeen() { return lastSeen; }
