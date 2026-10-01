@@ -109,7 +109,7 @@ public final class TpaManager implements Listener {
     }
 
     public void deny(Player target) {
-        if (plugin.getCombatManager().isInCombat(target)) {
+        if (!isStaff(target) && plugin.getCombatManager().isInCombat(target)) {
             target.sendMessage("§c⚔ You cannot use that command while in combat!");
             return;
         }
