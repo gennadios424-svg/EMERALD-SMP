@@ -114,7 +114,6 @@ public final class CrateManager implements Listener {
             return;
         }
         target.setType(Material.CHEST, false);
-        target.getPersistentDataContainer().set(crateKey, PersistentDataType.STRING, type);
         crates.put(key, type);
         save();
         player.sendMessage(ChatColor.GREEN + "Placed " + cap(type) + " Crate.");
