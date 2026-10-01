@@ -28,6 +28,10 @@ public final class TpaManager implements Listener {
     }
 
     public void request(Player sender, Player target, boolean here) {
+        if (plugin.getCombatManager().isInCombat(sender) || plugin.getCombatManager().isInCombat(target)) {
+            sender.sendMessage("§c⚔ You cannot use that command while in combat!");
+            return;
+        }
         if (sender.getUniqueId().equals(target.getUniqueId())) {
             sender.sendMessage("§cYou cannot send a teleport request to yourself.");
             return;
@@ -75,6 +79,10 @@ public final class TpaManager implements Listener {
     }
 
     public void accept(Player target) {
+        if (plugin.getCombatManager().isInCombat(target)) {
+            target.sendMessage("§c⚔ You cannot use that command while in combat!");
+            return;
+        }
         Request request = incoming.get(target.getUniqueId());
         if (request == null) {
             target.sendMessage("§cYou have no pending teleport request.");
@@ -101,6 +109,10 @@ public final class TpaManager implements Listener {
     }
 
     public void deny(Player target) {
+        if (plugin.getCombatManager().isInCombat(target)) {
+            target.sendMessage("§c⚔ You cannot use that command while in combat!");
+            return;
+        }
         Request request = incoming.get(target.getUniqueId());
         if (request == null) {
             target.sendMessage("§cYou have no pending teleport request.");
@@ -203,6 +215,29 @@ public final class TpaManager implements Listener {
         Player target = Bukkit.getPlayer(request.targetId);
         if (sender != null && sender.isOnline()) sender.sendMessage("§cTeleport request expired.");
         if (target != null && target.isOnline()) target.sendMessage("§cTeleport request expired.");
+    }
+
+    public void cancelRequestsFor(Player player) {
+        if (player == null) return;
+        UUID id = player.getUniqueId();
+
+        Request sent = outgoing.remove(id);
+        if (sent != null) {
+            incoming.remove(sent.targetId, sent);
+            Player target = Bukkit.getPlayer(sent.targetId);
+            if (target != null && target.isOnline()) {
+                target.sendMessage("§cTeleport request cancelled because the requester entered combat.");
+            }
+        }
+
+        Request received = incoming.remove(id);
+        if (received != null) {
+            outgoing.remove(received.senderId, received);
+            Player sender = Bukkit.getPlayer(received.senderId);
+            if (sender != null && sender.isOnline()) {
+                sender.sendMessage("§cTeleport request cancelled because the target entered combat.");
+            }
+        }
     }
 
     private void remove(Request request) {
