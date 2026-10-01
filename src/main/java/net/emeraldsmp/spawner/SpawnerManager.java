@@ -372,6 +372,9 @@ public final class SpawnerManager implements Listener {
         }
         inv.setItem(22, item(Material.ARROW, "§a§l← BACK", List.of("§7Return to spawner")));
         p.openInventory(inv);
+        // Re-register after the previous GUI's close event has completed.
+        open.put(p.getUniqueId(), d.key());
+        openInventories.put(p.getUniqueId(), inv);
     }
 
     private void collect(Player p, Data d) {
