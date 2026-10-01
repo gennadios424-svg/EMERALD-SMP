@@ -32,6 +32,7 @@ public final class ShopManager {
     private final EmeraldSMP plugin;
     private final Map<UUID, ShopView> views = new HashMap<>();
     private final Map<UUID, Inventory> sellInventories = new HashMap<>();
+    private final Set<UUID> sellProcessing = new HashSet<>();
 
     public ShopManager(EmeraldSMP plugin) { this.plugin = plugin; }
 
@@ -100,16 +101,19 @@ public final class ShopManager {
     }
 
     public void openSell(Player p) {
+        // The sell area is slots 0-44. Closing the inventory is the transaction
+        // confirmation; there is intentionally no SELL button.
+        Inventory old = sellInventories.remove(p.getUniqueId());
+        if (old != null) returnSellItems(p);
         Inventory inv = plugin.getServer().createInventory(null, 54, "§2§l💚 SELL ITEMS");
         for (int i = 45; i < 54; i++) {
             inv.setItem(i, filler());
         }
-        inv.setItem(49, icon(Material.EMERALD, "§a§lSELL", List.of(
-                "§7Sell every supported item currently inside",
-                "§7Shulker contents are counted too",
-                "§eClick to sell"
+        inv.setItem(49, icon(Material.EMERALD, "§a§lAUTO SELL", List.of(
+                "§7Place items in the slots above",
+                "§7Close this menu to sell them",
+                "§7Unsaleable items are returned safely"
         )));
-        inv.setItem(53, icon(Material.BARRIER, "§cClose", List.of("§7Items will be returned")));
         sellInventories.put(p.getUniqueId(), inv);
         p.openInventory(inv);
     }
@@ -119,45 +123,86 @@ public final class ShopManager {
     }
 
     public void handleSellClick(Player p, int rawSlot) {
-        if (rawSlot < 0 || rawSlot >= 54) return;
-        if (rawSlot == 49) {
-            sellContents(p);
-        } else if (rawSlot == 53) {
-            returnSellItems(p);
-            p.closeInventory();
-        }
+        // Footer slots are informational and can never trigger a transaction.
     }
 
     public void sellContents(Player p) {
-        Inventory inv = sellInventories.get(p.getUniqueId());
+        processSellOnClose(p);
+    }
+
+    private void processSellOnClose(Player p) {
+        UUID uuid = p.getUniqueId();
+        if (sellProcessing.contains(uuid)) return;
+        Inventory inv = sellInventories.remove(uuid);
         if (inv == null) return;
 
-        List<ItemStack> original = new ArrayList<>();
-        for (int slot = 0; slot < 45; slot++) {
-            ItemStack stack = inv.getItem(slot);
-            original.add(stack == null ? null : stack.clone());
-        }
-        long total = calculateSellValue(inv, new HashSet<>());
-        if (total <= 0) {
-            p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThere are no sellable items in the sell menu.");
-            return;
-        }
+        sellProcessing.add(uuid);
+        try {
+            List<ItemStack> all = new ArrayList<>();
+            List<ItemStack> sellable = new ArrayList<>();
+            List<ItemStack> unsellable = new ArrayList<>();
+            long total = 0L;
 
-        // Remove everything from the sell area only after the complete value was calculated.
-        for (int slot = 0; slot < 45; slot++) inv.setItem(slot, null);
-
-        if (!plugin.getEconomyManager().deposit(p.getUniqueId(), total)) {
-            for (ItemStack stack : original) {
+            for (int slot = 0; slot < 45; slot++) {
+                ItemStack stack = inv.getItem(slot);
                 if (stack == null || stack.getType().isAir()) continue;
-                Map<Integer, ItemStack> left = p.getInventory().addItem(stack);
-                for (ItemStack drop : left.values()) p.getWorld().dropItemNaturally(p.getLocation(), drop);
-            }
-            p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThe transaction could not be completed; your items were returned.");
-            return;
-        }
+                ItemStack copy = stack.clone();
+                all.add(copy);
 
-        p.sendMessage("§a💚 §2§lEmerald SMP §8» §aSold items for §f" +
-                plugin.getEconomyManager().format(total) + "§a.");
+                long value;
+                try {
+                    value = valueOfStack(copy, new HashSet<>());
+                } catch (ArithmeticException ex) {
+                    value = Long.MAX_VALUE;
+                }
+                if (value > 0L) {
+                    if (Long.MAX_VALUE - total < value) {
+                        total = Long.MAX_VALUE;
+                    } else {
+                        total += value;
+                    }
+                    sellable.add(copy);
+                } else {
+                    unsellable.add(copy);
+                }
+                inv.setItem(slot, null);
+            }
+
+            if (sellable.isEmpty()) {
+                restoreItems(p, all);
+                if (!all.isEmpty()) {
+                    p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThese items cannot be sold and were returned.");
+                }
+                return;
+            }
+
+            if (!plugin.getEconomyManager().deposit(p.getUniqueId(), total)) {
+                restoreItems(p, all);
+                p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThe transaction could not be completed; all items were returned.");
+                return;
+            }
+
+            // Unsaleable items are never deleted.
+            restoreItems(p, unsellable);
+
+            p.sendMessage("§a💚 §2§lEmerald SMP §8» §aSold §f" + sellable.size() +
+                    " §aitem stack(s) for §f" + plugin.getEconomyManager().format(total) + "§a.");
+            if (!unsellable.isEmpty()) {
+                p.sendMessage("§a💚 §2§lEmerald SMP §8» §eSome items could not be sold and were returned.");
+            }
+        } finally {
+            sellProcessing.remove(uuid);
+        }
+    }
+
+    private void restoreItems(Player p, List<ItemStack> items) {
+        for (ItemStack stack : items) {
+            if (stack == null || stack.getType().isAir()) continue;
+            Map<Integer, ItemStack> left = p.getInventory().addItem(stack);
+            for (ItemStack drop : left.values()) {
+                p.getWorld().dropItemNaturally(p.getLocation(), drop);
+            }
+        }
     }
 
     private long calculateSellValue(Inventory inv, Set<String> recursionGuard) {
@@ -212,7 +257,7 @@ public final class ShopManager {
     }
 
     public void closeSell(Player p) {
-        if (sellInventories.containsKey(p.getUniqueId())) returnSellItems(p);
+        processSellOnClose(p);
     }
 
     public ShopView view(Player p) { return views.get(p.getUniqueId()); }
