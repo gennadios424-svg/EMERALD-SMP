@@ -44,7 +44,6 @@ public final class ServerUI implements Listener {
         viewer.setPlayerListHeaderFooter("\n§a§l💚 EMERALD SMP §8• §7Network","§7s1.seranodes.com:25638 §8• §7MS: §b"+viewer.getPing()+"\n");
         updatePlayerList();
         updateScoreboard(viewer,r);
-        updateNametags(viewer);
     }
 
     private void updatePlayerList(){
@@ -67,7 +66,7 @@ public final class ServerUI implements Listener {
                 RoleManager.Role role=plugin.getRoleManager().get(target);
                 String name=String.format(Locale.US,"tab_%02d_%s",99-role.weight(),target.getUniqueId().toString().replace("-","").substring(0,12));
                 Team sort=board.registerNewTeam(name);
-                sort.setOption(Team.Option.NAME_TAG_VISIBILITY,Team.OptionStatus.NEVER);
+                sort.setOption(Team.Option.NAME_TAG_VISIBILITY,Team.OptionStatus.ALWAYS);
                 sort.addEntry(target.getName());
             }
         }
@@ -88,18 +87,6 @@ public final class ServerUI implements Listener {
         line(o,old,"§b📶 MS: §f"+viewer.getPing(),2);
         line(o,old,"§7s1.seranodes.com:25638",1);
         viewer.setScoreboard(b);
-    }
-
-    private void updateNametags(Player viewer){
-        Scoreboard b=viewer.getScoreboard();
-        for(Team t:new ArrayList<>(b.getTeams())) if(t.getName().startsWith("emr_")) t.unregister();
-        for(Player target:Bukkit.getOnlinePlayers()){
-            RoleManager.Role r=plugin.getRoleManager().get(target);
-            Team t=b.registerNewTeam("emr_"+target.getUniqueId().toString().replace("-","").substring(0,12));
-            t.setPrefix(r.color()+"§l"+r.icon()+" "+r.label()+" §f");
-            t.setSuffix("");
-            t.addEntry(target.getName());
-        }
     }
 
     private String formatMoney(long amount){
