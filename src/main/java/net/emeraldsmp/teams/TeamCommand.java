@@ -70,7 +70,7 @@ public final class TeamCommand implements CommandExecutor, TabCompleter, Listene
         } else {
             inv.setItem(4, item(Material.EMERALD, "§a§l💚 " + team.name(), List.of(
                     "§7Owner: §f" + Bukkit.getOfflinePlayer(team.owner()).getName(),
-                    "§7Role: §f" + RoleUtil.roleLabel(p))));
+                    "§7Role: §f" + plugin.getRoleManager().get(p).color()+plugin.getRoleManager().get(p).label())));
             StringBuilder members = new StringBuilder("§7Members:");
             for (String name : manager.memberNames(team)) members.append("\n§f• ").append(name);
             inv.setItem(11, item(Material.PLAYER_HEAD, "§f👥 Members", List.of(members.toString().split("\n"))));
