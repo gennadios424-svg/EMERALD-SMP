@@ -4,6 +4,14 @@ main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
 description: Emerald SMP economy, teams, tags, roles, kits, custom spawners, drills, worth, shop, RTP, coin flips, auction house, homes and investments
 commands:
+  register:
+    description: Register your Emerald SMP account
+    usage: /register <password>
+    permission: emerald.auth
+  login:
+    description: Login to your Emerald SMP account
+    usage: /login <password>
+    permission: emerald.auth
   emerald:
     description: Emerald SMP foundation command
     usage: /emerald [reload]
@@ -166,6 +174,9 @@ commands:
     usage: /suslist [tp|remove|clear] [player]
     permission: emerald.anticheat
 permissions:
+  emerald.auth:
+    description: Allows account registration and login
+    default: true
   emerald.command:
     description: Allows use of Emerald SMP commands
     default: true
