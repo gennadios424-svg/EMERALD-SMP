@@ -49,15 +49,20 @@ public final class LiveManager implements Listener, CommandExecutor {
         cooldowns.put(p.getUniqueId(),now);live.add(p.getUniqueId());links.put(p.getUniqueId(),link);refresh();
         p.sendMessage("§a§l🔴 YOU ARE LIVE §8» §7Your stream link has been shared with the server.");
         p.playSound(p.getLocation(),Sound.ENTITY_PLAYER_LEVELUP,.7f,1.15f);
-        Component announcement=Component.text("§c§l🔴 THIS GUY IS LIVE! §f§l"+p.getName())
-                .append(Component.text(" §7» §b§l[WATCH STREAM]"))
+
+        Component prefix=Component.text("§c§l🔴 THIS GUY IS LIVE! §f§l"+p.getName()+" §7» ");
+        Component clickableUrl=Component.text("§b§n"+link)
                 .clickEvent(ClickEvent.openUrl(link))
-                .hoverEvent(HoverEvent.showText(Component.text("§aClick to watch "+p.getName()+" live")));
-        Bukkit.broadcast(announcement);
+                .hoverEvent(HoverEvent.showText(Component.text("§a§lCLICK TO WATCH §7• "+p.getName()+" is live")));
+        Component watch=Component.text(" §8[§bWATCH§8]")
+                .clickEvent(ClickEvent.openUrl(link))
+                .hoverEvent(HoverEvent.showText(Component.text("§aOpen stream")));
+        Bukkit.broadcast(prefix.append(clickableUrl).append(watch));
+
         for(Player viewer:Bukkit.getOnlinePlayers())viewer.playSound(viewer.getLocation(),Sound.BLOCK_NOTE_BLOCK_PLING,.65f,1.15f);
         for(Player viewer:Bukkit.getOnlinePlayers())viewer.showTitle(net.kyori.adventure.title.Title.title(
                 Component.text("§c§l🔴 THIS GUY IS LIVE"),
-                Component.text("§f"+p.getName()+" §7• §bClick the chat link to watch"),
+                Component.text("§f"+p.getName()+" §7• §bClick the link in chat to watch"),
                 net.kyori.adventure.title.Title.Times.times(java.time.Duration.ofMillis(300),java.time.Duration.ofMillis(3500),java.time.Duration.ofMillis(700))));
     }
 
