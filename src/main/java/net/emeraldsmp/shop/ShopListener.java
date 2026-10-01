@@ -5,7 +5,6 @@ import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.inventory.*;
-import org.bukkit.event.player.PlayerQuitEvent;
 
 public final class ShopListener implements Listener {
     private final EmeraldSMP plugin;
@@ -14,10 +13,6 @@ public final class ShopListener implements Listener {
     @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
     public void click(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (plugin.getCleanSellManager().isOpen(player, event.getView().getTopInventory())) {
-            plugin.getCleanSellManager().handleClick(player, event);
-            return;
-        }
         String title = ChatColor.stripColor(event.getView().getTitle());
         if (!title.contains("EMERALD SMP SHOP") && !title.startsWith("💚 SHOP") && !title.startsWith("💚 BUY")) return;
         event.setCancelled(true);
@@ -56,20 +51,9 @@ public final class ShopListener implements Listener {
     @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
     public void drag(InventoryDragEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (plugin.getCleanSellManager().isOpen(player, event.getView().getTopInventory())) {
-            plugin.getCleanSellManager().handleDrag(player, event);
-            return;
-        }
         String title = ChatColor.stripColor(event.getView().getTitle());
         if (title.contains("EMERALD SMP SHOP") || title.startsWith("💚 SHOP") || title.startsWith("💚 BUY")) event.setCancelled(true);
     }
-
-    @EventHandler public void close(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player player && plugin.getCleanSellManager().isOpen(player, event.getInventory()))
-            plugin.getCleanSellManager().close(player);
-    }
-
-    @EventHandler public void quit(PlayerQuitEvent event) { plugin.getCleanSellManager().quit(event.getPlayer()); }
 
     private String categoryAt(int slot) {
         int[] slots={11,13,15,21,23}; String[] keys={"resources","blocks","redstone","cpvp","nether"};
