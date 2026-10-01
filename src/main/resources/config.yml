@@ -9,8 +9,13 @@ afk:
 economy:
   starting-balance: 0
   currency-symbol: "$"
-  # /sell payout = Worth value × this multiplier. 0.50 = 50%.
-  sell-multiplier: 0.50
+  # /sell always pays the central /worth value.
+  sell-multiplier: 1.0
+
+shop:
+  # /shop buy price = /worth value × this multiplier.
+  # Must stay above 1.0 so buying and immediately selling loses money.
+  buy-multiplier: 2.5
 
 visual:
   primary-color: "GREEN"
