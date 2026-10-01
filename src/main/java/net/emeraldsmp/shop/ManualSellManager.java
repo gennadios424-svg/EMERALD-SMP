@@ -89,7 +89,7 @@ public final class ManualSellManager {
 
     public void handleClick(Player player, int slot) {
         Inventory inv = player.getOpenInventory().getTopInventory();
-        String title = inv.getTitle();
+        String title = player.getOpenInventory().getTitle();
 
         if (title.contains("SELECT ITEM")) {
             if (slot == BACK_SLOT) {
