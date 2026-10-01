@@ -213,7 +213,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
             long payment=safeMultiply(accepted,o.price);if(payment<=0){p.sendMessage("§cThis delivery could not be valued safely.");return;}
             List<ItemStack> snapshot=takeFromDelivery(session.inventory,o.item,accepted);if(snapshot.isEmpty()||snapshot.stream().mapToLong(ItemStack::getAmount).sum()!=accepted){restoreToDelivery(session.inventory,snapshot);return;}
             if(!plugin.getEconomyManager().deposit(u,payment)){restoreToDelivery(session.inventory,snapshot);p.sendMessage("§cPayment failed; nothing was completed.");return;}
-            for(ItemStack x:snapshot)o.storage.add(x.clone());
+            for(ItemStack x:snapshot)addToStorage(o.storage,x.clone());
             o.delivered+=accepted;o.status=o.remaining()==0?Status.COMPLETED:Status.OPEN;o.lastSeller=u;save();
             p.sendMessage("§a📦 Accepted §f"+fmt(accepted)+"x "+pretty(o.item)+" §afor §6"+money(payment)+"§a.");
             p.sendMessage("§7The items are stored in the order. The buyer must claim them from /order.");
@@ -242,6 +242,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     private boolean isExpired(Order o){return o.expiresAt>0 && System.currentTimeMillis()>=o.expiresAt && o.remaining()>0 && o.status==Status.OPEN;}
     private String remainingTime(long at){long s=Math.max(0,(at-System.currentTimeMillis())/1000);long d=s/86400;s%=86400;long h=s/3600;s%=3600;long m=s/60;return d+"d "+h+"h "+m+"m";}
     private long storedCount(Order o){long n=0;for(ItemStack x:o.storage)n+=x.getAmount();return n;}
+    private void addToStorage(List<ItemStack> storage,ItemStack incoming){int max=Math.max(1,incoming.getMaxStackSize());for(ItemStack existing:storage){if(existing.isSimilar(incoming)&&existing.getAmount()<max){int move=Math.min(max-existing.getAmount(),incoming.getAmount());existing.setAmount(existing.getAmount()+move);incoming.setAmount(incoming.getAmount()-move);if(incoming.getAmount()<=0)return;}}while(incoming.getAmount()>0){int take=Math.min(max,incoming.getAmount());storage.add(new ItemStack(incoming.getType(),take));incoming.setAmount(incoming.getAmount()-take);}}
     private void expireOrders(){boolean changed=false;for(Order o:orders.values()){if(!isExpired(o))continue;long refund=safeMultiply(o.remaining(),o.price);if(refund>0)plugin.getEconomyManager().deposit(o.owner,refund);o.status=Status.EXPIRED;changed=true;plugin.getLogger().info("Order "+o.id+" expired; refunded "+refund+" to buyer.");}if(changed){save();refreshOrders();}}
 
     private void openClaim(Player p,Order o){
