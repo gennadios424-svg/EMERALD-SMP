@@ -148,7 +148,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         UUID u=p.getUniqueId(); long total;
         try{total=Math.multiplyExact(state.price,(long)state.amount);}catch(ArithmeticException ex){pending.remove(u);p.sendMessage("§cOrder value is too large.");return;}
         if(plugin.getEconomyManager().getBalance(u)<total||!plugin.getEconomyManager().withdraw(u,total)){pending.remove(u);p.sendMessage("§cYou need §f"+money(total)+" §cto reserve this order.");return;}
-        Order o=new Order(UUID.randomUUID(),u,p.getName(),state.item,state.amount,state.price,total,0,Status.OPEN,System.currentTimeMillis(),System.currentTimeMillis()+ORDER_EXPIRY_MS,new ArrayList<>()); orders.put(o.id,o);pending.remove(u);save();
+        Order o=new Order(UUID.randomUUID(),u,p.getName(),state.item,state.amount,state.price,total,0,Status.OPEN,System.currentTimeMillis(),System.currentTimeMillis()+ORDER_EXPIRY_MS,new ArrayList<>(),null); orders.put(o.id,o);pending.remove(u);save();
         p.sendMessage("§a§l📦 ORDER CREATED");p.sendMessage("§7Item: §f"+pretty(o.item));p.sendMessage("§7Required: §f"+fmt(o.required));p.sendMessage("§7Price: §6"+money(o.price)+" §7/ item");p.sendMessage("§7Total reserved: §6"+money(o.total));refreshOrders();
     }
 
