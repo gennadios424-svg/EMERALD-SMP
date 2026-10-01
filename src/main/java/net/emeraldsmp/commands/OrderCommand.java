@@ -3,54 +3,50 @@ package net.emeraldsmp.commands;
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
-import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 public final class OrderCommand implements org.bukkit.command.CommandExecutor, Listener {
     private static final long INPUT_TIMEOUT_MS = 60_000L;
+    private static final int DELIVERY_SLOTS = 45;
     private final EmeraldSMP plugin;
+    private final File file;
     private final Map<UUID, Order> orders = new LinkedHashMap<>();
     private final Map<UUID, PendingOrder> pending = new HashMap<>();
     private final Set<UUID> searchWaiting = new HashSet<>();
+    private final Map<UUID, DeliverySession> deliveries = new HashMap<>();
+    private final Set<UUID> transactionLocks = new HashSet<>();
     private SortMode sortMode = SortMode.MOST_PAID;
-    private final Set<UUID> busy = new HashSet<>();
     private final List<Material> requestable;
 
     public OrderCommand(EmeraldSMP plugin) {
         this.plugin = plugin;
+        this.file = new File(plugin.getDataFolder(), "orders.yml");
         this.requestable = buildRequestable();
+        load();
     }
 
     private List<Material> buildRequestable() {
-        Set<String> excluded = Set.of(
-            "AIR","CAVE_AIR","VOID_AIR","BARRIER","BEDROCK","COMMAND_BLOCK","CHAIN_COMMAND_BLOCK",
-            "REPEATING_COMMAND_BLOCK","COMMAND_BLOCK_MINECART","STRUCTURE_BLOCK","STRUCTURE_VOID",
-            "JIGSAW","LIGHT","KNOWLEDGE_BOOK","DEBUG_STICK","SPAWNER","END_PORTAL","END_GATEWAY",
-            "END_PORTAL_FRAME","REINFORCED_DEEPSLATE","POTION","SPLASH_POTION","LINGERING_POTION",
-            "TIPPED_ARROW","PLAYER_HEAD","PLAYER_WALL_HEAD","WITHER_SKELETON_SKULL","WITHER_SKELETON_WALL_HEAD"
-        );
+        Set<String> excluded = Set.of("AIR","CAVE_AIR","VOID_AIR","BARRIER","BEDROCK","COMMAND_BLOCK","CHAIN_COMMAND_BLOCK","REPEATING_COMMAND_BLOCK","COMMAND_BLOCK_MINECART","STRUCTURE_BLOCK","STRUCTURE_VOID","JIGSAW","LIGHT","KNOWLEDGE_BOOK","DEBUG_STICK","SPAWNER","END_PORTAL","END_GATEWAY","END_PORTAL_FRAME","REINFORCED_DEEPSLATE","POTION","SPLASH_POTION","LINGERING_POTION","TIPPED_ARROW","PLAYER_HEAD","PLAYER_WALL_HEAD","WITHER_SKELETON_SKULL","WITHER_SKELETON_WALL_HEAD");
         List<Material> result = new ArrayList<>();
-        for (Material material : Material.values()) {
-            if (!material.isItem() || material.isAir() || material.isLegacy()) continue;
-            if (excluded.contains(material.name())) continue;
-            result.add(material);
-        }
+        for (Material m : Material.values()) if (m.isItem() && !m.isAir() && !m.isLegacy() && !excluded.contains(m.name())) result.add(m);
         result.sort(Comparator.comparing(this::pretty, String.CASE_INSENSITIVE_ORDER));
         return Collections.unmodifiableList(result);
     }
 
-    @Override
-    public boolean onCommand(org.bukkit.command.CommandSender s, org.bukkit.command.Command c, String l, String[] a) {
-        if (!(s instanceof Player p)) { s.sendMessage("Only players can use /order."); return true; }
+    @Override public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
+        if (!(sender instanceof Player p)) { sender.sendMessage("Only players can use /order."); return true; }
         openOrders(p, 0);
         return true;
     }
@@ -63,17 +59,17 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         int from = page * 45, to = Math.min(from + 45, visible.size());
         for (int i = from; i < to; i++) {
             Order o = visible.get(i);
-            ItemStack it = new ItemStack(o.item, Math.min(64, Math.max(1, o.amount)));
-            ItemMeta m = it.getItemMeta();
-            m.setDisplayName("§a" + pretty(o.item));
-            m.setLore(List.of("§7Amount: §f" + o.amount, "§7Per: §6$" + o.price, "§7Total: §6$" + o.total,
-                "§7Ordered by: §f" + o.name, "", "§eClick to fulfill"));
-            it.setItemMeta(m);
-            inv.setItem(i - from, it);
+            ItemStack icon = new ItemStack(o.item, 1);
+            ItemMeta meta = icon.getItemMeta();
+            long remaining = o.remaining();
+            meta.setDisplayName("§a§l📦 " + pretty(o.item));
+            meta.setLore(List.of("§7Required: §f" + fmt(o.required), "§7Delivered: §f" + fmt(o.delivered) + " / " + fmt(o.required), "§7Remaining: §f" + fmt(remaining), "", "§7Price: §6" + money(o.price) + " §7/ item", "§7Total: §6" + money(o.total), "", "§e📦 Click to deliver"));
+            icon.setItemMeta(meta);
+            inv.setItem(i - from, icon);
         }
         inv.setItem(45, button(Material.HOPPER, "§e§lSORT: " + sortMode.label, List.of("§7Click to switch sorting")));
         if (page > 0) inv.setItem(48, button(Material.ARROW, "§a§lPREVIOUS PAGE", List.of("§7Page " + page + " / " + pages)));
-        inv.setItem(49, button(Material.CHEST, "§a§lCREATE ORDER", List.of("§7Choose any obtainable item", "§7Search or browse the full list")));
+        inv.setItem(49, button(Material.CHEST, "§a§lCREATE ORDER", List.of("§7Choose an item, amount and price", "§7Orders use logical quantities, not stacks")));
         if (page + 1 < pages) inv.setItem(50, button(Material.ARROW, "§a§lNEXT PAGE", List.of("§7Page " + (page + 2) + " / " + pages)));
         inv.setItem(53, button(Material.BARRIER, "§c§lCLOSE", List.of("§7Close this menu")));
         p.openInventory(inv);
@@ -81,10 +77,8 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
 
     private List<Order> getVisible(Player p) {
         List<Order> list = new ArrayList<>();
-        for (Order o : orders.values()) if (!o.owner.equals(p.getUniqueId())) list.add(o);
-        Comparator<Order> cmp = sortMode == SortMode.MOST_PAID
-            ? Comparator.comparingLong((Order o) -> o.total).reversed().thenComparingLong(o -> o.price).reversed()
-            : Comparator.comparingLong((Order o) -> o.price).reversed().thenComparingLong(o -> o.total).reversed();
+        for (Order o : orders.values()) if (!o.owner.equals(p.getUniqueId()) && o.status == Status.OPEN && o.remaining() > 0) list.add(o);
+        Comparator<Order> cmp = sortMode == SortMode.MOST_PAID ? Comparator.comparingLong((Order o) -> o.total).reversed().thenComparingLong(o -> o.price).reversed() : Comparator.comparingLong((Order o) -> o.price).reversed().thenComparingLong(o -> o.total).reversed();
         list.sort(cmp);
         return list;
     }
@@ -93,22 +87,10 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         List<Material> filtered = filteredItems(query);
         int pages = Math.max(1, (filtered.size() + 35) / 36);
         page = Math.max(0, Math.min(page, pages - 1));
-        String title = query == null || query.isBlank() ? "§2§l🛒 SELECT ITEM" : "§2§l🔎 " + trimTitle(query);
-        Inventory inv = Bukkit.createInventory(new ItemHolder(page, query == null ? "" : query), 45, title);
+        Inventory inv = Bukkit.createInventory(new ItemHolder(page, query == null ? "" : query), 45, query == null || query.isBlank() ? "§2§l🛒 SELECT ITEM" : "§2§l🔎 " + trimTitle(query));
         int from = page * 36, to = Math.min(from + 36, filtered.size());
-        for (int i = from; i < to; i++) {
-            Material mat = filtered.get(i);
-            ItemStack it = new ItemStack(mat);
-            ItemMeta m = it.getItemMeta();
-            m.setDisplayName("§a" + pretty(mat));
-            m.setLore(List.of("§7Click to request this item"));
-            it.setItemMeta(m);
-            inv.setItem(i - from, it);
-        }
-        inv.setItem(40, button(Material.NAME_TAG, "§e§lSEARCH", List.of(
-            query == null || query.isBlank() ? "§7Search the full item list" : "§7Current: §f" + query,
-            "§7Click and type an item name in chat"
-        )));
+        for (int i = from; i < to; i++) inv.setItem(i - from, button(filtered.get(i), "§a" + pretty(filtered.get(i)), List.of("§7Click to request this item")));
+        inv.setItem(40, button(Material.NAME_TAG, "§e§lSEARCH", List.of("§7Search the full item list", "§7Click and type an item name in chat")));
         if (page > 0) inv.setItem(36, button(Material.ARROW, "§a§lPREVIOUS", List.of("§7Page " + page + " / " + pages)));
         if (page + 1 < pages) inv.setItem(44, button(Material.ARROW, "§a§lNEXT", List.of("§7Page " + (page + 2) + " / " + pages)));
         if (filtered.isEmpty()) inv.setItem(22, button(Material.BARRIER, "§c§lNO ITEMS FOUND", List.of("§7Try another search")));
@@ -119,272 +101,149 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         if (query == null || query.isBlank()) return requestable;
         String q = query.toLowerCase(Locale.ROOT).trim().replace(' ', '_');
         List<Material> result = new ArrayList<>();
-        for (Material m : requestable) {
-            String name = m.name().toLowerCase(Locale.ROOT);
-            String pretty = pretty(m).toLowerCase(Locale.ROOT);
-            if (name.contains(q) || pretty.contains(q)) result.add(m);
-        }
+        for (Material m : requestable) if (m.name().toLowerCase(Locale.ROOT).contains(q) || pretty(m).toLowerCase(Locale.ROOT).contains(q)) result.add(m);
         return result;
     }
 
     private void requestSearch(Player p) {
-        searchWaiting.add(p.getUniqueId());
-        p.closeInventory();
-        p.sendMessage("§a§l📦 ORDER SEARCH");
-        p.sendMessage("§fType an item name in chat.");
-        p.sendMessage("§7Examples: §fdiamond§7, §fredstone§7, §fstone§7, §firon");
-        p.sendMessage("§7Type §ccancel §7to return to the item list.");
+        searchWaiting.add(p.getUniqueId()); p.closeInventory();
+        p.sendMessage("§a§l📦 ORDER SEARCH"); p.sendMessage("§fType an item name in chat."); p.sendMessage("§7Type §ccancel §7to return to the item list.");
     }
 
     private void beginChatOrder(Player p, Material item) {
-        UUID u = p.getUniqueId();
-        searchWaiting.remove(u);
-        PendingOrder state = new PendingOrder(item, Stage.AMOUNT, 0, 0, System.currentTimeMillis() + INPUT_TIMEOUT_MS);
-        pending.put(u, state);
-        p.closeInventory();
-        p.sendMessage("§a§l📦 CREATE ORDER");
-        p.sendMessage("§fHow many items do you want?");
-        p.sendMessage("§7Type the amount in chat. Type §ccancel §7to cancel.");
-        scheduleTimeout(u);
+        UUID u = p.getUniqueId(); searchWaiting.remove(u);
+        pending.put(u, new PendingOrder(item, Stage.AMOUNT, 0, 0, System.currentTimeMillis() + INPUT_TIMEOUT_MS)); p.closeInventory();
+        p.sendMessage("§a§l📦 CREATE ORDER"); p.sendMessage("§fHow many items do you want?"); p.sendMessage("§7Type the amount in chat. Type §ccancel §7to cancel."); scheduleTimeout(u);
     }
 
-    private void scheduleTimeout(UUID uuid) {
-        new BukkitRunnable() {
-            @Override public void run() {
-                PendingOrder state = pending.get(uuid);
-                if (state == null || state.expiresAt <= System.currentTimeMillis()) {
-                    pending.remove(uuid);
-                    Player p = Bukkit.getPlayer(uuid);
-                    if (p != null) p.sendMessage("§e📦 Order input timed out. Nothing was charged.");
-                }
-            }
-        }.runTaskLater(plugin, (INPUT_TIMEOUT_MS / 50L) + 1L);
-    }
+    private void scheduleTimeout(UUID uuid) { new BukkitRunnable() { @Override public void run() { PendingOrder s = pending.get(uuid); if (s != null && s.expiresAt <= System.currentTimeMillis()) { pending.remove(uuid); Player p = Bukkit.getPlayer(uuid); if (p != null) p.sendMessage("§e📦 Order input timed out. Nothing was charged."); } } }.runTaskLater(plugin, (INPUT_TIMEOUT_MS / 50L) + 1L); }
 
-    @EventHandler
-    public void chat(AsyncPlayerChatEvent e) {
-        Player p = e.getPlayer();
-        UUID u = p.getUniqueId();
-        String message = e.getMessage().trim();
-
-        if (searchWaiting.remove(u)) {
-            e.setCancelled(true);
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (message.equalsIgnoreCase("cancel")) openItemSelection(p, 0, "");
-                else openItemSelection(p, 0, message);
-            });
-            return;
-        }
-
-        PendingOrder state = pending.get(u);
-        if (state == null) return;
-        e.setCancelled(true);
-
-        if (message.equalsIgnoreCase("cancel")) {
-            pending.remove(u);
-            Bukkit.getScheduler().runTask(plugin, () -> openItemSelection(p, 0, ""));
-            return;
-        }
-
-        if (state.expiresAt < System.currentTimeMillis()) {
-            pending.remove(u);
-            p.sendMessage("§e📦 Order input timed out. Nothing was charged.");
-            return;
-        }
-
-        switch (state.stage) {
-            case AMOUNT -> {
-                int amount = parseInt(message);
-                if (amount < 1 || amount > 2304) {
-                    p.sendMessage("§cEnter a positive whole-number amount between 1 and 2304.");
-                    return;
-                }
-                pending.put(u, new PendingOrder(state.item, Stage.PRICE, amount, 0, state.expiresAt));
-                p.sendMessage("§a§l💰 ORDER");
-                p.sendMessage("§fHow much will you pay per item?");
-                p.sendMessage("§7Type the price in chat. Type §ccancel §7to cancel.");
-            }
-            case PRICE -> {
-                long price = plugin.getEconomyManager().parseAmount(message);
-                if (price < 1 || price > 1_000_000_000_000L) {
-                    p.sendMessage("§cEnter a positive whole-number price (maximum $1T per item).");
-                    return;
-                }
-                try {
-                    Math.multiplyExact(price, (long) state.amount);
-                } catch (ArithmeticException ex) {
-                    p.sendMessage("§cThat order value is too large.");
-                    return;
-                }
-                pending.put(u, new PendingOrder(state.item, Stage.CONFIRM, state.amount, price, state.expiresAt));
-                p.sendMessage("§a§l📦 ORDER CONFIRMATION");
-                p.sendMessage("§7Item: §f" + pretty(state.item));
-                p.sendMessage("§7Amount: §f" + state.amount);
-                p.sendMessage("§7Price per item: §6$" + price);
-                p.sendMessage("§7Total reserved: §6$" + Math.multiplyExact(price, (long) state.amount));
-                p.sendMessage("§eType §aCONFIRM §eto create the order, or §cCANCEL §eto abort.");
-            }
-            case CONFIRM -> {
-                if (!message.equalsIgnoreCase("confirm")) {
-                    p.sendMessage("§eType §aCONFIRM §eto create the order, or §cCANCEL §eto abort.");
-                    return;
-                }
-                createOrder(p, state);
-            }
+    @EventHandler public void chat(AsyncPlayerChatEvent e) {
+        Player p=e.getPlayer(); UUID u=p.getUniqueId(); String msg=e.getMessage().trim();
+        if (searchWaiting.remove(u)) { e.setCancelled(true); Bukkit.getScheduler().runTask(plugin, () -> msg.equalsIgnoreCase("cancel") ? openItemSelection(p,0,"") : openItemSelection(p,0,msg)); return; }
+        PendingOrder state=pending.get(u); if(state==null)return; e.setCancelled(true);
+        if(msg.equalsIgnoreCase("cancel")){pending.remove(u);Bukkit.getScheduler().runTask(plugin,()->openItemSelection(p,0,""));return;}
+        if(state.expiresAt<System.currentTimeMillis()){pending.remove(u);p.sendMessage("§e📦 Order input timed out. Nothing was charged.");return;}
+        switch(state.stage){
+            case AMOUNT -> {int amount=parseInt(msg);if(amount<1||amount>2_000_000){p.sendMessage("§cEnter a whole-number amount between 1 and 2,000,000.");return;}pending.put(u,new PendingOrder(state.item,Stage.PRICE,amount,0,state.expiresAt));p.sendMessage("§a§l💰 ORDER");p.sendMessage("§fHow much will you pay per item?");p.sendMessage("§7Type the price in chat. Type §ccancel §7to cancel.");}
+            case PRICE -> {long price=plugin.getEconomyManager().parseAmount(msg);if(price<1||price>1_000_000_000_000L){p.sendMessage("§cEnter a positive whole-number price (maximum $1T per item).");return;}try{Math.multiplyExact(price,(long)state.amount);}catch(ArithmeticException ex){p.sendMessage("§cThat order value is too large.");return;}pending.put(u,new PendingOrder(state.item,Stage.CONFIRM,state.amount,price,state.expiresAt));p.sendMessage("§a§l📦 ORDER CONFIRMATION");p.sendMessage("§7Item: §f"+pretty(state.item));p.sendMessage("§7Amount: §f"+fmt(state.amount));p.sendMessage("§7Price per item: §6"+money(price));p.sendMessage("§7Total reserved: §6"+money(Math.multiplyExact(price,(long)state.amount)));p.sendMessage("§eType §aCONFIRM §eto create the order, or §cCANCEL §eto abort.");}
+            case CONFIRM -> {if(!msg.equalsIgnoreCase("confirm")){p.sendMessage("§eType §aCONFIRM §eto create the order, or §cCANCEL §eto abort.");return;}createOrder(p,state);}
         }
     }
 
-    private void createOrder(Player p, PendingOrder state) {
-        UUID u = p.getUniqueId();
-        long total;
-        try { total = Math.multiplyExact(state.price, (long) state.amount); }
-        catch (ArithmeticException ex) { pending.remove(u); p.sendMessage("§cOrder value is too large."); return; }
+    private synchronized void createOrder(Player p, PendingOrder state) {
+        UUID u=p.getUniqueId(); long total;
+        try{total=Math.multiplyExact(state.price,(long)state.amount);}catch(ArithmeticException ex){pending.remove(u);p.sendMessage("§cOrder value is too large.");return;}
+        if(plugin.getEconomyManager().getBalance(u)<total||!plugin.getEconomyManager().withdraw(u,total)){pending.remove(u);p.sendMessage("§cYou need §f"+money(total)+" §cto reserve this order.");return;}
+        Order o=new Order(UUID.randomUUID(),u,p.getName(),state.item,state.amount,state.price,total,0,Status.OPEN,System.currentTimeMillis()); orders.put(o.id,o);pending.remove(u);save();
+        p.sendMessage("§a§l📦 ORDER CREATED");p.sendMessage("§7Item: §f"+pretty(o.item));p.sendMessage("§7Required: §f"+fmt(o.required));p.sendMessage("§7Price: §6"+money(o.price)+" §7/ item");p.sendMessage("§7Total reserved: §6"+money(o.total));refreshOrders();
+    }
 
-        if (plugin.getEconomyManager().getBalance(u) < total) {
-            pending.remove(u);
-            p.sendMessage("§cYou need §f$" + total + " §cto create this order.");
-            return;
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false) public void click(InventoryClickEvent e) {
+        if(!(e.getWhoClicked() instanceof Player p))return;
+        Inventory top=e.getView().getTopInventory(); InventoryHolder holder=top.getHolder(); int raw=e.getRawSlot();
+        if(holder instanceof OrderHolder h){e.setCancelled(true);if(raw==45){sortMode=sortMode==SortMode.MOST_PAID?SortMode.MOST_PER_ITEM:SortMode.MOST_PAID;openOrders(p,h.page);return;}if(raw==48&&h.page>0){openOrders(p,h.page-1);return;}if(raw==49){openItemSelection(p,0,"");return;}if(raw==50){List<Order> v=getVisible(p);if((h.page+1)*45<v.size())openOrders(p,h.page+1);return;}if(raw==53){p.closeInventory();return;}if(raw>=0&&raw<45){List<Order> v=getVisible(p);int idx=h.page*45+raw;if(idx<v.size())openDelivery(p,v.get(idx));}return;}
+        if(holder instanceof ItemHolder h){e.setCancelled(true);if(raw==36&&h.page>0){openItemSelection(p,h.page-1,h.query);return;}if(raw==40){requestSearch(p);return;}if(raw==44&&((h.page+1)*36<filteredItems(h.query).size())){openItemSelection(p,h.page+1,h.query);return;}if(raw>=0&&raw<36){List<Material> f=filteredItems(h.query);int idx=h.page*36+raw;if(idx<f.size())beginChatOrder(p,f.get(idx));}return;}
+        DeliverySession session=deliveries.get(p.getUniqueId()); if(session==null||top!=session.inventory)return;
+        if(raw>=DELIVERY_SLOTS){e.setCancelled(true);if(raw==49)finalizeDelivery(p,session);else if(raw==53)p.closeInventory();return;}
+        ItemStack cursor=e.getCursor(); ItemStack clicked=e.getCurrentItem();
+        if(e.isShiftClick()){
+            if(e.getClickedInventory()==top){e.setCancelled(false);} else if(e.getClickedInventory()==p.getInventory()){if(!isAllowed(cursorOrClicked(clicked,cursor),session.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(session.order.item)+" to this order.");}}
+        } else if(e.getClickedInventory()==top){
+            if(clicked!=null&&!clicked.getType().isAir()&&!isAllowed(clicked,session.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(session.order.item)+" to this order.");}
+            if(cursor!=null&&!cursor.getType().isAir()&&!isAllowed(cursor,session.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(session.order.item)+" to this order.");}
+        } else if(e.getClickedInventory()==p.getInventory() && cursor!=null&&!cursor.getType().isAir()&&!isAllowed(cursor,session.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(session.order.item)+" to this order.");}
+        if(!e.isCancelled()) Bukkit.getScheduler().runTask(plugin,()->normalizeDelivery(p,session));
+    }
+
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false) public void drag(InventoryDragEvent e){
+        if(!(e.getWhoClicked() instanceof Player p))return;DeliverySession s=deliveries.get(p.getUniqueId());if(s==null||e.getView().getTopInventory()!=s.inventory)return;
+        boolean bad=false;for(int raw:e.getRawSlots())if(raw>=DELIVERY_SLOTS){bad=true;break;}if(bad){e.setCancelled(true);return;}
+        for(ItemStack x:e.getNewItems().values())if(!isAllowed(x,s.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(s.order.item)+" to this order.");return;}
+        Bukkit.getScheduler().runTask(plugin,()->normalizeDelivery(p,s));
+    }
+
+    private ItemStack cursorOrClicked(ItemStack clicked,ItemStack cursor){return clicked!=null&&!clicked.getType().isAir()?clicked:cursor;}
+    private boolean isAllowed(ItemStack item,Material expected){return item==null||item.getType().isAir()||item.getType()==expected;}
+
+    private void openDelivery(Player p,Order order){
+        if(order.owner.equals(p.getUniqueId())){p.sendMessage("§cYou cannot fulfill your own order.");return;}if(order.status!=Status.OPEN||order.remaining()<=0){p.sendMessage("§cThat order is already completed.");return;}
+        Inventory inv=Bukkit.createInventory(new DeliveryHolder(order.id),54,"§2§l📦 DELIVER ORDER #"+shortId(order.id));
+        for(int i=45;i<54;i++)inv.setItem(i,button(Material.GRAY_STAINED_GLASS_PANE,"§r",List.of()));
+        inv.setItem(47,progressItem(order,0));inv.setItem(49,button(Material.EMERALD_BLOCK,"§a§l📦 DELIVER ITEMS",List.of("§7Place the items you want to deliver here","§eClick to submit this delivery")));inv.setItem(53,button(Material.BARRIER,"§c§l✕ CANCEL",List.of("§7Return all placed items")));
+        DeliverySession s=new DeliverySession(order.id,inv);deliveries.put(p.getUniqueId(),s);p.openInventory(inv);updateDeliveryDisplay(p,s);
+    }
+
+    private void normalizeDelivery(Player p,DeliverySession s){
+        if(deliveries.get(p.getUniqueId())!=s)return;Order order=orders.get(s.orderId);if(order==null){p.closeInventory();return;}
+        long allowed=Math.max(0,order.remaining());long kept=0;
+        for(int slot=0;slot<DELIVERY_SLOTS;slot++){
+            ItemStack stack=s.inventory.getItem(slot);if(stack==null||stack.getType().isAir())continue;
+            if(stack.getType()!=order.item){s.inventory.setItem(slot,null);giveOrDrop(p,stack);continue;}
+            long take=Math.min(stack.getAmount(),Math.max(0,allowed-kept));int overflow=stack.getAmount()-(int)take;
+            if(overflow>0){stack.setAmount((int)take);giveOrDrop(p,new ItemStack(order.item,overflow));}
+            kept+=take;if(take<=0)s.inventory.setItem(slot,null);
         }
-        if (!plugin.getEconomyManager().withdraw(u, total)) {
-            pending.remove(u);
-            p.sendMessage("§cCould not reserve the order payment. Nothing was charged.");
-            return;
-        }
-
-        UUID id = UUID.randomUUID();
-        orders.put(id, new Order(id, u, p.getName(), state.item, state.amount, state.price, total));
-        pending.remove(u);
-        p.sendMessage("§a§l📦 ORDER CREATED");
-        p.sendMessage("§7Selected Item: §f" + pretty(state.item));
-        p.sendMessage("§7Amount: §f" + state.amount);
-        p.sendMessage("§7Price Per Item: §6$" + state.price);
-        p.sendMessage("§7Total: §6$" + total);
-        refreshOrders();
+        updateDeliveryDisplay(p,s);
     }
 
-    @EventHandler
-    public void click(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p)) return;
-        InventoryHolder holder = e.getView().getTopInventory().getHolder();
-        if (holder instanceof OrderHolder h) {
-            e.setCancelled(true);
-            int raw = e.getRawSlot();
-            if (raw == 45) { sortMode = sortMode == SortMode.MOST_PAID ? SortMode.MOST_PER_ITEM : SortMode.MOST_PAID; openOrders(p, h.page); return; }
-            if (raw == 48) { if (h.page > 0) openOrders(p, h.page - 1); return; }
-            if (raw == 49) { openItemSelection(p, 0, ""); return; }
-            if (raw == 50) { List<Order> v = getVisible(p); if ((h.page + 1) * 45 < v.size()) openOrders(p, h.page + 1); return; }
-            if (raw == 53) { p.closeInventory(); return; }
-            if (raw < 0 || raw >= 45) return;
-            List<Order> v = getVisible(p);
-            int idx = h.page * 45 + raw;
-            if (idx < v.size()) fulfill(p, v.get(idx));
-        } else if (holder instanceof ItemHolder h) {
-            e.setCancelled(true);
-            int raw = e.getRawSlot();
-            if (raw == 36 && h.page > 0) { openItemSelection(p, h.page - 1, h.query); return; }
-            if (raw == 40) { requestSearch(p); return; }
-            if (raw == 44) { if ((h.page + 1) * 36 < filteredItems(h.query).size()) openItemSelection(p, h.page + 1, h.query); return; }
-            if (raw < 0 || raw >= 36) return;
-            List<Material> filtered = filteredItems(h.query);
-            int idx = h.page * 36 + raw;
-            if (idx >= filtered.size()) return;
-            beginChatOrder(p, filtered.get(idx));
-        }
+    private ItemStack progressItem(Order o,long current){double pct=o.required<=0?1.0:(double)(o.delivered+current)/o.required;int bars=20;int filled=(int)Math.floor(Math.max(0,Math.min(1,pct))*bars);StringBuilder bar=new StringBuilder();for(int i=0;i<bars;i++)bar.append(i<filled?"§a█":"§8░");return button(Material.PAPER,"§a§l📦 DELIVERY",List.of("§7Your delivery: §f"+fmt(current)+" / "+fmt(o.remaining()),"§7Remaining after delivery: §f"+fmt(Math.max(0,o.remaining()-current)),"",bar+" §f"+String.format(Locale.US,"%.1f%%",pct*100)));}
+
+    private long stagedCount(DeliverySession s,Material item){long n=0;for(int i=0;i<DELIVERY_SLOTS;i++){ItemStack x=s.inventory.getItem(i);if(x!=null&&x.getType()==item)n+=x.getAmount();}return n;}
+    private void updateDeliveryDisplay(Player p,DeliverySession s){Order o=orders.get(s.orderId);if(o==null)return;long count=stagedCount(s,o.item);s.inventory.setItem(47,progressItem(o,count));s.inventory.setItem(49,button(Material.EMERALD_BLOCK,"§a§l📦 DELIVER ITEMS",List.of("§7Place the items you want to deliver here","§7Currently staged: §f"+fmt(count),"§7Remaining: §f"+fmt(Math.max(0,o.remaining()-count)),"","§eClick to submit this delivery")));}
+
+    private synchronized void finalizeDelivery(Player p,DeliverySession session){
+        UUID u=p.getUniqueId();if(!transactionLocks.add(u))return;try{
+            Order o=orders.get(session.orderId);if(o==null||o.status!=Status.OPEN)return;
+            Player buyer=Bukkit.getPlayer(o.owner);if(buyer==null){p.sendMessage("§cThe buyer must be online to receive this delivery.");return;}
+            long accepted=Math.min(stagedCount(session,o.item),o.remaining());if(accepted<=0){p.sendMessage("§cPlace some "+pretty(o.item)+" in the delivery area first.");return;}
+            long payment=safeMultiply(accepted,o.price);if(payment<=0){p.sendMessage("§cThis delivery could not be valued safely.");return;}
+            if(!hasSpace(buyer,o.item,accepted)){p.sendMessage("§cThe buyer does not have enough inventory space for this delivery.");return;}
+            List<ItemStack> snapshot=takeFromDelivery(session.inventory,o.item,accepted);if(snapshot.isEmpty()||snapshot.stream().mapToLong(ItemStack::getAmount).sum()!=accepted){restoreToDelivery(session.inventory,snapshot);return;}
+            if(!plugin.getEconomyManager().deposit(u,payment)){restoreToDelivery(session.inventory,snapshot);p.sendMessage("§cPayment failed; nothing was completed.");return;}
+            Map<Integer,ItemStack> extra=buyer.getInventory().addItem(snapshot.toArray(new ItemStack[0]));
+            if(!extra.isEmpty()){plugin.getEconomyManager().withdraw(u,payment);for(ItemStack x:extra.values())giveOrDrop(buyer,x);restoreToDelivery(session.inventory,snapshot);p.sendMessage("§cThe buyer's inventory changed before delivery; transaction rolled back.");return;}
+            o.delivered+=accepted;o.status=o.remaining()==0?Status.COMPLETED:Status.OPEN;save();
+            buyer.sendMessage("§a📦 Your order received §f"+fmt(accepted)+"x "+pretty(o.item)+" §afrom §f"+p.getName()+"§a. Payment: §6"+money(payment)+"§a.");
+            p.sendMessage("§a📦 Delivered §f"+fmt(accepted)+"x "+pretty(o.item)+" §afor §6"+money(payment)+"§a.");
+            if(o.status==Status.COMPLETED)p.sendMessage("§a§l✅ ORDER COMPLETED §7("+fmt(o.required)+" / "+fmt(o.required)+")");
+            deliveries.remove(u);p.closeInventory();refreshOrders();
+        }finally{transactionLocks.remove(u);}
     }
 
-    private void fulfill(Player seller, Order o) {
-        if (o.owner.equals(seller.getUniqueId())) { seller.sendMessage("§cYou cannot fulfill your own order."); return; }
-        if (!orders.containsKey(o.id)) { seller.sendMessage("§cThat order is no longer active."); openOrders(seller, 0); return; }
-        if (!busy.add(o.id)) { seller.sendMessage("§cThat order is already being fulfilled."); return; }
-        try {
-            Order current = orders.get(o.id);
-            if (current == null) return;
-            Player buyer = Bukkit.getPlayer(o.owner);
-            if (buyer == null) { seller.sendMessage("§cThe order owner is offline."); return; }
-            if (!hasItems(seller, o.item, o.amount)) { seller.sendMessage("§cYou do not have enough " + pretty(o.item) + "§c."); return; }
-            removeItems(seller, o.item, o.amount);
-            Map<Integer, ItemStack> extra = buyer.getInventory().addItem(new ItemStack(o.item, o.amount));
-            if (!extra.isEmpty()) {
-                removeItems(buyer, o.item, o.amount);
-                giveItems(seller, o.item, o.amount);
-                seller.sendMessage("§cThe buyer has no inventory space for the requested items.");
-                return;
-            }
-            if (!plugin.getEconomyManager().deposit(seller.getUniqueId(), o.total)) {
-                removeItems(buyer, o.item, o.amount); giveItems(seller, o.item, o.amount);
-                seller.sendMessage("§cPayment failed; the transaction was rolled back.");
-                return;
-            }
-            orders.remove(o.id);
-            buyer.sendMessage("§aYour order was fulfilled by §f" + seller.getName() + "§a.");
-            seller.sendMessage("§aOrder fulfilled! You received §6$" + o.total + "§a.");
-            openOrders(seller, 0); refreshOrders();
-        } finally { busy.remove(o.id); }
-    }
+    private List<ItemStack> takeFromDelivery(Inventory inv,Material material,long amount){List<ItemStack> out=new ArrayList<>();long left=amount;for(int slot=0;slot<DELIVERY_SLOTS&&left>0;slot++){ItemStack stack=inv.getItem(slot);if(stack==null||stack.getType()!=material)continue;int take=(int)Math.min((long)stack.getAmount(),left);out.add(new ItemStack(material,take));stack.setAmount(stack.getAmount()-take);left-=take;}return out;}
+    private void restoreToDelivery(Inventory inv,List<ItemStack> items){for(ItemStack item:items){Map<Integer,ItemStack> extra=inv.addItem(item.clone());if(!extra.isEmpty()){Player owner=findDeliveryOwner(inv);if(owner!=null)for(ItemStack x:extra.values())giveOrDrop(owner,x);}}}
+    private Player findDeliveryOwner(Inventory inv){for(Map.Entry<UUID,DeliverySession> e:deliveries.entrySet())if(e.getValue().inventory==inv)return Bukkit.getPlayer(e.getKey());return null;}
+    private boolean hasSpace(Player p,Material material,long amount){long remaining=amount;int max=Math.max(1,material.getMaxStackSize());for(ItemStack stack:p.getInventory().getStorageContents()){if(remaining<=0)return true;if(stack==null||stack.getType().isAir())remaining-=max;else if(stack.getType()==material)remaining-=Math.max(0,stack.getMaxStackSize()-stack.getAmount());}return remaining<=0;}
 
-    private boolean hasItems(Player p, Material m, int n) {
-        int left = n;
-        for (ItemStack it : p.getInventory().getStorageContents()) if (it != null && it.getType() == m) left -= it.getAmount();
-        return left <= 0;
-    }
+    @EventHandler public void close(InventoryCloseEvent e){if(!(e.getPlayer() instanceof Player p))return;DeliverySession s=deliveries.get(p.getUniqueId());if(s==null||e.getInventory()!=s.inventory)return;deliveries.remove(p.getUniqueId());returnDeliveryItems(p,s);}
+    @EventHandler public void quit(PlayerQuitEvent e){UUID u=e.getPlayer().getUniqueId();pending.remove(u);searchWaiting.remove(u);DeliverySession s=deliveries.remove(u);if(s!=null)returnDeliveryItems(e.getPlayer(),s);}
 
-    private void removeItems(Player p, Material m, int n) {
-        for (int i = 0; i < p.getInventory().getStorageContents().length && n > 0; i++) {
-            ItemStack it = p.getInventory().getItem(i);
-            if (it == null || it.getType() != m) continue;
-            int take = Math.min(n, it.getAmount());
-            it.setAmount(it.getAmount() - take);
-            n -= take;
-        }
-    }
+    private void returnDeliveryItems(Player p,DeliverySession s){for(int i=0;i<DELIVERY_SLOTS;i++){ItemStack x=s.inventory.getItem(i);if(x==null||x.getType().isAir())continue;s.inventory.setItem(i,null);giveOrDrop(p,x);}}
+    private void giveOrDrop(Player p,ItemStack item){if(item==null||item.getType().isAir()||item.getAmount()<=0)return;for(ItemStack x:p.getInventory().addItem(item.clone()).values())p.getWorld().dropItemNaturally(p.getLocation(),x);}
 
-    private void giveItems(Player p, Material m, int n) {
-        ItemStack left = new ItemStack(m, n);
-        Map<Integer, ItemStack> extra = p.getInventory().addItem(left);
-        for (ItemStack x : extra.values()) p.getWorld().dropItemNaturally(p.getLocation(), x);
-    }
+    private void refreshOrders(){for(Player p:Bukkit.getOnlinePlayers())if(p.getOpenInventory().getTopInventory().getHolder() instanceof OrderHolder h)openOrders(p,h.page);}
 
-    private String pretty(Material m) { return m.name().toLowerCase(Locale.ROOT).replace('_', ' '); }
-    private String trimTitle(String s) { return s.length() > 20 ? s.substring(0, 20) : s; }
+    private synchronized void load(){orders.clear();if(!file.exists())return;YamlConfiguration y=YamlConfiguration.loadConfiguration(file);var root=y.getConfigurationSection("orders");if(root==null)return;for(String k:root.getKeys(false))try{String path="orders."+k;UUID id=UUID.fromString(k),owner=UUID.fromString(y.getString(path+".buyer"));Material item=Material.matchMaterial(y.getString(path+".item","AIR"));if(item==null||item.isAir())continue;long required=Math.max(1,y.getLong(path+".required"));long price=Math.max(1,y.getLong(path+".price-per-item"));long total=Math.max(1,y.getLong(path+".total-price"));long delivered=Math.max(0,Math.min(required,y.getLong(path+".delivered")));Status status=Status.valueOf(y.getString(path+".status","OPEN"));orders.put(id,new Order(id,owner,y.getString(path+".buyer-name","Unknown"),item,required,price,total,delivered,status,y.getLong(path+".created-time",System.currentTimeMillis())));}catch(Exception ex){plugin.getLogger().warning("Skipped invalid order: "+k);}}
+    private synchronized void save(){YamlConfiguration y=new YamlConfiguration();for(Order o:orders.values()){String p="orders."+o.id;y.set(p+".buyer",o.owner.toString());y.set(p+".buyer-name",o.ownerName);y.set(p+".item",o.item.name());y.set(p+".required",o.required);y.set(p+".price-per-item",o.price);y.set(p+".total-price",o.total);y.set(p+".delivered",o.delivered);y.set(p+".remaining",o.remaining());y.set(p+".status",o.status.name());y.set(p+".created-time",o.createdTime);}try{y.save(file);}catch(IOException ex){plugin.getLogger().warning("Could not save orders.yml: "+ex.getMessage());}}
 
-    private ItemStack button(Material m, String n, List<String> lore) {
-        ItemStack i = new ItemStack(m); ItemMeta meta = i.getItemMeta();
-        meta.setDisplayName(n); meta.setLore(lore); i.setItemMeta(meta); return i;
-    }
+    private ItemStack button(Material m,String n,List<String> lore){ItemStack i=new ItemStack(m);ItemMeta meta=i.getItemMeta();if(meta!=null){meta.setDisplayName(n);meta.setLore(lore);i.setItemMeta(meta);}return i;}
+    private ItemStack button(Material m,String n,List<String> lore,boolean unused){return button(m,n,lore);}
+    private String money(long n){return plugin.getEconomyManager().format(n);}
+    private String fmt(long n){return String.format(Locale.US,"%,d",Math.max(0,n));}
+    private String pretty(Material m){String s=m.name().toLowerCase(Locale.ROOT).replace('_',' ');StringBuilder b=new StringBuilder();for(String w:s.split(" "))if(!w.isEmpty())b.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(' ');return b.toString().trim();}
+    private String trimTitle(String s){return s.length()>20?s.substring(0,20):s;}
+    private int parseInt(String s){try{return Integer.parseInt(s.trim());}catch(Exception e){return -1;}}
+    private long safeMultiply(long a,long b){if(a<=0||b<=0||a>Long.MAX_VALUE/b)return 0;return a*b;}
+    private String shortId(UUID id){return id.toString().substring(0,8);}
 
-    private void refreshOrders() {
-        for (Player p : Bukkit.getOnlinePlayers())
-            if (p.getOpenInventory().getTopInventory().getHolder() instanceof OrderHolder h) openOrders(p, h.page);
-    }
-
-    @EventHandler
-    public void quit(PlayerQuitEvent e) {
-        UUID u = e.getPlayer().getUniqueId();
-        pending.remove(u);
-        searchWaiting.remove(u);
-        List<UUID> refund = new ArrayList<>();
-        for (Order o : orders.values()) if (o.owner.equals(u)) refund.add(o.id);
-        for (UUID id : refund) {
-            Order o = orders.remove(id);
-            if (o != null) plugin.getEconomyManager().deposit(u, o.total);
-        }
-        refreshOrders();
-    }
-
-    private int parseInt(String s) {
-        try { return Integer.parseInt(s.trim()); } catch (Exception e) { return -1; }
-    }
-
-    private enum Stage { AMOUNT, PRICE, CONFIRM }
-    private enum SortMode { MOST_PAID("MOST PAID"), MOST_PER_ITEM("MOST PER ITEM"); final String label; SortMode(String label) { this.label = label; } }
-    private record Order(UUID id, UUID owner, String name, Material item, int amount, long price, long total) {}
-    private record PendingOrder(Material item, Stage stage, int amount, long price, long expiresAt) {}
-    private static final class OrderHolder implements InventoryHolder {
-        final int page; OrderHolder(int page) { this.page = page; } public Inventory getInventory() { return null; }
-    }
-    private static final class ItemHolder implements InventoryHolder {
-        final int page; final String query;
-        ItemHolder(int page, String query) { this.page = page; this.query = query; }
-        public Inventory getInventory() { return null; }
-    }
+    private enum Stage{AMOUNT,PRICE,CONFIRM}
+    private enum SortMode{MOST_PAID("MOST PAID"),MOST_PER_ITEM("MOST PER ITEM");final String label;SortMode(String label){this.label=label;}}
+    private enum Status{OPEN,COMPLETED}
+    private static final class PendingOrder{final Material item;final Stage stage;final int amount;final long price,expiresAt;PendingOrder(Material i,Stage s,int a,long p,long e){item=i;stage=s;amount=a;price=p;expiresAt=e;}}
+    private static final class Order{final UUID id,owner;final String ownerName;final Material item;final long required,price,total,createdTime;long delivered;Status status;Order(UUID i,UUID o,String n,Material m,long r,long p,long t,long d,Status s,long c){id=i;owner=o;ownerName=n;item=m;required=r;price=p;total=t;delivered=d;status=s;createdTime=c;}long remaining(){return Math.max(0,required-delivered);}}
+    private static final class DeliverySession{final UUID orderId;final Inventory inventory;DeliverySession(UUID id,Inventory i){orderId=id;inventory=i;}}
+    private static final class OrderHolder implements InventoryHolder{final int page;OrderHolder(int p){page=p;}public Inventory getInventory(){return null;}}
+    private static final class ItemHolder implements InventoryHolder{final int page;final String query;ItemHolder(int p,String q){page=p;query=q;}public Inventory getInventory(){return null;}}
+    private static final class DeliveryHolder implements InventoryHolder{final UUID orderId;DeliveryHolder(UUID id){orderId=id;}public Inventory getInventory(){return null;}}
 }
