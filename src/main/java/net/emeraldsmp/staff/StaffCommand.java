@@ -51,7 +51,7 @@ public final class StaffCommand implements CommandExecutor, TabCompleter, Listen
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String name = command.getName().toLowerCase(Locale.ROOT);
-        boolean ownerOnly = name.equals("ipban");
+        boolean ownerOnly = name.equals("ipban") || name.equals("ipunban");
         if (!check(sender, name, ownerOnly)) return true;
         Player p = (Player) sender;
 
@@ -62,7 +62,7 @@ public final class StaffCommand implements CommandExecutor, TabCompleter, Listen
             case "tphere" -> teleport(p, args, true);
             case "kick" -> punish(p, args, false, false);
             case "ban" -> punish(p, args, true, false);
-            case "ipban" -> punish(p, args, true, true);
+            case "ipban" -> punish(p, args, true, true);\n            case "unban" -> unban(p, args, false);\n            case "ipunban" -> unban(p, args, true);
             default -> p.sendMessage("§cUnknown staff command.");
         }
         return true;
@@ -108,6 +108,33 @@ public final class StaffCommand implements CommandExecutor, TabCompleter, Listen
             staff.teleport(target.getLocation());
             staff.sendMessage("§a⚡ Teleported instantly to §f" + target.getName() + "§a.");
         }
+    }
+
+    private void unban(Player staff, String[] args, boolean ipunban) {
+        if (args.length != 1) {
+            staff.sendMessage("§cUsage: /" + (ipunban ? "ipunban" : "unban") + " <player|IP>");
+            return;
+        }
+
+        String target = args[0];
+        if (ipunban) {
+            boolean removed = Bukkit.getBanList(BanList.Type.IP).isBanned(target);
+            if (!removed) {
+                staff.sendMessage("§cNo IP ban was found for §f" + target + "§c.");
+                return;
+            }
+            Bukkit.getBanList(BanList.Type.IP).pardon(target);
+            staff.sendMessage("§a🔓 IP ban removed for §f" + target + "§a.");
+            return;
+        }
+
+        boolean removed = Bukkit.getBanList(BanList.Type.NAME).isBanned(target);
+        if (!removed) {
+            staff.sendMessage("§cNo player ban was found for §f" + target + "§c.");
+            return;
+        }
+        Bukkit.getBanList(BanList.Type.NAME).pardon(target);
+        staff.sendMessage("§a🔓 Ban removed for §f" + target + "§a.");
     }
 
     private void punish(Player staff, String[] args, boolean ban, boolean ipban) {
