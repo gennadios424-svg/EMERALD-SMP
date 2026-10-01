@@ -64,7 +64,7 @@ public final class DrillManager implements Listener {
         long exp=System.currentTimeMillis()+Math.max(1,plugin.getConfig().getLong("emerald-miner.expiration-days",7))*86400000L;
         List<String> lore=new ArrayList<>();
         if(tool==Tool.ORIGINAL_DRILL){lore.add("§7💚 EMERALD MINER");lore.add("§f3×3 Mining Tool");lore.add("§7⛏ Mines a 3×3 area");lore.add("§7🏗 Designed for Digouts");}
-        else {lore.add("§7💚 EMERALD MINER");lore.add("§fShard-farming pickaxe");lore.add("§7💚 Earn Emerald Shards while mining");lore.add("§7🎲 Random trigger: §f1–128 blocks");lore.add("§7💎 Reward: §f1–5 Emerald Shards");}
+        else {lore.add("§7💚 EMERALD MINER");lore.add("§fShard-farming pickaxe");lore.add("§7💚 Earn Emerald Shards while mining");lore.add("§7🎲 Random trigger: §f1–32 blocks");lore.add("§7💎 Reward: §f1–5 Emerald Shards");}
         lore.add("§7⏳ Expires In: §f"+remaining(exp)); lore.add("§8Emerald SMP");
         m.setLore(lore); m.getPersistentDataContainer().set(toolKey,PersistentDataType.STRING,tool.name()); m.getPersistentDataContainer().set(expiresKey,PersistentDataType.LONG,exp); i.setItemMeta(m); return i;
     }
@@ -116,10 +116,73 @@ public final class DrillManager implements Listener {
     public void open(Player p){
         Inventory inv=Bukkit.createInventory(null,27,TITLE);
         Stats s=stats.computeIfAbsent(p.getUniqueId(),k->new Stats());
-        ItemStack drill=createItem(Tool.ORIGINAL_DRILL,s.tier); ItemMeta dm=drill.getItemMeta(); dm.setLore(List.of("§7Your Original Drill", "§f3×3 mining tool", "§7Blocks mined: §f"+s.originalBlocks)); drill.setItemMeta(dm);
-        ItemStack gainer=createItem(Tool.EMERALD_GAINER,s.tier); ItemMeta gm=gainer.getItemMeta(); gm.setLore(List.of("§7Your Emerald Gainer", "§fRandom shard rewards", "§7Progress: §f"+s.gainerProgress+"/"+Math.max(1,s.gainerTarget), "§7Shards earned: §f"+s.shardsEarned)); gainer.setItemMeta(gm);
-        ItemStack info=new ItemStack(Material.EMERALD); ItemMeta im=info.getItemMeta(); im.setDisplayName("§a§lStatistics"); im.setLore(List.of("§7Tier: §f"+s.tier,"§7Level: §f"+s.level,"§7XP: §f"+s.xp,"§7Total Blocks: §f"+s.totalBlocks,"§7Shard Triggers: §f"+s.shardTriggers)); info.setItemMeta(im);
-        inv.setItem(11,drill);inv.setItem(13,info);inv.setItem(15,gainer);p.openInventory(inv);
+
+        if (p.hasPermission("emerald.admin")) {
+            ItemStack drill=createItem(Tool.ORIGINAL_DRILL,s.tier);
+            ItemMeta dm=drill.getItemMeta();
+            dm.setLore(List.of(
+                    "§a⛏️ Original Drill",
+                    "§f3×3 mining / digout tool",
+                    "§7Tier: §f"+s.tier,
+                    "§7Blocks mined: §f"+s.originalBlocks,
+                    "§7Expiration is stored on the actual tool"
+            ));
+            drill.setItemMeta(dm);
+
+            ItemStack gainer=createItem(Tool.EMERALD_GAINER,s.tier);
+            ItemMeta gm=gainer.getItemMeta();
+            gm.setLore(List.of(
+                    "§a💚 Emerald Gainer",
+                    "§fNormal mining + shard triggers",
+                    "§7Tier: §f"+s.tier,
+                    "§7Progress: §f"+s.gainerProgress+"/"+Math.max(1,s.gainerTarget),
+                    "§7Shards earned: §f"+s.shardsEarned
+            ));
+            gainer.setItemMeta(gm);
+
+            ItemStack tiers=new ItemStack(Material.EMERALD);
+            ItemMeta tm=tiers.getItemMeta();
+            tm.setDisplayName("§a§l📈 ALL TIERS");
+            List<String> tl=new ArrayList<>();
+            tl.add("§7Current Tier: §f"+s.tier);
+            for(int tier=1;tier<=5;tier++) tl.add("§8• §fTier "+roman(tier)+" §7"+(tier==s.tier?"(current)":""));
+            tl.add("§7Level: §f"+s.level);
+            tl.add("§7XP: §f"+s.xp);
+            tiers.setItemMeta(tm);
+            tm.setLore(tl);
+            tiers.setItemMeta(tm);
+
+            ItemStack statsItem=new ItemStack(Material.PAPER);
+            ItemMeta sm=statsItem.getItemMeta();
+            sm.setDisplayName("§a§l📊 STATISTICS");
+            sm.setLore(List.of(
+                    "§7Total Blocks: §f"+s.totalBlocks,
+                    "§7Original Drill Blocks: §f"+s.originalBlocks,
+                    "§7Gainer Blocks: §f"+s.gainerBlocks,
+                    "§7Shard Triggers: §f"+s.shardTriggers,
+                    "§7Shards Earned: §f"+s.shardsEarned,
+                    "§7Current Gainer Target: §f"+Math.max(1,s.gainerTarget)
+            ));
+            statsItem.setItemMeta(sm);
+
+            inv.setItem(10,drill);
+            inv.setItem(12,tiers);
+            inv.setItem(14,statsItem);
+            inv.setItem(16,gainer);
+        } else {
+            ItemStack statsItem=new ItemStack(Material.EMERALD);
+            ItemMeta im=statsItem.getItemMeta();
+            im.setDisplayName("§a§l📊 YOUR STATISTICS");
+            im.setLore(List.of(
+                    "§7⛏️ Blocks Mined: §f"+s.totalBlocks,
+                    "§7💚 Shards Earned: §f"+s.shardsEarned,
+                    "§7🎯 Shard Triggers: §f"+s.shardTriggers
+            ));
+            statsItem.setItemMeta(im);
+            inv.setItem(13,statsItem);
+        }
+
+        p.openInventory(inv);
     }
     private void recordMine(Player p,Tool t,int blocks){
         if(blocks<=0)return; Stats s=stats.computeIfAbsent(p.getUniqueId(),k->new Stats()); s.totalBlocks+=blocks;
