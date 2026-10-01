@@ -3,127 +3,32 @@ package net.emeraldsmp.shop;
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.*;
+import org.bukkit.event.inventory.*;
 
-public final class ShopListener implements Listener {
+public final class ShopListener implements Listener{
     private final EmeraldSMP plugin;
-    public ShopListener(EmeraldSMP plugin) { this.plugin = plugin; }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void click(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p)) return;
-
-        if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
-            int slot = e.getRawSlot();
-
-            // Footer is read-only. Shift-click / hotbar-swap into or out of the
-            // sell inventory is blocked so the transaction can only contain
-            // deliberate items placed in slots 0-44.
-            if (slot >= 45 && slot < 54) {
-                e.setCancelled(true);
-                return;
-            }
-            // All normal inventory actions are intentionally allowed in slots 0-44.
-            // This includes shift-click, hotbar swaps, right/left click and stack splitting.
-            return;
-        }
-
-        String title = ChatColor.stripColor(e.getView().getTitle());
-        if (!title.contains("EMERALD SMP SHOP") && !title.startsWith("💚 SHOP") && !title.equals("💚 BUY ITEM"))
-            return;
-
-        e.setCancelled(true);
-        int slot = e.getRawSlot();
-        if (slot < 0 || slot >= e.getView().getTopInventory().getSize()) return;
-
-        if (title.contains("EMERALD SMP SHOP")) {
-            if (slot == 31 || slot == 53) { p.closeInventory(); return; }
-            String key = categoryAt(slot);
-            if (key != null) plugin.getShopManager().openCategory(p, key, 0);
-            return;
-        }
-
-        ShopManager.ShopView view = plugin.getShopManager().view(p);
-        if (view == null) return;
-
-        if (title.startsWith("💚 SHOP")) {
-            if (slot == 45) { plugin.getShopManager().openMain(p); return; }
-            if (slot == 53) { p.closeInventory(); return; }
-            if (slot == 48 && view.page() > 0) {
-                plugin.getShopManager().openCategory(p, view.category(), view.page() - 1);
-                return;
-            }
-            if (slot == 50) {
-                plugin.getShopManager().openCategory(p, view.category(), view.page() + 1);
-                return;
-            }
-            ShopManager.ShopItem item = plugin.getShopManager().itemFor(p, slot);
-            if (item != null) plugin.getShopManager().openItem(p, item, view.category(), view.page());
-            return;
-        }
-
-        if (title.equals("💚 BUY ITEM")) {
-            if (slot == 18) {
-                plugin.getShopManager().openCategory(p, view.category(), view.page());
-                return;
-            }
-            if (slot == 22) { p.closeInventory(); return; }
-
-            ShopManager.ShopItem item = view.items().isEmpty() ? null : (ShopManager.ShopItem) view.items().get(0);
-            if (item == null) return;
-
-            int qty = switch (slot) {
-                case 10 -> 1;
-                case 11 -> 16;
-                case 12 -> 32;
-                case 14 -> 64;
-                default -> 0;
-            };
-            if (qty <= 0) return;
-
-            boolean success = plugin.getShopManager().buy(p, item, qty);
-            p.sendMessage(success
-                    ? "§a💚 §2§lEmerald SMP §8» §aPurchase completed."
-                    : "§a💚 §2§lEmerald SMP §8» §cPurchase could not be completed.");
-        }
+    public ShopListener(EmeraldSMP plugin){this.plugin=plugin;}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void click(InventoryClickEvent e){
+        if(!(e.getWhoClicked() instanceof Player p))return;
+        if(plugin.getShopManager().isSellInventory(p,e.getView().getTopInventory())){if(e.getRawSlot()>=45)e.setCancelled(true);return;}
+        String title=ChatColor.stripColor(e.getView().getTitle());
+        if(!title.contains("EMERALD SMP SHOP")&&!title.startsWith("💚 SHOP")&&!title.equals("💚 BUY ITEM"))return;
+        e.setCancelled(true);int slot=e.getRawSlot();if(slot<0||slot>=e.getView().getTopInventory().getSize())return;
+        if(title.contains("EMERALD SMP SHOP")){if(slot==31){p.closeInventory();return;}String key=categoryAt(slot);if(key!=null)plugin.getShopManager().openCategory(p,key,0);return;}
+        ShopManager.ShopView v=plugin.getShopManager().view(p);if(v==null)return;
+        if(title.startsWith("💚 SHOP")){if(slot==45){plugin.getShopManager().openMain(p);return;}if(slot==53){p.closeInventory();return;}if(slot==48){plugin.getShopManager().openCategory(p,v.category(),v.page()-1);return;}if(slot==50){plugin.getShopManager().openCategory(p,v.category(),v.page()+1);return;}ShopManager.ShopItem item=plugin.getShopManager().itemFor(p,slot);if(item!=null)plugin.getShopManager().openItem(p,item,v.category(),v.page());return;}
+        if(title.equals("💚 BUY ITEM")){if(slot==18){plugin.getShopManager().openCategory(p,v.category(),v.page());return;}if(slot==22){p.closeInventory();return;}ShopManager.ShopItem item=v.items().isEmpty()?null:(ShopManager.ShopItem)v.items().get(0);if(item==null)return;int qty=switch(slot){case 10->1;case 11->16;case 12->32;case 14->64;default->0};if(qty<=0)return;p.sendMessage(plugin.getShopManager().buy(p,item,qty)?"§a💚 Purchase completed.":"§cPurchase could not be completed.");}
     }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void drag(InventoryDragEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p)) return;
-        if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
-            int topSize = e.getView().getTopInventory().getSize();
-            boolean invalid = e.getRawSlots().stream().anyMatch(s -> s >= topSize || (s >= 45 && s < 54));
-            if (invalid) e.setCancelled(true);
-            return;
-        }
-
-        String title = ChatColor.stripColor(e.getView().getTitle());
-        if (title.contains("EMERALD SMP SHOP") || title.startsWith("💚 SHOP") || title.equals("💚 BUY ITEM"))
-            e.setCancelled(true);
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
+    public void drag(InventoryDragEvent e){
+        if(!(e.getWhoClicked() instanceof Player p))return;
+        if(plugin.getShopManager().isSellInventory(p,e.getView().getTopInventory())){if(e.getRawSlots().stream().anyMatch(s->s>=e.getView().getTopInventory().getSize()||(s>=45&&s<54)))e.setCancelled(true);return;}
+        String title=ChatColor.stripColor(e.getView().getTitle());if(title.contains("EMERALD SMP SHOP")||title.startsWith("💚 SHOP")||title.equals("💚 BUY ITEM"))e.setCancelled(true);
     }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void close(InventoryCloseEvent e) {
-        if (!(e.getPlayer() instanceof Player p)) return;
-        if (plugin.getShopManager().isSellInventory(p, e.getInventory())) {
-            // ESC, the close button, or any other normal inventory close is the
-            // confirmation that sells the contents.
-            plugin.getShopManager().closeSell(p);
-        }
-        plugin.getShopManager().view(p);
-    }
-
-    private String categoryAt(int slot) {
-        int[] slots={10,11,12,13,14,15,16,19,20,21,22,23};
-        String[] keys={"blocks","resources","farm","food","combat","tools","redstone","mob_drops","nether","end","building","spawners"};
-        for(int i=0;i<slots.length;i++)if(slots[i]==slot)return keys[i];
-        return null;
-    }
+    @EventHandler public void close(InventoryCloseEvent e){if(e.getPlayer() instanceof Player p&&plugin.getShopManager().isSellInventory(p,e.getInventory()))plugin.getShopManager().closeSell(p);}
+    private String categoryAt(int slot){for(int i=0;i<CATEGORY_SLOTS.length;i++)if(CATEGORY_SLOTS[i]==slot)return CATEGORY_KEYS[i];return null;}
+    private static final int[] CATEGORY_SLOTS={11,13,15,21,23};
+    private static final String[] CATEGORY_KEYS={"farm","resources","redstone","utility","nether"};
 }
