@@ -79,7 +79,7 @@ public final class EmeraldSMP extends JavaPlugin {
             TagsCommand tags=new TagsCommand(this,tagsManager);register("tags",tags,null);
             SpawnerCommand spawner=new SpawnerCommand(this,spawnerManager);register("spawner",spawner,spawner);
             DrillCommand drill=new DrillCommand(this,drillManager);register("drill",drill,drill);
-            CrateCommand crates=new CrateCommand(crateManager);register("crates",crates,crates);
+            CrateCommand crates=new CrateCommand(crateManager);register("crates",crates,crates);register("crate",crates,crates);register("keyall",crates,crates);register("shardgainer",drill,drill);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);
             getServer().getPluginManager().registerEvents(new ShopListener(this),this);
