@@ -16,9 +16,6 @@ public final class ShopManager {
     private static final String[] CATEGORY_KEYS = {"resources", "blocks", "redstone", "cpvp", "nether"};
     private static final String[] CATEGORY_NAMES = {"§a§l🌾 RESOURCES", "§2§l🧱 BLOCKS", "§c§l🔴 REDSTONE", "§5§l⚔ CPvP", "§4§l🔥 NETHER"};
     private static final Material[] CATEGORY_ICONS = {Material.WHEAT, Material.BRICKS, Material.REDSTONE, Material.END_CRYSTAL, Material.NETHER_BRICKS};
-    private static final int SELL_INPUT_SLOTS = 45;
-    private static final int SELL_BUTTON_SLOT = 49;
-    private static final int SELL_CLOSE_SLOT = 53;
 
     private static final Map<String, List<Material>> CURATED = Map.ofEntries(
             Map.entry("resources", List.of(Material.KELP, Material.WHEAT, Material.CARROT, Material.POTATO, Material.BAMBOO, Material.CACTUS, Material.COCOA_BEANS, Material.SUGAR_CANE, Material.NETHER_WART)),
@@ -30,8 +27,6 @@ public final class ShopManager {
 
     private final EmeraldSMP plugin;
     private final Map<UUID, ShopView> views = new HashMap<>();
-    private final Map<UUID, Inventory> sellInventories = new HashMap<>();
-    private final Set<UUID> sellProcessing = new HashSet<>();
     private final Set<UUID> buyProcessing = new HashSet<>();
 
     public ShopManager(EmeraldSMP plugin) { this.plugin = plugin; }
@@ -42,7 +37,7 @@ public final class ShopManager {
         for (int i = 0; i < CATEGORY_SLOTS.length; i++) inv.setItem(CATEGORY_SLOTS[i], icon(CATEGORY_ICONS[i], CATEGORY_NAMES[i], List.of("§7Curated survival essentials", "§8Click to browse")));
         inv.setItem(4, icon(Material.EMERALD, "§a§l💚 EMERALD SMP", List.of("§7A compact survival economy shop", "§8Resources • Blocks • Redstone • CPvP • Nether")));
         inv.setItem(31, icon(Material.BARRIER, "§c§l✕ CLOSE", List.of()));
-        views.put(p.getUniqueId(), new ShopView(false, null, 0, List.of()));
+        views.put(p.getUniqueId(), new ShopView(null, 0, List.of()));
         p.openInventory(inv);
     }
 
@@ -58,7 +53,7 @@ public final class ShopManager {
         inv.setItem(49, icon(Material.EMERALD, "§a§l" + categoryDisplay(key), List.of("§7Page §f" + (safe + 1) + "§7/§f" + pages, "§7" + items.size() + " curated items")));
         inv.setItem(50, icon(Material.ARROW, "§aNEXT ➡", List.of("§7Next page")));
         inv.setItem(53, icon(Material.BARRIER, "§c§l✕ CLOSE", List.of()));
-        views.put(p.getUniqueId(), new ShopView(false, key, safe, items));
+        views.put(p.getUniqueId(), new ShopView(key, safe, items));
         p.openInventory(inv);
     }
 
@@ -69,130 +64,9 @@ public final class ShopManager {
         inv.setItem(16, icon(Material.EMERALD, "§a§l💰 BUY", List.of("§7Select an amount above", "§8Purchase only if you can afford it")));
         inv.setItem(18, icon(Material.ARROW, "§e§l⬅ BACK", List.of("§7Return to " + categoryDisplay(key))));
         inv.setItem(22, icon(Material.BARRIER, "§c§l✕ CLOSE", List.of()));
-        views.put(p.getUniqueId(), new ShopView(false, key, page, List.of(item)));
+        views.put(p.getUniqueId(), new ShopView(key, page, List.of(item)));
         p.openInventory(inv);
     }
-
-    public void openSell(Player p) {
-        returnSellItems(p);
-        Inventory inv = plugin.getServer().createInventory(null, 54, "§2§l💚 SELL ITEMS");
-        for (int i = SELL_INPUT_SLOTS; i < 54; i++) inv.setItem(i, filler());
-        inv.setItem(47, icon(Material.EMERALD, "§a§l💰 TOTAL", List.of("§7Current sell value", "§f$0")));
-        inv.setItem(49, icon(Material.EMERALD_BLOCK, "§a§l💰 SELL", List.of("§7Sell every valid item in the input area", "§8Transaction is validated server-side", "§eClick to sell")));
-        inv.setItem(53, icon(Material.BARRIER, "§c§l✕ CLOSE", List.of("§7Return your items without selling")));
-        sellInventories.put(p.getUniqueId(), inv);
-        p.openInventory(inv);
-        updateSellDisplay(p, inv);
-    }
-
-    public boolean isSellInventory(Player p, Inventory inv) { return sellInventories.get(p.getUniqueId()) == inv; }
-    public boolean isSellButton(int slot) { return slot == SELL_BUTTON_SLOT; }
-
-    public void handleSellClick(Player p, int rawSlot) {
-        Inventory inv = sellInventories.get(p.getUniqueId());
-        if (inv == null) return;
-        if (rawSlot == SELL_BUTTON_SLOT) sellContents(p);
-        else if (rawSlot == SELL_CLOSE_SLOT) p.closeInventory();
-        else if (rawSlot >= 0 && rawSlot < SELL_INPUT_SLOTS) updateSellDisplay(p, inv);
-    }
-
-    public void sellContents(Player p) {
-        UUID u = p.getUniqueId();
-        if (!sellProcessing.add(u)) { p.sendMessage("§e💰 Sell transaction already processing."); return; }
-        Inventory inv = sellInventories.get(u);
-        if (inv == null) { sellProcessing.remove(u); return; }
-        try {
-            long total = 0;
-            long itemCount = 0;
-            List<ItemStack> snapshot = new ArrayList<>();
-            for (int slot = 0; slot < SELL_INPUT_SLOTS; slot++) {
-                ItemStack stack = inv.getItem(slot);
-                if (stack == null || stack.getType().isAir()) continue;
-                long value = plugin.getWorthManager().sellValue(stack.getType(), stack.getAmount());
-                if (value <= 0) continue;
-                if (Long.MAX_VALUE - total < value) { p.sendMessage("§cSell value is too large; nothing was sold."); return; }
-                total += value;
-                itemCount += stack.getAmount();
-                snapshot.add(stack.clone());
-            }
-            if (total <= 0) { p.sendMessage("§cThere are no sellable items in the sell area."); return; }
-
-            // Remove exactly the validated sellable stacks first. If the economy rejects
-            // the credit, the exact snapshot is restored so the player cannot lose items.
-            for (int slot = 0; slot < SELL_INPUT_SLOTS; slot++) {
-                ItemStack stack = inv.getItem(slot);
-                if (stack == null || stack.getType().isAir()) continue;
-                if (plugin.getWorthManager().sellValue(stack.getType(), stack.getAmount()) > 0) inv.setItem(slot, null);
-            }
-
-            if (!plugin.getEconomyManager().deposit(u, total)) {
-                restoreSellSnapshot(inv, snapshot);
-                p.sendMessage("§cThe economy rejected this transaction; nothing was sold.");
-                return;
-            }
-
-            p.sendMessage("§a💰 Sold §f" + fmt(itemCount) + " §aitems for §f" + plugin.getEconomyManager().format(total) + "§a!");
-            sellInventories.remove(u);
-            p.closeInventory();
-        } finally {
-            sellProcessing.remove(u);
-        }
-    }
-
-    private void restoreSellSnapshot(Inventory inv, List<ItemStack> snapshot) {
-        for (ItemStack item : snapshot) {
-            Map<Integer, ItemStack> extra = inv.addItem(item.clone());
-            for (ItemStack left : extra.values()) {
-                // This should be unreachable because the snapshot came from this inventory.
-                // Keep the item rather than deleting it if a future inventory change makes it full.
-                Player owner = null;
-                for (Map.Entry<UUID, Inventory> entry : sellInventories.entrySet()) {
-                    if (entry.getValue() == inv) { owner = plugin.getServer().getPlayer(entry.getKey()); break; }
-                }
-                if (owner != null) owner.getWorld().dropItemNaturally(owner.getLocation(), left);
-            }
-        }
-    }
-
-    public void closeSell(Player p) {
-        UUID u = p.getUniqueId();
-        if (sellProcessing.contains(u)) return;
-        Inventory inv = sellInventories.remove(u);
-        if (inv == null) return;
-        restoreInputItems(p, inv);
-    }
-
-    public void returnSellItems(Player p) {
-        Inventory inv = sellInventories.remove(p.getUniqueId());
-        if (inv != null) restoreInputItems(p, inv);
-    }
-
-    private void restoreInputItems(Player p, Inventory inv) {
-        for (int slot = 0; slot < SELL_INPUT_SLOTS; slot++) {
-            ItemStack s = inv.getItem(slot);
-            if (s == null || s.getType().isAir()) continue;
-            inv.setItem(slot, null);
-            for (ItemStack left : p.getInventory().addItem(s.clone()).values()) p.getWorld().dropItemNaturally(p.getLocation(), left);
-        }
-    }
-
-    public void refreshSellDisplay(Player p) {
-        Inventory inv = sellInventories.get(p.getUniqueId());
-        if (inv != null) updateSellDisplay(p, inv);
-    }
-
-    private void updateSellDisplay(Player p, Inventory inv) {
-        long total = 0;
-        for (int slot = 0; slot < SELL_INPUT_SLOTS; slot++) {
-            ItemStack s = inv.getItem(slot);
-            if (s == null || s.getType().isAir()) continue;
-            long value = plugin.getWorthManager().sellValue(s.getType(), s.getAmount());
-            if (value > 0 && Long.MAX_VALUE - total >= value) total += value;
-        }
-        inv.setItem(47, icon(Material.EMERALD, "§a§l💰 TOTAL", List.of("§7Current sell value", "§f" + plugin.getEconomyManager().format(total))));
-    }
-
-    private String fmt(long n) { return String.format(Locale.US, "%,d", n); }
 
     public ShopView view(Player p) { return views.get(p.getUniqueId()); }
     public ShopItem itemFor(Player p, int slot) {
@@ -270,6 +144,6 @@ public final class ShopManager {
         for (String w : s.split(" ")) if (!w.isEmpty()) b.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(' ');
         return b.toString().trim();
     }
-    public record ShopView(boolean sellMode, String category, int page, List<?> items) {}
+    public record ShopView(String category, int page, List<?> items) {}
     public record ShopItem(String key, Material material, String displayName, long buyPrice, List<String> lore) {}
 }

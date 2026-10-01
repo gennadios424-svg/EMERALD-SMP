@@ -87,6 +87,8 @@ public final class CrateManager implements Listener {
     private KeyType keyEnum(String t){return KeyType.valueOf(normalize(t).toUpperCase(Locale.ROOT));}
     private boolean consumeVirtualKey(Player p,String type){UUID u=p.getUniqueId();EnumMap<KeyType,Integer> m=virtualKeys.get(u);if(m==null)return false;KeyType k=keyEnum(type);int n=m.getOrDefault(k,0);if(n<=0)return false;if(n==1)m.remove(k);else m.put(k,n-1);if(m.isEmpty())virtualKeys.remove(u);save();return true;}
     private int keySlot(Player p,String type){ItemStack[] c=p.getInventory().getStorageContents();for(int i=0;i<c.length;i++)if(type.equals(keyType(c[i])))return i;return -1;}
+    public boolean isKeyAllRunning(){return keyAllRunning;}
+
     public synchronized void keyAll(String type,int amount,CommandSender sender){
         type=normalize(type);amount=Math.max(1,Math.min(64,amount));
         if(keyAllRunning){sender.sendMessage(ChatColor.YELLOW+"⏳ A Keyall animation is already running. Please wait for it to finish.");return;}

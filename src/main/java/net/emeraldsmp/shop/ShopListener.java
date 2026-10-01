@@ -1,16 +1,79 @@
 package net.emeraldsmp.shop;
-import org.bukkit.ChatColor;import org.bukkit.entity.Player;import org.bukkit.event.*;import org.bukkit.event.inventory.*;import org.bukkit.event.player.PlayerQuitEvent;
-public final class ShopListener implements Listener{
- private final net.emeraldsmp.EmeraldSMP plugin;public ShopListener(net.emeraldsmp.EmeraldSMP p){plugin=p;}
- @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false) public void click(InventoryClickEvent e){if(!(e.getWhoClicked() instanceof Player p))return;
-  if(plugin.getCleanSellManager().isOpen(p,e.getView().getTopInventory())){int raw=e.getRawSlot();if(raw>=0&&raw<e.getView().getTopInventory().getSize()&&plugin.getCleanSellManager().isControl(raw)){e.setCancelled(true);plugin.getCleanSellManager().control(p,raw);return;}if(e.isShiftClick()&&e.getClickedInventory()==p.getInventory()){var x=e.getCurrentItem();if(x!=null&&!x.getType().isAir()){var w=plugin.getWorthManager().get(x.getType());if(w==null||!w.enabled()||w.worth()<=0){e.setCancelled(true);p.sendMessage("§c❌ This item cannot be sold.");return;}}}plugin.getCleanSellManager().refreshLater(p);return;}
-  String t=ChatColor.stripColor(e.getView().getTitle());if(!t.contains("EMERALD SMP SHOP")&&!t.startsWith("💚 SHOP")&&!t.startsWith("💚 BUY"))return;e.setCancelled(true);int slot=e.getRawSlot();if(slot<0||slot>=e.getView().getTopInventory().getSize())return;
-  if(t.contains("EMERALD SMP SHOP")){if(slot==31){p.closeInventory();return;}String k=categoryAt(slot);if(k!=null)plugin.getShopManager().openCategory(p,k,0);return;}
-  var v=plugin.getShopManager().view(p);if(v==null)return;
-  if(t.startsWith("💚 SHOP")){if(slot==45){plugin.getShopManager().openMain(p);return;}if(slot==53){p.closeInventory();return;}if(slot==48){plugin.getShopManager().openCategory(p,v.category(),v.page()-1);return;}if(slot==50){plugin.getShopManager().openCategory(p,v.category(),v.page()+1);return;}var item=plugin.getShopManager().itemFor(p,slot);if(item!=null)plugin.getShopManager().openItem(p,item,v.category(),v.page());return;}
-  if(t.startsWith("💚 BUY")){if(slot==18){plugin.getShopManager().openCategory(p,v.category(),v.page());return;}if(slot==22){p.closeInventory();return;}var item=v.items().isEmpty()?null:(ShopManager.ShopItem)v.items().get(0);if(item==null)return;int q=switch(slot){case 10->1;case 11->16;case 12->32;case 14->64;default->0;};if(q<=0)return;boolean ok=plugin.getShopManager().buy(p,item,q);p.sendMessage(ok?"§a💚 Purchase completed: §f"+q+"x "+item.material().name()+"§a.":"§cPurchase could not be completed. Check your balance and inventory space.");}}
- @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false) public void drag(InventoryDragEvent e){if(!(e.getWhoClicked() instanceof Player p))return;if(plugin.getCleanSellManager().isOpen(p,e.getView().getTopInventory())){int size=e.getView().getTopInventory().getSize();if(e.getRawSlots().stream().anyMatch(x->x>=45&&x<size)){e.setCancelled(true);return;}plugin.getCleanSellManager().refreshLater(p);return;}String t=ChatColor.stripColor(e.getView().getTitle());if(t.contains("EMERALD SMP SHOP")||t.startsWith("💚 SHOP")||t.startsWith("💚 BUY"))e.setCancelled(true);}
- @EventHandler public void close(InventoryCloseEvent e){if(e.getPlayer() instanceof Player p&&plugin.getCleanSellManager().isOpen(p,e.getInventory()))plugin.getCleanSellManager().close(p);}
- @EventHandler public void quit(PlayerQuitEvent e){plugin.getCleanSellManager().quit(e.getPlayer());}
- private String categoryAt(int s){int[] slots={11,13,15,21,23};String[] keys={"resources","blocks","redstone","cpvp","nether"};for(int i=0;i<slots.length;i++)if(slots[i]==s)return keys[i];return null;}
+
+import net.emeraldsmp.EmeraldSMP;
+import org.bukkit.ChatColor;
+import org.bukkit.entity.Player;
+import org.bukkit.event.*;
+import org.bukkit.event.inventory.*;
+import org.bukkit.event.player.PlayerQuitEvent;
+
+public final class ShopListener implements Listener {
+    private final EmeraldSMP plugin;
+    public ShopListener(EmeraldSMP plugin) { this.plugin = plugin; }
+
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
+    public void click(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (plugin.getCleanSellManager().isOpen(player, event.getView().getTopInventory())) {
+            plugin.getCleanSellManager().handleClick(player, event);
+            return;
+        }
+        String title = ChatColor.stripColor(event.getView().getTitle());
+        if (!title.contains("EMERALD SMP SHOP") && !title.startsWith("💚 SHOP") && !title.startsWith("💚 BUY")) return;
+        event.setCancelled(true);
+        int slot = event.getRawSlot();
+        if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+        if (title.contains("EMERALD SMP SHOP")) {
+            if (slot == 31) { player.closeInventory(); return; }
+            String key = categoryAt(slot);
+            if (key != null) plugin.getShopManager().openCategory(player, key, 0);
+            return;
+        }
+        var view = plugin.getShopManager().view(player);
+        if (view == null) return;
+        if (title.startsWith("💚 SHOP")) {
+            if (slot == 45) { plugin.getShopManager().openMain(player); return; }
+            if (slot == 53) { player.closeInventory(); return; }
+            if (slot == 48) { plugin.getShopManager().openCategory(player, view.category(), view.page()-1); return; }
+            if (slot == 50) { plugin.getShopManager().openCategory(player, view.category(), view.page()+1); return; }
+            var item = plugin.getShopManager().itemFor(player, slot);
+            if (item != null) plugin.getShopManager().openItem(player, item, view.category(), view.page());
+            return;
+        }
+        if (title.startsWith("💚 BUY")) {
+            if (slot == 18) { plugin.getShopManager().openCategory(player, view.category(), view.page()); return; }
+            if (slot == 22) { player.closeInventory(); return; }
+            var item = view.items().isEmpty() ? null : (ShopManager.ShopItem)view.items().get(0);
+            if (item == null) return;
+            int qty = switch(slot) { case 10 -> 1; case 11 -> 16; case 12 -> 32; case 14 -> 64; default -> 0; };
+            if (qty <= 0) return;
+            boolean ok = plugin.getShopManager().buy(player, item, qty);
+            player.sendMessage(ok ? "§a💚 Purchase completed: §f"+qty+"x "+item.material().name()+"§a."
+                    : "§cPurchase could not be completed. Check your balance and inventory space.");
+        }
+    }
+
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
+    public void drag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (plugin.getCleanSellManager().isOpen(player, event.getView().getTopInventory())) {
+            plugin.getCleanSellManager().handleDrag(player, event);
+            return;
+        }
+        String title = ChatColor.stripColor(event.getView().getTitle());
+        if (title.contains("EMERALD SMP SHOP") || title.startsWith("💚 SHOP") || title.startsWith("💚 BUY")) event.setCancelled(true);
+    }
+
+    @EventHandler public void close(InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player player && plugin.getCleanSellManager().isOpen(player, event.getInventory()))
+            plugin.getCleanSellManager().close(player);
+    }
+
+    @EventHandler public void quit(PlayerQuitEvent event) { plugin.getCleanSellManager().quit(event.getPlayer()); }
+
+    private String categoryAt(int slot) {
+        int[] slots={11,13,15,21,23}; String[] keys={"resources","blocks","redstone","cpvp","nether"};
+        for(int i=0;i<slots.length;i++) if(slots[i]==slot) return keys[i];
+        return null;
+    }
 }

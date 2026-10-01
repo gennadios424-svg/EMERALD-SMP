@@ -2,7 +2,7 @@ name: EmeraldSMP
 version: '1.6'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP economy, teams, tags, roles, kits, custom spawners, drills, worth, shop, RTP, orders, coin flips, auction house, homes and investments
+description: Emerald SMP economy, teams, tags, roles, kits, custom spawners, drills, worth, shop, RTP, coin flips, auction house, homes and investments
 commands:
   emerald:
     description: Emerald SMP foundation command
@@ -36,10 +36,6 @@ commands:
   rtp:
     description: Teleports you to a random safe location
     usage: /rtp
-    permission: emerald.command
-  order:
-    description: Opens player-to-player item orders
-    usage: /order
     permission: emerald.command
   cf:
     description: Opens coin flip
