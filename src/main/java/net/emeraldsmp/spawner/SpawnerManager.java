@@ -149,6 +149,12 @@ public final class SpawnerManager implements Listener {
     public void breakBlock(BlockBreakEvent e){
         Data d=spawners.get(key(e.getBlock()));if(d==null)return;Player p=e.getPlayer();
         if(!d.owner.equals(p.getUniqueId())&&!p.hasPermission("emerald.admin")){e.setCancelled(true);p.sendMessage(ChatColor.RED+"Only the owner can break this spawner.");return;}
+        ItemStack tool = p.getInventory().getItemInMainHand();
+        if (tool.getType() != Material.DIAMOND_PICKAXE && tool.getType() != Material.NETHERITE_PICKAXE) {
+            e.setCancelled(true);
+            p.sendMessage(ChatColor.RED + "You need a Diamond or Netherite Pickaxe to break an Emerald Spawner.");
+            return;
+        }
         e.setCancelled(true);e.getBlock().setType(Material.AIR,false);spawners.remove(d.key());openSpawners.values().removeIf(v->v.equals(d.key()));
         giveSpawnerItems(p,d.amount);give(p,Material.BONE,d.bones);give(p,Material.ARROW,d.arrows);give(p,Material.BOW,d.bows);if(d.collectXp&&d.xp>0)p.giveExp((int)Math.min(Integer.MAX_VALUE,d.xp));save();
         p.sendMessage(ChatColor.GREEN+"Skeleton Spawner x"+d.amount+" broken and returned.");
