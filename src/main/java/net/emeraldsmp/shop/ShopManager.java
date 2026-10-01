@@ -103,6 +103,7 @@ public final class ShopManager {
         try {
             long total = 0;
             long itemCount = 0;
+            List<ItemStack> snapshot = new ArrayList<>();
             for (int slot = 0; slot < SELL_INPUT_SLOTS; slot++) {
                 ItemStack stack = inv.getItem(slot);
                 if (stack == null || stack.getType().isAir()) continue;
@@ -111,23 +112,44 @@ public final class ShopManager {
                 if (Long.MAX_VALUE - total < value) { p.sendMessage("§cSell value is too large; nothing was sold."); return; }
                 total += value;
                 itemCount += stack.getAmount();
+                snapshot.add(stack.clone());
             }
             if (total <= 0) { p.sendMessage("§cThere are no sellable items in the sell area."); return; }
 
-            // Validate the complete transaction before mutating the inventory.
-            if (!plugin.getEconomyManager().deposit(u, total)) { p.sendMessage("§cThe economy rejected this transaction; nothing was removed."); return; }
-
+            // Remove exactly the validated sellable stacks first. If the economy rejects
+            // the credit, the exact snapshot is restored so the player cannot lose items.
             for (int slot = 0; slot < SELL_INPUT_SLOTS; slot++) {
                 ItemStack stack = inv.getItem(slot);
                 if (stack == null || stack.getType().isAir()) continue;
-                long value = plugin.getWorthManager().sellValue(stack.getType(), stack.getAmount());
-                if (value > 0) inv.setItem(slot, null);
+                if (plugin.getWorthManager().sellValue(stack.getType(), stack.getAmount()) > 0) inv.setItem(slot, null);
             }
+
+            if (!plugin.getEconomyManager().deposit(u, total)) {
+                restoreSellSnapshot(inv, snapshot);
+                p.sendMessage("§cThe economy rejected this transaction; nothing was sold.");
+                return;
+            }
+
             p.sendMessage("§a💰 Sold §f" + fmt(itemCount) + " §aitems for §f" + plugin.getEconomyManager().format(total) + "§a!");
             sellInventories.remove(u);
             p.closeInventory();
         } finally {
             sellProcessing.remove(u);
+        }
+    }
+
+    private void restoreSellSnapshot(Inventory inv, List<ItemStack> snapshot) {
+        for (ItemStack item : snapshot) {
+            Map<Integer, ItemStack> extra = inv.addItem(item.clone());
+            for (ItemStack left : extra.values()) {
+                // This should be unreachable because the snapshot came from this inventory.
+                // Keep the item rather than deleting it if a future inventory change makes it full.
+                Player owner = null;
+                for (Map.Entry<UUID, Inventory> entry : sellInventories.entrySet()) {
+                    if (entry.getValue() == inv) { owner = plugin.getServer().getPlayer(entry.getKey()); break; }
+                }
+                if (owner != null) owner.getWorld().dropItemNaturally(owner.getLocation(), left);
+            }
         }
     }
 
