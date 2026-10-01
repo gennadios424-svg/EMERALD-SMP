@@ -1,438 +1,94 @@
 package net.emeraldsmp.shop;
 
 import net.emeraldsmp.EmeraldSMP;
-import net.emeraldsmp.worth.WorthCategory;
 import net.emeraldsmp.worth.WorthEntry;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.BlockStateMeta;
-import org.bukkit.block.ShulkerBox;
-
 import java.util.*;
 
 public final class ShopManager {
-    public static final String MAIN = "shop_main";
-    public static final String CATEGORY = "shop_category";
-    public static final String ITEM = "shop_item";
-    public static final String SELL_GUI = "sell_gui";
-
-    private static final int ITEMS_PER_PAGE = 45;
-    private static final int[] CATEGORY_SLOTS = {10,11,12,13,14,15,16,19,20,21,22,23};
-    private static final String[] CATEGORY_KEYS = {"blocks","resources","farm","food","combat","tools","redstone","mob_drops","nether","end","building","spawners"};
-    private static final String[] CATEGORY_NAMES = {"§a🧱 Blocks","§b💎 Ores & Resources","§2🌿 Farming","§6🍖 Food","§c⚔ Combat","§e⛏ Tools","§c🔴 Redstone","§7🧟 Mob Drops","§4🔥 Nether","§5🌌 End","§d🏗 Building","§a🧟 Spawners"};
-    private static final Material[] CATEGORY_ICONS = {
-            Material.STONE,Material.DIAMOND,Material.WHEAT,Material.COOKED_BEEF,
-            Material.DIAMOND_SWORD,Material.DIAMOND_PICKAXE,Material.REDSTONE,Material.BONE,
-            Material.NETHERRACK,Material.ENDER_CHEST,Material.BRICKS,Material.SPAWNER
-    };
-
+    private static final int[] CATEGORY_SLOTS={11,13,15,21,23};
+    private static final String[] CATEGORY_KEYS={"farm","resources","redstone","utility","nether"};
+    private static final String[] CATEGORY_NAMES={"§2🌿 Farming","§b💎 Resources","§c🔴 Redstone","§e🔧 Utility","§4🔥 Nether"};
+    private static final Material[] CATEGORY_ICONS={Material.WHEAT,Material.IRON_INGOT,Material.REDSTONE,Material.HOPPER,Material.NETHERRACK};
+    private static final Map<String,List<Material>> CURATED=Map.of(
+        "farm",List.of(Material.WHEAT,Material.CARROT,Material.POTATO,Material.BEETROOT,Material.SUGAR_CANE,Material.CACTUS,Material.BAMBOO,Material.COCOA_BEANS,Material.NETHER_WART,Material.KELP),
+        "resources",List.of(Material.COBBLESTONE,Material.STONE,Material.COAL,Material.IRON_INGOT,Material.COPPER_INGOT,Material.GOLD_INGOT,Material.REDSTONE,Material.LAPIS_LAZULI,Material.QUARTZ,Material.AMETHYST_SHARD),
+        "redstone",List.of(Material.REDSTONE,Material.RAIL,Material.POWERED_RAIL,Material.PISTON,Material.STICKY_PISTON,Material.OBSERVER,Material.REPEATER,Material.COMPARATOR,Material.HOPPER),
+        "utility",List.of(Material.GLASS,Material.SAND,Material.GRAVEL,Material.CLAY,Material.TORCH,Material.CHEST,Material.BARREL),
+        "nether",List.of(Material.NETHERRACK,Material.SOUL_SAND,Material.SOUL_SOIL,Material.QUARTZ,Material.GLOWSTONE_DUST)
+    );
     private final EmeraldSMP plugin;
-    private final Map<UUID, ShopView> views = new HashMap<>();
-    private final Map<UUID, Inventory> sellInventories = new HashMap<>();
-    private final Set<UUID> sellProcessing = new HashSet<>();
-
-    public ShopManager(EmeraldSMP plugin) { this.plugin = plugin; }
-
-    public void reload() {
-        views.clear();
+    private final Map<UUID,ShopView> views=new HashMap<>();
+    private final Map<UUID,Inventory> sellInventories=new HashMap<>();
+    private final Set<UUID> sellProcessing=new HashSet<>();
+    public ShopManager(EmeraldSMP plugin){this.plugin=plugin;}
+    public void reload(){views.clear();}
+    public void openMain(Player p){
+        Inventory inv=plugin.getServer().createInventory(null,36,"§2§l💚 EMERALD SMP SHOP");
+        for(int i=0;i<CATEGORY_SLOTS.length;i++)inv.setItem(CATEGORY_SLOTS[i],icon(CATEGORY_ICONS[i],CATEGORY_NAMES[i],List.of("§7Useful survival resources","§8No gear • No weapons • No mob drops")));
+        inv.setItem(31,icon(Material.BARRIER,"§cClose",List.of()));views.put(p.getUniqueId(),new ShopView(false,null,0,List.of()));p.openInventory(inv);
     }
-
-    public void openMain(Player p) {
-        Inventory inv = plugin.getServer().createInventory(null, 36, "§2§l💚 EMERALD SMP SHOP");
-        for (int i = 0; i < CATEGORY_SLOTS.length; i++) {
-            inv.setItem(CATEGORY_SLOTS[i], icon(CATEGORY_ICONS[i], CATEGORY_NAMES[i],
-                    List.of("§7Browse items available to buy")));
-        }
-        inv.setItem(31, icon(Material.BARRIER, "§cClose", List.of()));
-        views.put(p.getUniqueId(), new ShopView(false, null, 0, List.of()));
-        p.openInventory(inv);
+    public void openCategory(Player p,String key,int page){
+        List<ShopItem> items=configuredItems(key);int pages=Math.max(1,(items.size()+44)/45),safe=Math.max(0,Math.min(page,pages-1));
+        Inventory inv=plugin.getServer().createInventory(null,54,"§2§l💚 SHOP §8• §f"+categoryDisplay(key)+" §8• §f"+(safe+1)+"/"+pages);
+        int from=safe*45,to=Math.min(from+45,items.size());for(int i=from;i<to;i++)inv.setItem(i-from,shopDisplay(items.get(i)));
+        inv.setItem(45,icon(Material.ARROW,"§e⬅ Back",List.of()));inv.setItem(48,icon(Material.ARROW,"§a⬅ Previous",List.of()));
+        inv.setItem(49,icon(Material.PAPER,"§fPage "+(safe+1)+"/"+pages,List.of("§7"+items.size()+" selected items")));
+        inv.setItem(50,icon(Material.ARROW,"§aNext ➡",List.of()));inv.setItem(53,icon(Material.BARRIER,"§cClose",List.of()));
+        views.put(p.getUniqueId(),new ShopView(false,key,safe,items));p.openInventory(inv);
     }
-
-    public void openCategory(Player p, String categoryKey, int page) {
-        List<ShopItem> items = configuredItems(categoryKey);
-        int pages = Math.max(1, (items.size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
-        int safePage = Math.max(0, Math.min(page, pages - 1));
-
-        Inventory inv = plugin.getServer().createInventory(null, 54,
-                "§2§l💚 SHOP §8• §f" + categoryDisplay(categoryKey) + " §8• §f" + (safePage + 1) + "/" + pages);
-
-        int from = safePage * ITEMS_PER_PAGE;
-        int to = Math.min(from + ITEMS_PER_PAGE, items.size());
-        for (int i = from; i < to; i++) {
-            inv.setItem(i - from, shopDisplay(items.get(i)));
-        }
-
-        inv.setItem(45, icon(Material.ARROW, "§e⬅ Back", List.of("§7Return to shop categories")));
-        inv.setItem(48, icon(Material.ARROW, "§a⬅ Previous", List.of("§7Previous page")));
-        inv.setItem(49, icon(Material.PAPER, "§fPage " + (safePage + 1) + "/" + pages,
-                List.of("§7" + items.size() + " configured items")));
-        inv.setItem(50, icon(Material.ARROW, "§aNext ➡", List.of("§7Next page")));
-        inv.setItem(53, icon(Material.BARRIER, "§cClose", List.of()));
-
-        views.put(p.getUniqueId(), new ShopView(false, categoryKey, safePage, items));
-        p.openInventory(inv);
+    public void openItem(Player p,ShopItem item,String key,int page){
+        Inventory inv=plugin.getServer().createInventory(null,27,"§2§l💚 BUY ITEM");inv.setItem(13,shopDisplay(item));
+        inv.setItem(10,buyButton(item,1));inv.setItem(11,buyButton(item,16));inv.setItem(12,buyButton(item,32));inv.setItem(14,buyButton(item,64));
+        inv.setItem(18,icon(Material.ARROW,"§e⬅ Back",List.of()));inv.setItem(22,icon(Material.BARRIER,"§cClose",List.of()));
+        views.put(p.getUniqueId(),new ShopView(false,key,page,List.of(item)));p.openInventory(inv);
     }
-
-    public void openItem(Player p, ShopItem item, String categoryKey, int page) {
-        Inventory inv = plugin.getServer().createInventory(null, 27, "§2§l💚 BUY ITEM");
-        ItemStack display = item.key().equalsIgnoreCase("spawner_skeleton")
-                ? plugin.getSpawnerManager().createItem(1) : new ItemStack(item.material());
-        ItemMeta meta = display.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(item.displayName());
-            meta.setLore(List.of(
-                    "§7Buy price: §a" + plugin.getEconomyManager().format(item.buyPrice()),
-                    "§8Click a button to purchase"
-            ));
-            display.setItemMeta(meta);
-        }
-        inv.setItem(13, display);
-        inv.setItem(10, buyButton(item, 1));
-        inv.setItem(11, buyButton(item, 16));
-        inv.setItem(12, buyButton(item, 32));
-        inv.setItem(14, buyButton(item, 64));
-        inv.setItem(18, icon(Material.ARROW, "§e⬅ Back", List.of("§7Return to this shop category")));
-        inv.setItem(22, icon(Material.BARRIER, "§cClose", List.of()));
-        views.put(p.getUniqueId(), new ShopView(false, categoryKey, page, List.of(item)));
-        p.openInventory(inv);
+    public void openSell(Player p){
+        returnSellItems(p);Inventory inv=plugin.getServer().createInventory(null,54,"§2§l💚 SELL ITEMS");
+        for(int i=45;i<54;i++)inv.setItem(i,filler());inv.setItem(49,icon(Material.EMERALD,"§a§lAUTO SELL",List.of("§7Place sellable items above","§7Close the menu to sell","§7Unsellable items are returned")));
+        sellInventories.put(p.getUniqueId(),inv);p.openInventory(inv);
     }
-
-    public void openSell(Player p) {
-        // The sell area is slots 0-44. Closing the inventory is the transaction
-        // confirmation; there is intentionally no SELL button.
-        Inventory old = sellInventories.remove(p.getUniqueId());
-        if (old != null) returnSellItems(p);
-        Inventory inv = plugin.getServer().createInventory(null, 54, "§2§l💚 SELL ITEMS");
-        for (int i = 45; i < 54; i++) {
-            inv.setItem(i, filler());
-        }
-        inv.setItem(49, icon(Material.EMERALD, "§a§lAUTO SELL", List.of(
-                "§7Place items in the slots above",
-                "§7Close this menu to sell them",
-                "§7Unsaleable items are returned safely"
-        )));
-        sellInventories.put(p.getUniqueId(), inv);
-        p.openInventory(inv);
+    public boolean isSellInventory(Player p,Inventory inv){return sellInventories.get(p.getUniqueId())==inv;}
+    public void handleSellClick(Player p,int rawSlot){}
+    public void sellContents(Player p){processSellOnClose(p);}
+    public void closeSell(Player p){processSellOnClose(p);}
+    private void processSellOnClose(Player p){
+        UUID u=p.getUniqueId();if(sellProcessing.contains(u))return;Inventory inv=sellInventories.remove(u);if(inv==null)return;sellProcessing.add(u);
+        try{List<ItemStack> unsellable=new ArrayList<>();long total=0;int stacks=0;
+            for(int slot=0;slot<45;slot++){ItemStack s=inv.getItem(slot);if(s==null||s.getType().isAir())continue;long value=plugin.getWorthManager().sellValue(s.getType(),s.getAmount());inv.setItem(slot,null);
+                if(value>0){total=Math.addExact(total,value);stacks++;}else unsellable.add(s.clone());}
+            if(total>0){if(!plugin.getEconomyManager().deposit(u,total)){restoreItems(p,unsellable);p.sendMessage("§cSell transaction failed; items were returned.");return;}p.sendMessage("§a💚 Sold §f"+stacks+" §astack(s) for §f"+plugin.getEconomyManager().format(total)+"§a.");}
+            restoreItems(p,unsellable);if(total==0&&!unsellable.isEmpty())p.sendMessage("§cThose items cannot be sold.");
+        }catch(ArithmeticException ex){restoreSellInventory(p,inv);p.sendMessage("§cSell value was too large; nothing was sold.");}finally{sellProcessing.remove(u);}
     }
-
-    public boolean isSellInventory(Player p, Inventory inv) {
-        return sellInventories.get(p.getUniqueId()) == inv;
+    private void restoreSellInventory(Player p,Inventory inv){List<ItemStack> all=new ArrayList<>();for(int i=0;i<45;i++){ItemStack s=inv.getItem(i);if(s!=null&&!s.getType().isAir())all.add(s.clone());inv.setItem(i,null);}restoreItems(p,all);}
+    public void returnSellItems(Player p){Inventory inv=sellInventories.remove(p.getUniqueId());if(inv==null)return;List<ItemStack> all=new ArrayList<>();for(int i=0;i<45;i++){ItemStack s=inv.getItem(i);if(s!=null&&!s.getType().isAir())all.add(s.clone());inv.setItem(i,null);}restoreItems(p,all);}
+    private void restoreItems(Player p,List<ItemStack> items){for(ItemStack s:items){Map<Integer,ItemStack> left=p.getInventory().addItem(s);for(ItemStack x:left.values())p.getWorld().dropItemNaturally(p.getLocation(),x);}}
+    public ShopView view(Player p){return views.get(p.getUniqueId());}
+    public ShopItem itemFor(Player p,int slot){ShopView v=views.get(p.getUniqueId());if(v==null||slot<0||slot>=45)return null;int idx=v.page()*45+slot;return idx>=0&&idx<v.items().size()?(ShopItem)v.items().get(idx):null;}
+    public boolean buy(Player p,ShopItem item,int qty){
+        if(item==null||qty<=0||qty>64)return false;long total;try{total=Math.multiplyExact(item.buyPrice(),qty);}catch(Exception ex){return false;}
+        if(plugin.getEconomyManager().getBalance(p.getUniqueId())<total||!hasSpace(p,item.material(),qty))return false;
+        if(!plugin.getEconomyManager().withdraw(p.getUniqueId(),total))return false;Map<Integer,ItemStack> left=p.getInventory().addItem(new ItemStack(item.material(),qty));
+        if(!left.isEmpty()){plugin.getEconomyManager().deposit(p.getUniqueId(),total);return false;}return true;
     }
-
-    public void handleSellClick(Player p, int rawSlot) {
-        // Footer slots are informational and can never trigger a transaction.
+    private List<ShopItem> configuredItems(String key){
+        List<Material> mats=CURATED.getOrDefault(key,List.of());List<ShopItem> out=new ArrayList<>();
+        for(Material m:mats){WorthEntry w=plugin.getWorthManager().get(m);if(w==null||!w.enabled())continue;long buy=plugin.getWorthManager().buyValue(m,1);if(buy<=w.worth())continue;
+            out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT),m,"§f"+pretty(m),buy,List.of("§7Sell value: §a"+plugin.getEconomyManager().format(w.worth())+" §7/ item")));}return out;
     }
-
-    public void sellContents(Player p) {
-        processSellOnClose(p);
-    }
-
-    private void processSellOnClose(Player p) {
-        UUID uuid = p.getUniqueId();
-        if (sellProcessing.contains(uuid)) return;
-        Inventory inv = sellInventories.remove(uuid);
-        if (inv == null) return;
-
-        sellProcessing.add(uuid);
-        try {
-            List<ItemStack> all = new ArrayList<>();
-            List<ItemStack> sellable = new ArrayList<>();
-            List<ItemStack> unsellable = new ArrayList<>();
-            long total = 0L;
-
-            for (int slot = 0; slot < 45; slot++) {
-                ItemStack stack = inv.getItem(slot);
-                if (stack == null || stack.getType().isAir()) continue;
-                ItemStack copy = stack.clone();
-                all.add(copy);
-
-                long value;
-                try {
-                    value = valueOfStack(copy, new HashSet<>());
-                } catch (ArithmeticException ex) {
-                    value = Long.MAX_VALUE;
-                }
-                if (value > 0L) {
-                    if (Long.MAX_VALUE - total < value) {
-                        total = Long.MAX_VALUE;
-                    } else {
-                        total += value;
-                    }
-                    sellable.add(copy);
-                } else {
-                    unsellable.add(copy);
-                }
-                inv.setItem(slot, null);
-            }
-
-            if (sellable.isEmpty()) {
-                restoreItems(p, all);
-                if (!all.isEmpty()) {
-                    p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThese items cannot be sold and were returned.");
-                }
-                return;
-            }
-
-            if (!plugin.getEconomyManager().deposit(p.getUniqueId(), total)) {
-                restoreItems(p, all);
-                p.sendMessage("§a💚 §2§lEmerald SMP §8» §cThe transaction could not be completed; all items were returned.");
-                return;
-            }
-
-            // Unsaleable items are never deleted.
-            restoreItems(p, unsellable);
-
-            p.sendMessage("§a💚 §2§lEmerald SMP §8» §aSold §f" + sellable.size() +
-                    " §aitem stack(s) for §f" + plugin.getEconomyManager().format(total) + "§a.");
-            if (!unsellable.isEmpty()) {
-                p.sendMessage("§a💚 §2§lEmerald SMP §8» §eSome items could not be sold and were returned.");
-            }
-        } finally {
-            sellProcessing.remove(uuid);
-        }
-    }
-
-    private void restoreItems(Player p, List<ItemStack> items) {
-        for (ItemStack stack : items) {
-            if (stack == null || stack.getType().isAir()) continue;
-            Map<Integer, ItemStack> left = p.getInventory().addItem(stack);
-            for (ItemStack drop : left.values()) {
-                p.getWorld().dropItemNaturally(p.getLocation(), drop);
-            }
-        }
-    }
-
-    private long calculateSellValue(Inventory inv, Set<String> recursionGuard) {
-        long total = 0L;
-        for (int slot = 0; slot < 45; slot++) {
-            ItemStack stack = inv.getItem(slot);
-            if (stack == null || stack.getType().isAir()) continue;
-            long value = valueOfStack(stack, recursionGuard);
-            if (Long.MAX_VALUE - total < value) return Long.MAX_VALUE;
-            total += value;
-        }
-        return total;
-    }
-
-    private long valueOfStack(ItemStack stack, Set<String> recursionGuard) {
-        Material material = stack.getType();
-        long direct = plugin.getWorthManager().sellValue(material, stack.getAmount());
-
-        if (isShulker(stack)) {
-            BlockStateMeta meta = (BlockStateMeta) stack.getItemMeta();
-            if (meta != null && meta.getBlockState() instanceof ShulkerBox shulker) {
-                String guard = shulker.getPersistentDataContainer().toString() + ":" + material.name();
-                if (recursionGuard.add(guard)) {
-                    for (ItemStack inside : shulker.getInventory().getContents()) {
-                        if (inside != null && !inside.getType().isAir()) {
-                            long child = valueOfStack(inside, recursionGuard);
-                            if (Long.MAX_VALUE - direct < child) return Long.MAX_VALUE;
-                            direct += child;
-                        }
-                    }
-                    recursionGuard.remove(guard);
-                }
-            }
-        }
-        return direct;
-    }
-
-    private boolean isShulker(ItemStack stack) {
-        return stack.getItemMeta() instanceof BlockStateMeta meta && meta.getBlockState() instanceof ShulkerBox;
-    }
-
-    public void returnSellItems(Player p) {
-        Inventory inv = sellInventories.remove(p.getUniqueId());
-        if (inv == null) return;
-        for (int slot = 0; slot < 45; slot++) {
-            ItemStack stack = inv.getItem(slot);
-            if (stack == null || stack.getType().isAir()) continue;
-            Map<Integer, ItemStack> left = p.getInventory().addItem(stack.clone());
-            for (ItemStack drop : left.values()) p.getWorld().dropItemNaturally(p.getLocation(), drop);
-            inv.setItem(slot, null);
-        }
-    }
-
-    public void closeSell(Player p) {
-        processSellOnClose(p);
-    }
-
-    public ShopView view(Player p) { return views.get(p.getUniqueId()); }
-
-    public ShopItem itemFor(Player p, int slot) {
-        ShopView view = views.get(p.getUniqueId());
-        if (view == null || view.items == null || slot < 0 || slot >= ITEMS_PER_PAGE) return null;
-        int index = view.page * ITEMS_PER_PAGE + slot;
-        return index >= 0 && index < view.items.size() ? (ShopItem) view.items.get(index) : null;
-    }
-
-    public boolean buy(Player p, ShopItem item, int qty) {
-        if (qty <= 0 || item == null) return false;
-        if (item.key().equalsIgnoreCase("spawner_skeleton")) return buySpawnerWithShards(p, qty);
-        long unit = item.buyPrice();
-        if (unit <= 0) return false;
-        long total;
-        try {
-            total = Math.multiplyExact(unit, (long) qty);
-        } catch (ArithmeticException ex) {
-            return false;
-        }
-        if (plugin.getEconomyManager().getBalance(p.getUniqueId()) < total) return false;
-        if (!hasSpace(p, item.material(), qty)) return false;
-        if (!plugin.getEconomyManager().withdraw(p.getUniqueId(), total)) return false;
-
-        Map<Integer, ItemStack> left = p.getInventory().addItem(new ItemStack(item.material(), qty));
-        if (!left.isEmpty()) {
-            plugin.getEconomyManager().deposit(p.getUniqueId(), total);
-            return false;
-        }
-        return true;
-    }
-
-    private boolean buySpawnerWithShards(Player p, int qty) {
-        long total;
-        try { total = Math.multiplyExact(1500L, (long) qty); }
-        catch (ArithmeticException ex) { return false; }
-        if (qty > 64 || !hasSpace(p, Material.SPAWNER, 1)) return false;
-        if (!plugin.getPlayerDataManager().withdrawEmeraldShards(p.getUniqueId(), total)) return false;
-        Map<Integer, ItemStack> left = p.getInventory().addItem(plugin.getSpawnerManager().createItem(qty));
-        if (!left.isEmpty()) {
-            plugin.getPlayerDataManager().setEmeraldShards(p.getUniqueId(), plugin.getPlayerDataManager().getEmeraldShards(p.getUniqueId()) + total);
-            return false;
-        }
-        return true;
-    }
-
-    private List<ShopItem> configuredItems(String categoryKey) {
-        String path = "shop.categories." + categoryKey + ".items";
-        ConfigurationSection section = plugin.getConfig().getConfigurationSection(path);
-
-        // Legacy configured categories remain supported.
-        if (section == null && categoryKey.equals("resources")) section=plugin.getConfig().getConfigurationSection("shop.categories.ores.items");
-        if (section == null && categoryKey.equals("combat")) section=plugin.getConfig().getConfigurationSection("shop.categories.cpvp.items");
-        if (section == null) return generatedWorthItems(categoryKey);
-
-        List<ShopItem> result = new ArrayList<>();
-        for (String key : section.getKeys(false)) {
-            ConfigurationSection s = section.getConfigurationSection(key);
-            if (s == null || !s.getBoolean("enabled", true)) continue;
-            Material material = Material.matchMaterial(s.getString("material", key));
-            if (material == null || !material.isItem()) continue;
-
-            long buy = s.getLong("buy", -1L);
-            if (buy < 0) {
-                WorthEntry worth = plugin.getWorthManager().get(material);
-                buy = worth == null ? 0L : plugin.getWorthManager().buyValue(material, 1);
-            }
-            if (buy <= 0) continue;
-
-            String name = s.getString("display-name", "§f" + pretty(material));
-            List<String> lore = s.getStringList("lore");
-            result.add(new ShopItem(key, material, name, buy, lore));
-        }
-        result.sort(Comparator.comparing(a -> a.material().name()));
-        return result;
-    }
-
-    private List<ShopItem> generatedWorthItems(String categoryKey) {
-        WorthCategory wanted=switch(categoryKey){
-            case "blocks","building"->WorthCategory.BLOCKS;
-            case "resources"->WorthCategory.RESOURCES;
-            case "farm"->WorthCategory.FARMING;
-            case "food"->WorthCategory.FOOD;
-            case "combat"->WorthCategory.COMBAT;
-            case "tools"->WorthCategory.TOOLS;
-            case "redstone"->WorthCategory.REDSTONE;
-            case "mob_drops"->WorthCategory.MOB_DROPS;
-            case "nether"->WorthCategory.NETHER;
-            case "end"->WorthCategory.END;
-            default->null;
-        };
-        if(wanted==null)return new ArrayList<>();
-        List<ShopItem> result=new ArrayList<>();
-        for(WorthEntry e:plugin.getWorthManager().all()){
-            if(e.category()!=wanted)continue;
-            long buy=plugin.getWorthManager().buyValue(e.material(),1);
-            if(buy<=0||e.material()==Material.SPAWNER)continue;
-            result.add(new ShopItem(e.material().name().toLowerCase(Locale.ROOT),e.material(),"§f"+pretty(e.material()),buy,List.of()));
-        }
-        result.sort(Comparator.comparing(a->a.material().name()));
-        return result;
-    }
-
-    private String categoryDisplay(String key) {
-        for (int i = 0; i < CATEGORY_KEYS.length; i++)
-            if (CATEGORY_KEYS[i].equals(key)) return ChatColorless(CATEGORY_NAMES[i]);
-        return key;
-    }
-
-    private String ChatColorless(String s) {
-        return s.replaceAll("§.", "");
-    }
-
-    private ItemStack shopDisplay(ShopItem item) {
-        ItemStack stack = item.key().equalsIgnoreCase("spawner_skeleton")
-                ? plugin.getSpawnerManager().createItem(1) : new ItemStack(item.material());
-        ItemMeta meta = stack.getItemMeta();
-        if (meta != null) {
-            List<String> lore = new ArrayList<>();
-            lore.add("§aBuy: §f" + plugin.getEconomyManager().format(item.buyPrice()) + " §7/ item");
-            lore.addAll(item.lore());
-            lore.add("§8Click to view purchase options");
-            meta.setDisplayName(item.displayName());
-            meta.setLore(lore);
-            stack.setItemMeta(meta);
-        }
-        return stack;
-    }
-
-    private ItemStack buyButton(ShopItem item, int qty) {
-        long total;
-        try { total = Math.multiplyExact(item.buyPrice(), qty); }
-        catch (ArithmeticException ex) { total = Long.MAX_VALUE; }
-        return icon(Material.PAPER, "§eBuy " + qty, List.of("§7Price: §a" + plugin.getEconomyManager().format(total)));
-    }
-
-    private ItemStack filler() {
-        ItemStack i = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta m = i.getItemMeta();
-        if (m != null) { m.setDisplayName(" "); i.setItemMeta(m); }
-        return i;
-    }
-
-    private ItemStack icon(Material material, String name, List<String> lore) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(name);
-            meta.setLore(lore);
-            item.setItemMeta(meta);
-        }
-        return item;
-    }
-
-    private boolean hasSpace(Player p, Material m, int qty) {
-        int capacity = 0;
-        for (ItemStack item : p.getInventory().getStorageContents()) {
-            if (item == null || item.getType().isAir()) capacity += m.getMaxStackSize();
-            else if (item.getType() == m) capacity += m.getMaxStackSize() - item.getAmount();
-            if (capacity >= qty) return true;
-        }
-        return false;
-    }
-
-    private String pretty(Material m) {
-        String s = m.name().toLowerCase(Locale.ROOT).replace('_', ' ');
-        StringBuilder b = new StringBuilder();
-        for (String w : s.split(" "))
-            if (!w.isEmpty()) b.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(' ');
-        return b.toString().trim();
-    }
-
-    public record ShopView(boolean sellMode, String category, int page, List<?> items) {}
-    public record ShopItem(String key, Material material, String displayName, long buyPrice, List<String> lore) {}
+    private String categoryDisplay(String key){for(int i=0;i<CATEGORY_KEYS.length;i++)if(CATEGORY_KEYS[i].equals(key))return ChatColor.stripColor(CATEGORY_NAMES[i]);return key;}
+    private ItemStack shopDisplay(ShopItem item){ItemStack s=new ItemStack(item.material());ItemMeta m=s.getItemMeta();if(m!=null){m.setDisplayName(item.displayName());List<String> l=new ArrayList<>();l.add("§aBuy: §f"+plugin.getEconomyManager().format(item.buyPrice())+" §7/ item");l.addAll(item.lore());l.add("§8Click for quantities");m.setLore(l);s.setItemMeta(m);}return s;}
+    private ItemStack buyButton(ShopItem item,int qty){long total;try{total=Math.multiplyExact(item.buyPrice(),qty);}catch(Exception e){total=Long.MAX_VALUE;}return icon(Material.PAPER,"§eBuy "+qty,List.of("§7Price: §a"+plugin.getEconomyManager().format(total)));}
+    private ItemStack filler(){return icon(Material.GRAY_STAINED_GLASS_PANE," ",List.of());}
+    private ItemStack icon(Material m,String n,List<String> l){ItemStack i=new ItemStack(m);ItemMeta meta=i.getItemMeta();if(meta!=null){meta.setDisplayName(n);meta.setLore(l);i.setItemMeta(meta);}return i;}
+    private boolean hasSpace(Player p,Material m,int qty){int cap=0;for(ItemStack s:p.getInventory().getStorageContents()){if(s==null||s.getType().isAir())cap+=m.getMaxStackSize();else if(s.getType()==m)cap+=m.getMaxStackSize()-s.getAmount();if(cap>=qty)return true;}return false;}
+    private String pretty(Material m){String s=m.name().toLowerCase(Locale.ROOT).replace('_',' ');StringBuilder b=new StringBuilder();for(String w:s.split(" "))if(!w.isEmpty())b.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(' ');return b.toString().trim();}
+    public record ShopView(boolean sellMode,String category,int page,List<?> items){}
+    public record ShopItem(String key,Material material,String displayName,long buyPrice,List<String> lore){}
 }
