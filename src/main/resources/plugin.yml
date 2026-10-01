@@ -137,7 +137,7 @@ commands:
     usage: /unban <player>
   ipunban:
     description: OWNER-only Emerald SMP IP unban
-    usage: /ipunban <IP>
+    usage: /ipunban <player>
   suslist:
     description: Opens the Emerald SMP anti-cheat suspect list
     usage: /suslist [tp|remove|clear] [player]
