@@ -27,6 +27,15 @@ spawners:
   skeleton:
     amount: 8
     interval-seconds: 12
+  zombie:
+    amount: 8
+    interval-seconds: 12
+  spider:
+    amount: 8
+    interval-seconds: 12
+  creeper:
+    amount: 8
+    interval-seconds: 12
 emerald-miner:
   expiration-days: 7
   xp-per-block: 1
