@@ -21,12 +21,13 @@ public final class ShopManager {
     public static final String SELL_GUI = "sell_gui";
 
     private static final int ITEMS_PER_PAGE = 45;
-    private static final int[] CATEGORY_SLOTS = {10, 11, 12, 13, 14, 15, 16};
-    private static final String[] CATEGORY_KEYS = {"blocks", "cpvp", "redstone", "food", "farm", "end", "spawners"};
-    private static final String[] CATEGORY_NAMES = {"§a🧱 Blocks", "§c⚔ CPVP", "§c🔴 Redstone", "§6🍖 Food", "§2🌾 Farm", "§5🟢 End", "§a🧟 Spawners"};
+    private static final int[] CATEGORY_SLOTS = {10,11,12,13,14,15,16,19,20,21,22,23};
+    private static final String[] CATEGORY_KEYS = {"blocks","resources","farm","food","combat","tools","redstone","mob_drops","nether","end","building","spawners"};
+    private static final String[] CATEGORY_NAMES = {"§a🧱 Blocks","§b💎 Ores & Resources","§2🌿 Farming","§6🍖 Food","§c⚔ Combat","§e⛏ Tools","§c🔴 Redstone","§7🧟 Mob Drops","§4🔥 Nether","§5🌌 End","§d🏗 Building","§a🧟 Spawners"};
     private static final Material[] CATEGORY_ICONS = {
-            Material.STONE, Material.NETHERITE_SWORD, Material.REDSTONE,
-            Material.COOKED_BEEF, Material.WHEAT, Material.ENDER_CHEST, Material.SPAWNER
+            Material.STONE,Material.DIAMOND,Material.WHEAT,Material.COOKED_BEEF,
+            Material.DIAMOND_SWORD,Material.DIAMOND_PICKAXE,Material.REDSTONE,Material.BONE,
+            Material.NETHERRACK,Material.ENDER_CHEST,Material.BRICKS,Material.SPAWNER
     };
 
     private final EmeraldSMP plugin;
@@ -310,12 +311,10 @@ public final class ShopManager {
         String path = "shop.categories." + categoryKey + ".items";
         ConfigurationSection section = plugin.getConfig().getConfigurationSection(path);
 
-        // Backwards compatibility with the previous Stage 3 name.
-        if (section == null && categoryKey.equals("cpvp"))
-            section = plugin.getConfig().getConfigurationSection("shop.categories.gear");
-
-        List<ShopItem> result = new ArrayList<>();
-        if (section == null) return result;
+        // Legacy configured categories remain supported.
+        if (section == null && categoryKey.equals("resources")) section=plugin.getConfig().getConfigurationSection("shop.categories.ores.items");
+        if (section == null && categoryKey.equals("combat")) section=plugin.getConfig().getConfigurationSection("shop.categories.cpvp.items");
+        if (section == null) return generatedWorthItems(categoryKey);
 
         for (String key : section.getKeys(false)) {
             ConfigurationSection s = section.getConfigurationSection(key);
@@ -335,6 +334,32 @@ public final class ShopManager {
             result.add(new ShopItem(key, material, name, buy, lore));
         }
         result.sort(Comparator.comparing(a -> a.material().name()));
+        return result;
+    }
+
+    private List<ShopItem> generatedWorthItems(String categoryKey) {
+        WorthCategory wanted=switch(categoryKey){
+            case "blocks","building"->WorthCategory.BLOCKS;
+            case "resources"->WorthCategory.RESOURCES;
+            case "farm"->WorthCategory.FARMING;
+            case "food"->WorthCategory.FOOD;
+            case "combat"->WorthCategory.COMBAT;
+            case "tools"->WorthCategory.TOOLS;
+            case "redstone"->WorthCategory.REDSTONE;
+            case "mob_drops"->WorthCategory.MOB_DROPS;
+            case "nether"->WorthCategory.NETHER;
+            case "end"->WorthCategory.END;
+            default->null;
+        };
+        if(wanted==null)return new ArrayList<>();
+        List<ShopItem> result=new ArrayList<>();
+        for(WorthEntry e:plugin.getWorthManager().all()){
+            if(e.category()!=wanted)continue;
+            long buy=plugin.getWorthManager().buyValue(e.material(),1);
+            if(buy<=0||e.material()==Material.SPAWNER)continue;
+            result.add(new ShopItem(e.material().name().toLowerCase(Locale.ROOT),e.material(),"§f"+pretty(e.material()),buy,List.of()));
+        }
+        result.sort(Comparator.comparing(a->a.material().name()));
         return result;
     }
 
