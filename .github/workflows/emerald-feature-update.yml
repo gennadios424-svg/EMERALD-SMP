@@ -1,0 +1,362 @@
+name: Emerald SMP Feature Update
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-build:
+    if: ${{ !contains(github.event.head_commit.message, '[emerald-feature-update]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+      - name: Apply Emerald SMP update
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          root = Path('.')
+          src = root / 'src/main/java/net/emeraldsmp'
+
+          def write(rel, text):
+              p = root / rel
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_text(text, encoding='utf-8')
+
+          # /LIVE — Media role only, clickable GUI, ephemeral live state.
+          write('src/main/java/net/emeraldsmp/live/LiveManager.java', r'''package net.emeraldsmp.live;
+
+import net.emeraldsmp.EmeraldSMP;
+import net.emeraldsmp.roles.RoleManager;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.Sound;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.Command;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public final class LiveManager implements Listener, CommandExecutor {
+    private static final String TITLE = "§2§l💚 LIVE STATUS";
+    private final EmeraldSMP plugin;
+    private final Set<UUID> live = ConcurrentHashMap.newKeySet();
+
+    public LiveManager(EmeraldSMP plugin) { this.plugin = plugin; }
+    public boolean isLive(Player p) { return p != null && live.contains(p.getUniqueId()); }
+    public boolean isLive(UUID id) { return id != null && live.contains(id); }
+
+    @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!(sender instanceof Player p)) { sender.sendMessage("§cOnly players can use /live."); return true; }
+        if (plugin.getRoleManager().get(p) != RoleManager.Role.MEDIA) {
+            p.sendMessage("§c§lMEDIA ONLY §8» §7Only players with the §dMEDIA §7role can use /live.");
+            p.playSound(p.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7f, 0.9f);
+            return true;
+        }
+        open(p);
+        return true;
+    }
+
+    private void open(Player p) {
+        Inventory inv = Bukkit.createInventory(null, 27, TITLE);
+        boolean active = isLive(p);
+        for (int i = 0; i < 27; i++) inv.setItem(i, pane());
+        inv.setItem(13, icon(active ? Material.REDSTONE_BLOCK : Material.LIME_CONCRETE,
+                active ? "§c§l🔴 LIVE ACTIVE" : "§a§l▶ GO LIVE",
+                active ? List.of("§7Your live status is currently visible.", "§eClick to turn it off.") : List.of("§7Show other players that you are streaming.", "§eClick to activate live status.")));
+        inv.setItem(22, icon(Material.BARRIER, "§c§l✕ CLOSE", List.of("§7Close this menu")));
+        p.openInventory(inv);
+        p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.45f, active ? 1.15f : 1.0f);
+    }
+
+    @EventHandler public void click(InventoryClickEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (!TITLE.equals(e.getView().getTitle())) return;
+        e.setCancelled(true);
+        if (e.getRawSlot() == 22) { p.closeInventory(); return; }
+        if (e.getRawSlot() != 13) return;
+        if (plugin.getRoleManager().get(p) != RoleManager.Role.MEDIA) { p.closeInventory(); return; }
+        UUID id = p.getUniqueId();
+        boolean nowLive;
+        if (live.remove(id)) nowLive = false; else { live.add(id); nowLive = true; }
+        p.closeInventory();
+        if (nowLive) {
+            p.sendMessage("§a§l🔴 YOU ARE LIVE §8» §7Other players can now see your live status.");
+            p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.65f, 1.15f);
+        } else {
+            p.sendMessage("§7§lLIVE OFF §8» §7Your live status is now hidden.");
+            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.55f, 0.9f);
+        }
+        if (plugin.getServerUI() != null) plugin.getServerUI().refreshAll();
+    }
+
+    @EventHandler public void quit(PlayerQuitEvent e) { live.remove(e.getPlayer().getUniqueId()); }
+
+    public void disable() { live.clear(); }
+    private ItemStack pane() { return icon(Material.GRAY_STAINED_GLASS_PANE, " ", List.of()); }
+    private ItemStack icon(Material m, String name, List<String> lore) {
+        ItemStack i = new ItemStack(m); ItemMeta meta = i.getItemMeta();
+        meta.setDisplayName(name); meta.setLore(lore); i.setItemMeta(meta); return i;
+    }
+}
+''')
+
+          # Improved TPA manager with clickable chat controls and sounds.
+          write('src/main/java/net/emeraldsmp/tpa/TpaManager.java', r'''package net.emeraldsmp.tpa;
+
+import net.emeraldsmp.EmeraldSMP;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Sound;
+import org.bukkit.entity.Player;
+import org.bukkit.event.*;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.server.PluginDisableEvent;
+import java.util.*;
+
+public final class TpaManager implements Listener {
+    private static final long REQUEST_TICKS = 20L * 60L;
+    private final EmeraldSMP plugin;
+    private final Map<UUID, Request> outgoing = new HashMap<>();
+    private final Map<UUID, Request> incoming = new HashMap<>();
+    private final Map<UUID, Countdown> countdowns = new HashMap<>();
+    public TpaManager(EmeraldSMP plugin) { this.plugin = plugin; }
+
+    public void request(Player sender, Player target, boolean here) {
+        if (!isStaff(sender) && (plugin.getCombatManager().isInCombat(sender) || plugin.getCombatManager().isInCombat(target))) { sender.sendMessage("§c⚔ You cannot use that command while in combat!"); return; }
+        if (sender.getUniqueId().equals(target.getUniqueId())) { sender.sendMessage("§cYou cannot send a teleport request to yourself."); return; }
+        if (outgoing.containsKey(sender.getUniqueId())) { sender.sendMessage("§cYou already have a pending teleport request."); return; }
+        if (incoming.containsKey(target.getUniqueId())) { sender.sendMessage("§cThat player already has a pending teleport request."); return; }
+        Request r = new Request(sender.getUniqueId(), target.getUniqueId(), sender.getName(), target.getName(), here);
+        outgoing.put(sender.getUniqueId(), r); incoming.put(target.getUniqueId(), r);
+        target.sendMessage("§8╔════════════════════════════╗");
+        target.sendMessage(here ? "§8║ §a§l💚 TELEPORT-HERE REQUEST" : "§8║ §a§l💚 TELEPORT REQUEST");
+        target.sendMessage("§8╠════════════════════════════╣");
+        target.sendMessage(here ? "§8║ §f"+sender.getName()+" §7wants you to teleport to them." : "§8║ §f"+sender.getName()+" §7wants to teleport to you.");
+        target.sendMessage("§8║ §7⏱ Expires in §f60s");
+        target.sendMessage("§8╚════════════════════════════╝");
+        target.sendMessage(Component.text("   ✔ ACCEPT   ").color(NamedTextColor.GREEN).clickEvent(ClickEvent.runCommand("/tpaccept"))
+                .append(Component.text("   ✖ DENY").color(NamedTextColor.RED).clickEvent(ClickEvent.runCommand("/tpdeny"))));
+        target.playSound(target.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.55f, 1.15f);
+        sender.sendMessage("§a💚 Teleport request sent to §f"+target.getName()+"§a.");
+        sender.playSound(sender.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.4f, 1.1f);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> expire(r), REQUEST_TICKS);
+    }
+
+    public void accept(Player target) {
+        if (!isStaff(target) && plugin.getCombatManager().isInCombat(target)) { target.sendMessage("§c⚔ You cannot use that command while in combat!"); return; }
+        Request r = incoming.get(target.getUniqueId());
+        if (r == null) { target.sendMessage("§cYou have no pending teleport request."); return; }
+        if (!isValid(r)) { remove(r); target.sendMessage("§cThat teleport request is no longer valid."); return; }
+        remove(r);
+        Player sender = Bukkit.getPlayer(r.senderId); if (sender == null || !sender.isOnline()) { target.sendMessage("§cThe requester is no longer online."); return; }
+        Player teleporting = r.here ? target : sender; Player destination = r.here ? sender : target;
+        startCountdown(teleporting, destination, r);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.5f, 1.1f);
+    }
+
+    public void deny(Player target) {
+        if (!isStaff(target) && plugin.getCombatManager().isInCombat(target)) { target.sendMessage("§c⚔ You cannot use that command while in combat!"); return; }
+        Request r = incoming.get(target.getUniqueId());
+        if (r == null) { target.sendMessage("§cYou have no pending teleport request."); return; }
+        remove(r); Player sender = Bukkit.getPlayer(r.senderId);
+        if (sender != null && sender.isOnline()) { sender.sendMessage("§c❌ Your teleport request was denied."); sender.playSound(sender.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.45f, 0.9f); }
+        target.sendMessage("§cTeleport request denied."); target.playSound(target.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.35f, 0.9f);
+    }
+
+    private boolean isStaff(Player p) { return plugin.getRoleManager().isStaff(p); }
+
+    private void startCountdown(Player teleporting, Player destination, Request request) {
+        UUID id = teleporting.getUniqueId(); Countdown old = countdowns.remove(id); if (old != null) Bukkit.getScheduler().cancelTask(old.taskId);
+        Countdown c = new Countdown(teleporting.getLocation().clone()); countdowns.put(id, c);
+        c.taskId = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+            int seconds = 5;
+            @Override public void run() {
+                Countdown current = countdowns.get(id); Player p = Bukkit.getPlayer(id); Player dest = Bukkit.getPlayer(request.here ? request.senderId : request.targetId);
+                if (current != c || p == null || !p.isOnline() || dest == null || !dest.isOnline()) { cancelCountdown(id, false); return; }
+                if (moved(c.start, p.getLocation())) { cancelCountdown(id, true); return; }
+                p.sendMessage("§a💚 Teleporting in §f"+seconds+"§a...");
+                p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.28f, 0.85f + seconds * 0.07f);
+                if (seconds <= 1) {
+                    countdowns.remove(id); Bukkit.getScheduler().cancelTask(c.taskId); Location loc = dest.getLocation().clone();
+                    if (p.teleport(loc)) { p.sendMessage("§a✔ Teleported successfully."); p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.7f, 1.0f); }
+                    else { p.sendMessage("§cTeleport failed."); }
+                    return;
+                }
+                seconds--;
+            }
+        }, 0L, 20L).getTaskId();
+    }
+
+    private boolean moved(Location a, Location b) { return a.getWorld() == null || b.getWorld() == null || !a.getWorld().equals(b.getWorld()) || a.distanceSquared(b) > 0.000001D; }
+    private void cancelCountdown(UUID id, boolean moved) { Countdown c=countdowns.remove(id); if(c==null)return; if(c.taskId!=-1)Bukkit.getScheduler().cancelTask(c.taskId); Player p=Bukkit.getPlayer(id); if(p!=null&&p.isOnline()&&moved){p.sendMessage("§c⚠ Teleport cancelled because you moved.");p.playSound(p.getLocation(),Sound.BLOCK_NOTE_BLOCK_BASS,0.45f,0.8f);}}
+    private boolean isValid(Request r){Player a=Bukkit.getPlayer(r.senderId),b=Bukkit.getPlayer(r.targetId);return a!=null&&a.isOnline()&&b!=null&&b.isOnline();}
+    private void expire(Request r){if(outgoing.get(r.senderId)!=r)return;remove(r);Player a=Bukkit.getPlayer(r.senderId),b=Bukkit.getPlayer(r.targetId);if(a!=null&&a.isOnline())a.sendMessage("§cTeleport request expired.");if(b!=null&&b.isOnline())b.sendMessage("§cTeleport request expired.");}
+    public void cancelRequestsFor(Player p){if(p==null)return;UUID id=p.getUniqueId();Request a=outgoing.remove(id);if(a!=null)incoming.remove(a.targetId,a);Request b=incoming.remove(id);if(b!=null)outgoing.remove(b.senderId,b);}
+    private void remove(Request r){outgoing.remove(r.senderId,r);incoming.remove(r.targetId,r);}
+    @EventHandler public void onMove(PlayerMoveEvent e){if(!countdowns.containsKey(e.getPlayer().getUniqueId()))return;if(e.getTo()==null||moved(e.getFrom(),e.getTo()))cancelCountdown(e.getPlayer().getUniqueId(),true);}
+    @EventHandler public void onQuit(PlayerQuitEvent e){UUID id=e.getPlayer().getUniqueId();Request a=outgoing.remove(id);if(a!=null)incoming.remove(a.targetId,a);Request b=incoming.remove(id);if(b!=null)outgoing.remove(b.senderId,b);cancelCountdown(id,false);}
+    @EventHandler public void onDisable(PluginDisableEvent e){if(!e.getPlugin().equals(plugin))return;for(Countdown c:countdowns.values())if(c.taskId!=-1)Bukkit.getScheduler().cancelTask(c.taskId);countdowns.clear();outgoing.clear();incoming.clear();}
+    private static final class Request {final UUID senderId,targetId;final String senderName,targetName;final boolean here;Request(UUID a,UUID b,String c,String d,boolean e){senderId=a;targetId=b;senderName=c;targetName=d;here=e;}}
+    private static final class Countdown {final Location start;int taskId=-1;Countdown(Location l){start=l;}}
+}
+''')
+
+          # Conservative anti-cheat: repeated anomalies are recorded in /suslist, no auto-bans.
+          write('src/main/java/net/emeraldsmp/anticheat/MovementAntiCheat.java', r'''package net.emeraldsmp.anticheat;
+
+import net.emeraldsmp.EmeraldSMP;
+import net.emeraldsmp.roles.RoleManager;
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
+import org.bukkit.event.*;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public final class MovementAntiCheat implements Listener {
+    private final EmeraldSMP plugin;
+    private final Map<UUID,Integer> flags=new ConcurrentHashMap<>();
+    private final Map<UUID,Integer> airTicks=new ConcurrentHashMap<>();
+    private final Map<UUID,Long> lastFlag=new ConcurrentHashMap<>();
+    public MovementAntiCheat(EmeraldSMP plugin){this.plugin=plugin;}
+    private boolean bypass(Player p){return p.getGameMode()==GameMode.SPECTATOR||p.getGameMode()==GameMode.CREATIVE||plugin.getRoleManager().isStaff(p)||p.hasPermission("emerald.anticheat.bypass");}
+    private void flag(Player p,String reason,int suspicion){if(bypass(p))return;long now=System.currentTimeMillis();long last=lastFlag.getOrDefault(p.getUniqueId(),0L);if(now-last<350L)return;lastFlag.put(p.getUniqueId(),now);int n=flags.merge(p.getUniqueId(),1,Integer::sum);plugin.getSusListManager().record(p,p.getLocation(),reason,n,Math.min(100,suspicion));}
+
+    @EventHandler(ignoreCancelled=true)
+    public void move(PlayerMoveEvent e){
+        Player p=e.getPlayer(); if(bypass(p)||e.getTo()==null)return;
+        Location a=e.getFrom(),b=e.getTo(); double dx=b.getX()-a.getX(),dz=b.getZ()-a.getZ(); double horizontal=Math.hypot(dx,dz);
+        if(horizontal>1.35D && !p.isFlying() && !p.isGliding() && !p.isInsideVehicle()) flag(p,"Speed",65);
+        if(!p.isOnGround() && !p.isFlying() && !p.isGliding() && !p.isInsideVehicle() && !p.hasPotionEffect(org.bukkit.potion.PotionEffectType.LEVITATION)){
+            int air=airTicks.merge(p.getUniqueId(),1,Integer::sum);
+            if(air>18 && Math.abs(b.getY()-a.getY())<0.035D) flag(p,"Flight",75);
+        } else airTicks.remove(p.getUniqueId());
+    }
+
+    @EventHandler(ignoreCancelled=false)
+    public void damage(EntityDamageEvent e){
+        if(!(e.getEntity() instanceof Player p)||bypass(p))return;
+        if(e.getCause()==EntityDamageEvent.DamageCause.FALL && e.isCancelled() && p.getFallDistance()>7.0f) flag(p,"NoFall",60);
+    }
+
+    @EventHandler(ignoreCancelled=true)
+    public void combat(EntityDamageByEntityEvent e){
+        if(!(e.getDamager() instanceof Player p)||bypass(p))return;
+        Entity target=e.getEntity(); if(target==null)return;
+        double reach=p.getEyeLocation().distance(target.getLocation().add(0, target.getHeight()*0.5, 0));
+        if(reach>4.35D) flag(p,"Reach",70);
+        // A single long-distance hit is not enough to punish; repeated flags accumulate in /suslist.
+    }
+
+    public void disable(){flags.clear();airTicks.clear();lastFlag.clear();}
+}
+''')
+
+          # Shop: add Skeleton Spawner to CPvP and charge Emerald Shards, not money.
+          sm = root/'src/main/java/net/emeraldsmp/shop/ShopManager.java'
+          s = sm.read_text(encoding='utf-8')
+          s = s.replace('import net.emeraldsmp.worth.WorthEntry;','import net.emeraldsmp.worth.WorthEntry;\nimport net.emeraldsmp.spawner.SpawnerManager;')
+          s = s.replace('Material.GOLDEN_APPLE))','Material.GOLDEN_APPLE, Material.SPAWNER))')
+          old = '''    public boolean buy(Player p, ShopItem item, int qty) {\n        UUID uuid = p.getUniqueId();\n        if (!buyProcessing.add(uuid)) return false;\n        try {\n            if (item == null || qty <= 0 || qty > 64) return false;\n            long total;\n            try { total = Math.multiplyExact(item.buyPrice(), qty); } catch (ArithmeticException ex) { return false; }\n            if (total <= 0 || plugin.getEconomyManager().getBalance(uuid) < total || !hasSpace(p, item.material(), qty)) return false;\n            if (!plugin.getEconomyManager().withdraw(uuid, total)) return false;\n            Map<Integer, ItemStack> left = p.getInventory().addItem(new ItemStack(item.material(), qty));\n            if (!left.isEmpty()) {\n                for (ItemStack leftover : left.values()) {\n                    p.getInventory().removeItem(leftover);\n                }\n                plugin.getEconomyManager().deposit(uuid, total);\n                return false;\n            }\n            return true;\n        } finally {\n            buyProcessing.remove(uuid);\n        }\n    }'''
+          new = '''    public boolean buy(Player p, ShopItem item, int qty) {\n        UUID uuid = p.getUniqueId();\n        if (!buyProcessing.add(uuid)) return false;\n        try {\n            if (item == null || qty <= 0 || qty > 64) return false;\n            if (item.material() == Material.SPAWNER) {\n                long total = 1500L * qty;\n                if (!hasSpace(p, Material.SPAWNER, qty)) return false;\n                if (!plugin.getPlayerDataManager().withdrawEmeraldShards(uuid, total)) return false;\n                Map<Integer, ItemStack> left = p.getInventory().addItem(plugin.getSpawnerManager().createItem(SpawnerManager.TYPE_SKELETON, qty));\n                if (!left.isEmpty()) {\n                    for (ItemStack leftover : left.values()) p.getInventory().removeItem(leftover);\n                    plugin.getPlayerDataManager().setEmeraldShards(uuid, plugin.getPlayerDataManager().getEmeraldShards(uuid) + total);\n                    return false;\n                }\n                p.playSound(p.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 0.55f, 1.2f);\n                return true;\n            }\n            long total;\n            try { total = Math.multiplyExact(item.buyPrice(), qty); } catch (ArithmeticException ex) { return false; }\n            if (total <= 0 || plugin.getEconomyManager().getBalance(uuid) < total || !hasSpace(p, item.material(), qty)) return false;\n            if (!plugin.getEconomyManager().withdraw(uuid, total)) return false;\n            Map<Integer, ItemStack> left = p.getInventory().addItem(new ItemStack(item.material(), qty));\n            if (!left.isEmpty()) {\n                for (ItemStack leftover : left.values()) p.getInventory().removeItem(leftover);\n                plugin.getEconomyManager().deposit(uuid, total);\n                return false;\n            }\n            p.playSound(p.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.45f, 1.15f);\n            return true;\n        } finally { buyProcessing.remove(uuid); }\n    }'''
+          if old not in s: raise SystemExit('ShopManager buy block not found')
+          s=s.replace(old,new)
+          old='''            long sellWorth = w == null ? 0L : w.worth();\n            long buy = m == Material.END_CRYSTAL ? 500L : plugin.getWorthManager().buyValue(m, 1);\n            if (buy <= sellWorth) continue;\n            out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT), m, roleStyledName(m), buy, List.of("§7Buy: §a" + plugin.getEconomyManager().format(buy) + " §7/ item", "§7Sell: §a" + plugin.getEconomyManager().format(sellWorth) + " §7/ item", "§8Click for purchase amounts")));'''
+          new='''            long sellWorth = w == null ? 0L : w.worth();\n            if (m == Material.SPAWNER) {\n                out.add(new ShopItem("skeleton_spawner", m, "§a§l🧟 Skeleton Spawner", 1500L, List.of("§7Buy: §a1,500 Emerald Shards §7/ spawner", "§7Currency: §aEmerald Shards", "§8Click for purchase amounts")));\n                continue;\n            }\n            long buy = m == Material.END_CRYSTAL ? 500L : plugin.getWorthManager().buyValue(m, 1);\n            if (buy <= sellWorth) continue;\n            out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT), m, roleStyledName(m), buy, List.of("§7Buy: §a" + plugin.getEconomyManager().format(buy) + " §7/ item", "§7Sell: §a" + plugin.getEconomyManager().format(sellWorth) + " §7/ item", "§8Click for purchase amounts")));'''
+          if old not in s: raise SystemExit('ShopManager configured block not found')
+          s=s.replace(old,new)
+          sm.write_text(s,encoding='utf-8')
+
+          # Shop listener: explicit shard wording for spawners.
+          sl=root/'src/main/java/net/emeraldsmp/shop/ShopListener.java'
+          s=sl.read_text(encoding='utf-8')
+          s=s.replace('player.sendMessage(ok ? "§a💚 Purchase completed: §f"+qty+"x "+item.material().name()+"§a."\n                    : "§cPurchase could not be completed. Check your balance and inventory space.");', 'player.sendMessage(ok ? (item.material() == org.bukkit.Material.SPAWNER ? "§a💚 Purchased §f"+qty+"x Skeleton Spawner §afor §f"+(1500L*qty)+" Emerald Shards§a." : "§a💚 Purchase completed: §f"+qty+"x "+item.material().name()+"§a.")\n                    : "§cPurchase could not be completed. Check your balance and inventory space.");')
+          sl.write_text(s,encoding='utf-8')
+
+          # Server UI: live indicator in tab/name and a public refresh hook.
+          su=root/'src/main/java/net/emeraldsmp/ServerUI.java'
+          s=su.read_text(encoding='utf-8')
+          s=s.replace('    public void refresh(Player p){if(p!=null&&p.isOnline())update(p);}', '    public void refresh(Player p){if(p!=null&&p.isOnline())update(p);}\n    public void refreshAll(){updateAll();}')
+          s=s.replace('target.setPlayerListName(role.icon()+" §f"+target.getName()+" §7"+teamText);', 'String live = plugin.getLiveManager()!=null && plugin.getLiveManager().isLive(target) ? "§c🔴 LIVE §r" : "";\n            target.setPlayerListName(live+role.icon()+" §f"+target.getName()+" §7"+teamText);')
+          s=s.replace('target.setCustomName("§a§l"+formatMoney(plugin.getEconomyManager().getBalance(target.getUniqueId())));', 'target.setCustomName((plugin.getLiveManager()!=null && plugin.getLiveManager().isLive(target) ? "§c§l🔴 LIVE §r" : "")+"§a§l"+formatMoney(plugin.getEconomyManager().getBalance(target.getUniqueId())));')
+          su.write_text(s,encoding='utf-8')
+
+          # Spawner ownership: keep legacy data compatible, but remove all gameplay ownership checks.
+          sp=root/'src/main/java/net/emeraldsmp/spawner/SpawnerManager.java'
+          s=sp.read_text(encoding='utf-8')
+          s=s.replace('this.owner = owner;', 'this.owner = new UUID(0L, 0L);')
+          s=s.replace('String ownerString = y.getString(p + ".owner");\n                if (ownerString == null) continue;', 'String ownerString = y.getString(p + ".owner", new UUID(0L, 0L).toString());')
+          s=re.sub(r'private Data findAdjacentOwned\(Block b, UUID owner, String type\) \{.*?\n    \}', '''private Data findAdjacentOwned(Block b, UUID owner, String type) {\n        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {\n            Data d = spawners.get(key(b.getRelative(face)));\n            if (d != null && d.type.equals(type)) return d;\n        }\n        return null;\n    }''', s, flags=re.S)
+          s=re.sub(r'private boolean canManage\(Player p, Data d\) \{.*?\n    \}', '''private boolean canManage(Player p, Data d) {\n        return true;\n    }''', s, count=1, flags=re.S)
+          sp.write_text(s,encoding='utf-8')
+
+          # Main plugin registration.
+          main=root/'src/main/java/net/emeraldsmp/EmeraldSMP.java'
+          s=main.read_text(encoding='utf-8')
+          s=s.replace('import net.emeraldsmp.anticheat.SusListManager;', 'import net.emeraldsmp.anticheat.SusListManager;\nimport net.emeraldsmp.anticheat.MovementAntiCheat;\nimport net.emeraldsmp.live.LiveManager;')
+          s=s.replace('private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager; private KeyAllManager keyAllManager; private TpaManager tpaManager; private CombatManager combatManager;', 'private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager; private KeyAllManager keyAllManager; private TpaManager tpaManager; private CombatManager combatManager; private LiveManager liveManager;')
+          s=s.replace('register("suslist",susListCommand,susListCommand);', 'register("suslist",susListCommand,susListCommand);\n            liveManager=new LiveManager(this); register("live",liveManager,null); getServer().getPluginManager().registerEvents(liveManager,this);')
+          s=s.replace('getServer().getPluginManager().registerEvents(new FlightAntiCheat(this,susListManager),this); getServer().getPluginManager().registerEvents(new MacroAntiCheat(this),this);', 'getServer().getPluginManager().registerEvents(new FlightAntiCheat(this,susListManager),this); getServer().getPluginManager().registerEvents(new MacroAntiCheat(this),this); getServer().getPluginManager().registerEvents(new MovementAntiCheat(this),this);')
+          s=s.replace('public InvestmentManager getInvestmentManager(){return investmentManager;} public SusListManager getSusListManager(){return susListManager;} public KeyAllManager getKeyAllManager(){return keyAllManager;} public TpaManager getTpaManager(){return tpaManager;} public CombatManager getCombatManager(){return combatManager;}', 'public InvestmentManager getInvestmentManager(){return investmentManager;} public SusListManager getSusListManager(){return susListManager;} public KeyAllManager getKeyAllManager(){return keyAllManager;} public TpaManager getTpaManager(){return tpaManager;} public CombatManager getCombatManager(){return combatManager;} public LiveManager getLiveManager(){return liveManager;}')
+          s=s.replace('if(investmentManager!=null)investmentManager.stop();', 'if(investmentManager!=null)investmentManager.stop(); if(liveManager!=null)liveManager.disable();')
+          main.write_text(s,encoding='utf-8')
+
+          # plugin.yml: register /live and keep access controlled in LiveManager by exact MEDIA role.
+          py=root/'src/main/resources/plugin.yml'
+          s=py.read_text(encoding='utf-8')
+          marker='  tpa:\n    description: Request to teleport to another player\n    usage: /tpa <player>\n    permission: emerald.command\n'
+          insert='  live:\n    description: Toggle Emerald SMP live status (MEDIA role only)\n    usage: /live\n    permission: emerald.command\n'
+          if '  live:\n' not in s: s=s.replace(marker, marker+insert)
+          py.write_text(s,encoding='utf-8')
+
+          # Version bump only; no unrelated systems are changed.
+          py.write_text(py.read_text(encoding='utf-8').replace("version: '1.7'", "version: '1.8'"), encoding='utf-8')
+
+      - name: Build and verify
+        run: mvn --batch-mode --update-snapshots clean package
+      - name: Commit source changes and remove one-time updater
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          rm -f .github/workflows/emerald-feature-update.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src pom.xml .github/workflows/emerald-feature-update.yml
+          git commit -m "[emerald-feature-update] Add live spawners anticheat and TPA upgrade"
+          git push
+      - name: Stage JAR
+        run: mkdir -p staging && cp target/EmeraldSMP-1.0.jar staging/EmeraldSMP-1.0.jar
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EmeraldSMP-live-spawners-anticheat-tpa
+          path: staging/EmeraldSMP-1.0.jar
+          retention-days: 7
