@@ -103,16 +103,24 @@ public final class CrateManager implements Listener {
 
     public void place(Player player, String type) {
         type = normalize(type);
-        Block target = player.getTargetBlockExact(5);
-        if (target == null || target.getType() != Material.AIR) {
-            player.sendMessage(ChatColor.RED + "Look at an empty block within 5 blocks.");
+        Block clicked = player.getTargetBlockExact(6);
+        if (clicked == null || clicked.getType().isAir()) {
+            player.sendMessage(ChatColor.RED + "Look directly at a solid block within 6 blocks.");
             return;
         }
+
+        Block target = clicked.getRelative(player.getTargetBlockFace(6) == null ? org.bukkit.block.BlockFace.UP : player.getTargetBlockFace(6));
+        if (!target.getType().isAir() || !target.isReplaceable()) {
+            player.sendMessage(ChatColor.RED + "There is no empty space to place the crate there.");
+            return;
+        }
+
         String key = loc(target);
         if (crates.containsKey(key)) {
             player.sendMessage(ChatColor.RED + "A crate is already registered there.");
             return;
         }
+
         target.setType(Material.CHEST, false);
         crates.put(key, type);
         save();
@@ -146,15 +154,18 @@ public final class CrateManager implements Listener {
     private void open(Player player, Block block, String type) {
         UUID uuid = player.getUniqueId();
         if (opening.contains(uuid)) return;
-        ItemStack held = player.getInventory().getItemInMainHand();
-        String heldType = keyType(held);
-        if (!type.equals(heldType)) {
-            player.sendMessage(ChatColor.RED + "❌ This key cannot open this crate!");
+        int keySlot = findKeySlot(player, type);
+        if (keySlot < 0) {
+            player.sendMessage(ChatColor.RED + "❌ You need a " + cap(type) + " Key to open this crate!");
             return;
         }
 
-        // Consume exactly one authenticated key before any reward is selected.
-        held.setAmount(held.getAmount() - 1);
+        // Consume exactly one authenticated ItemStack key before the reward is selected.
+        ItemStack key = player.getInventory().getItem(keySlot);
+        if (key == null || !type.equals(keyType(key))) return;
+        if (key.getAmount() <= 1) player.getInventory().setItem(keySlot, null);
+        else key.setAmount(key.getAmount() - 1);
+
         String reward = selectReward(type);
         pending.put(uuid, new Pending(type, reward));
         opening.add(uuid);
@@ -163,6 +174,15 @@ public final class CrateManager implements Listener {
         Inventory inv = Bukkit.createInventory(null, 27, "§2§l🎁 " + cap(type) + " CRATE");
         player.openInventory(inv);
         animate(player, type, inv);
+    }
+
+    private int findKeySlot(Player player, String type) {
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (type.equals(keyType(item))) return i;
+        }
+        return -1;
     }
 
     private void animate(Player player, String type, Inventory inv) {
@@ -307,6 +327,16 @@ public final class CrateManager implements Listener {
 
     private String cap(String type) {
         return type.substring(0, 1).toUpperCase(Locale.ROOT) + type.substring(1);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void blockExplosion(org.bukkit.event.block.BlockExplodeEvent event) {
+        event.blockList().removeIf(this::isCrate);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void entityExplosion(org.bukkit.event.entity.EntityExplodeEvent event) {
+        event.blockList().removeIf(this::isCrate);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
