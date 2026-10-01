@@ -401,9 +401,9 @@ public final class CrateManager implements Listener {
         p.openInventory(inv);
     }
 
-    private ItemStack button(Material m,String name,String... lore){
+    private ItemStack button(Material m,String name,List<String> lore){
         ItemStack i=new ItemStack(m);ItemMeta meta=i.getItemMeta();
-        meta.setDisplayName(name);meta.setLore(Arrays.asList(lore));i.setItemMeta(meta);return i;
+        meta.setDisplayName(name);meta.setLore(lore);i.setItemMeta(meta);return i;
     }
     private String identityToken(ItemStack item){
         ItemStack one=item.clone();one.setAmount(1);
