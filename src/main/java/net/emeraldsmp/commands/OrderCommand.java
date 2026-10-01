@@ -1,27 +1,26 @@
 package net.emeraldsmp.commands;
 
 import net.emeraldsmp.EmeraldSMP;
-import org.bukkit.*;
-import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
-import org.bukkit.block.Sign;
-import org.bukkit.block.data.BlockData;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
-import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
+
 import java.util.*;
 
 public final class OrderCommand implements org.bukkit.command.CommandExecutor, Listener {
+    private static final long INPUT_TIMEOUT_MS = 60_000L;
     private final EmeraldSMP plugin;
     private final Map<UUID, Order> orders = new LinkedHashMap<>();
-    private final Map<UUID, Pending> pending = new HashMap<>();
-    private final Map<UUID, String> searchWaiting = new HashMap<>();
+    private final Map<UUID, PendingOrder> pending = new HashMap<>();
+    private final Set<UUID> searchWaiting = new HashSet<>();
     private SortMode sortMode = SortMode.MOST_PAID;
     private final Set<UUID> busy = new HashSet<>();
     private final List<Material> requestable;
@@ -129,93 +128,141 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     }
 
     private void requestSearch(Player p) {
-        UUID uuid = p.getUniqueId();
-        searchWaiting.put(uuid, "order");
+        searchWaiting.add(p.getUniqueId());
         p.closeInventory();
-        p.sendMessage("§a§lORDER SEARCH §8» §fType an item name in chat.");
+        p.sendMessage("§a§l📦 ORDER SEARCH");
+        p.sendMessage("§fType an item name in chat.");
         p.sendMessage("§7Examples: §fdiamond§7, §fredstone§7, §fstone§7, §firon");
         p.sendMessage("§7Type §ccancel §7to return to the item list.");
     }
 
-    private void beginSign(Player p, Material item) {
-        if (pending.containsKey(p.getUniqueId())) return;
-        Block b = p.getLocation().getBlock().getRelative(BlockFace.UP);
-        if (!b.getType().isAir()) {
-            p.sendMessage("§cPlease stand in an open space to create an order.");
-            return;
-        }
-        BlockData original = b.getBlockData();
-        b.setType(Material.OAK_SIGN, false);
-        Sign sign = (Sign) b.getState();
-        sign.setLine(0, "AMOUNT");
-        sign.setLine(1, "");
-        sign.setLine(2, "PRICE / ITEM");
-        sign.setLine(3, "");
-        sign.update(true, false);
-        pending.put(p.getUniqueId(), new Pending(item, b.getLocation(), original));
-        p.sendMessage("§a§lCREATE ORDER");
-        p.sendMessage("§7Line 1 = §fAmount§7 (example: §f64§7)");
-        p.sendMessage("§7Line 2 = §fPrice PER ITEM§7 (example: §f500§7)");
-        p.sendMessage("§7Example: §f64§7 + §f500§7 = 64 " + pretty(item) + " at $500 each.");
-        new BukkitRunnable() {
-            public void run() {
-                if (p.isOnline() && pending.containsKey(p.getUniqueId())) p.openSign((Sign) b.getState());
-            }
-        }.runTask(plugin);
+    private void beginChatOrder(Player p, Material item) {
+        UUID u = p.getUniqueId();
+        searchWaiting.remove(u);
+        PendingOrder state = new PendingOrder(item, Stage.AMOUNT, 0, 0, System.currentTimeMillis() + INPUT_TIMEOUT_MS);
+        pending.put(u, state);
+        p.closeInventory();
+        p.sendMessage("§a§l📦 CREATE ORDER");
+        p.sendMessage("§fHow many items do you want?");
+        p.sendMessage("§7Type the amount in chat. Type §ccancel §7to cancel.");
+        scheduleTimeout(u);
     }
 
-    @EventHandler
-    public void sign(SignChangeEvent e) {
-        Player p = e.getPlayer();
-        Pending q = pending.remove(p.getUniqueId());
-        if (q == null) return;
+    private void scheduleTimeout(UUID uuid) {
         new BukkitRunnable() {
-            public void run() { q.location.getBlock().setBlockData(q.original, false); }
-        }.runTask(plugin);
-
-        String amountText = e.getLine(1);
-        String priceText = e.getLine(3);
-        int amount = parseInt(amountText);
-        long price = plugin.getEconomyManager().parseAmount(priceText);
-        if (amount < 1 || amount > 2304 || price < 1) {
-            p.sendMessage("§cInvalid order. Enter a positive amount (max 2304) and price per item.");
-            return;
-        }
-        long total;
-        try { total = Math.multiplyExact(price, (long) amount); }
-        catch (ArithmeticException ex) { p.sendMessage("§cOrder value is too large."); return; }
-        if (plugin.getEconomyManager().getBalance(p.getUniqueId()) < total) {
-            p.sendMessage("§cYou need §f$" + total + " §cto create this order.");
-            return;
-        }
-        if (!plugin.getEconomyManager().withdraw(p.getUniqueId(), total)) {
-            p.sendMessage("§cCould not reserve the order payment.");
-            return;
-        }
-        UUID id = UUID.randomUUID();
-        orders.put(id, new Order(id, p.getUniqueId(), p.getName(), q.item, amount, price, total));
-        p.sendMessage("§aOrder created:");
-        p.sendMessage("§7Selected Item: §f" + pretty(q.item));
-        p.sendMessage("§7Amount: §f" + amount);
-        p.sendMessage("§7Price Per Item: §6$" + price);
-        p.sendMessage("§7Total: §6$" + total);
-        refreshOrders();
+            @Override public void run() {
+                PendingOrder state = pending.get(uuid);
+                if (state == null || state.expiresAt < System.currentTimeMillis()) {
+                    pending.remove(uuid);
+                    Player p = Bukkit.getPlayer(uuid);
+                    if (p != null) p.sendMessage("§e📦 Order input timed out. Nothing was charged.");
+                    cancel();
+                } else {
+                    runTaskLater(plugin, 20L);
+                }
+            }
+        }.runTaskLater(plugin, 20L);
     }
 
     @EventHandler
     public void chat(AsyncPlayerChatEvent e) {
         Player p = e.getPlayer();
-        if (!searchWaiting.remove(p.getUniqueId()).equals("order")) return;
+        UUID u = p.getUniqueId();
+        String message = e.getMessage().trim();
+
+        if (searchWaiting.remove(u)) {
+            e.setCancelled(true);
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (message.equalsIgnoreCase("cancel")) openItemSelection(p, 0, "");
+                else openItemSelection(p, 0, message);
+            });
+            return;
+        }
+
+        PendingOrder state = pending.get(u);
+        if (state == null) return;
         e.setCancelled(true);
-        String query = e.getMessage().trim();
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            if (query.equalsIgnoreCase("cancel")) openItemSelection(p, 0, "");
-            else openItemSelection(p, 0, query);
-        });
+
+        if (message.equalsIgnoreCase("cancel")) {
+            pending.remove(u);
+            Bukkit.getScheduler().runTask(plugin, () -> openItemSelection(p, 0, ""));
+            return;
+        }
+
+        if (state.expiresAt < System.currentTimeMillis()) {
+            pending.remove(u);
+            p.sendMessage("§e📦 Order input timed out. Nothing was charged.");
+            return;
+        }
+
+        switch (state.stage) {
+            case AMOUNT -> {
+                int amount = parseInt(message);
+                if (amount < 1 || amount > 2304) {
+                    p.sendMessage("§cEnter a positive whole-number amount between 1 and 2304.");
+                    return;
+                }
+                pending.put(u, new PendingOrder(state.item, Stage.PRICE, amount, 0, state.expiresAt));
+                p.sendMessage("§a§l💰 ORDER");
+                p.sendMessage("§fHow much will you pay per item?");
+                p.sendMessage("§7Type the price in chat. Type §ccancel §7to cancel.");
+            }
+            case PRICE -> {
+                long price = plugin.getEconomyManager().parseAmount(message);
+                if (price < 1 || price > 1_000_000_000_000L) {
+                    p.sendMessage("§cEnter a positive whole-number price (maximum $1T per item).");
+                    return;
+                }
+                try {
+                    Math.multiplyExact(price, (long) state.amount);
+                } catch (ArithmeticException ex) {
+                    p.sendMessage("§cThat order value is too large.");
+                    return;
+                }
+                pending.put(u, new PendingOrder(state.item, Stage.CONFIRM, state.amount, price, state.expiresAt));
+                p.sendMessage("§a§l📦 ORDER CONFIRMATION");
+                p.sendMessage("§7Item: §f" + pretty(state.item));
+                p.sendMessage("§7Amount: §f" + state.amount);
+                p.sendMessage("§7Price per item: §6$" + price);
+                p.sendMessage("§7Total reserved: §6$" + Math.multiplyExact(price, (long) state.amount));
+                p.sendMessage("§eType §aCONFIRM §eto create the order, or §cCANCEL §eto abort.");
+            }
+            case CONFIRM -> {
+                if (!message.equalsIgnoreCase("confirm")) {
+                    p.sendMessage("§eType §aCONFIRM §eto create the order, or §cCANCEL §eto abort.");
+                    return;
+                }
+                createOrder(p, state);
+            }
+        }
     }
 
-    private int parseInt(String s) {
-        try { return Integer.parseInt(s.trim()); } catch (Exception e) { return -1; }
+    private void createOrder(Player p, PendingOrder state) {
+        UUID u = p.getUniqueId();
+        long total;
+        try { total = Math.multiplyExact(state.price, (long) state.amount); }
+        catch (ArithmeticException ex) { pending.remove(u); p.sendMessage("§cOrder value is too large."); return; }
+
+        if (plugin.getEconomyManager().getBalance(u) < total) {
+            pending.remove(u);
+            p.sendMessage("§cYou need §f$" + total + " §cto create this order.");
+            return;
+        }
+        if (!plugin.getEconomyManager().withdraw(u, total)) {
+            pending.remove(u);
+            p.sendMessage("§cCould not reserve the order payment. Nothing was charged.");
+            return;
+        }
+
+        UUID id = UUID.randomUUID();
+        orders.put(id, new Order(id, u, p.getName(), state.item, state.amount, state.price, total));
+        pending.remove(u);
+        p.sendMessage("§a§l📦 ORDER CREATED");
+        p.sendMessage("§7Selected Item: §f" + pretty(state.item));
+        p.sendMessage("§7Amount: §f" + state.amount);
+        p.sendMessage("§7Price Per Item: §6$" + state.price);
+        p.sendMessage("§7Total: §6$" + total);
+        refreshOrders();
     }
 
     @EventHandler
@@ -244,7 +291,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
             List<Material> filtered = filteredItems(h.query);
             int idx = h.page * 36 + raw;
             if (idx >= filtered.size()) return;
-            beginSign(p, filtered.get(idx));
+            beginChatOrder(p, filtered.get(idx));
         }
     }
 
@@ -316,9 +363,8 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     @EventHandler
     public void quit(PlayerQuitEvent e) {
         UUID u = e.getPlayer().getUniqueId();
-        Pending q = pending.remove(u);
+        pending.remove(u);
         searchWaiting.remove(u);
-        if (q != null) q.location.getBlock().setBlockData(q.original, false);
         List<UUID> refund = new ArrayList<>();
         for (Order o : orders.values()) if (o.owner.equals(u)) refund.add(o.id);
         for (UUID id : refund) {
@@ -328,9 +374,14 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         refreshOrders();
     }
 
+    private int parseInt(String s) {
+        try { return Integer.parseInt(s.trim()); } catch (Exception e) { return -1; }
+    }
+
+    private enum Stage { AMOUNT, PRICE, CONFIRM }
     private enum SortMode { MOST_PAID("MOST PAID"), MOST_PER_ITEM("MOST PER ITEM"); final String label; SortMode(String label) { this.label = label; } }
     private record Order(UUID id, UUID owner, String name, Material item, int amount, long price, long total) {}
-    private record Pending(Material item, Location location, BlockData original) {}
+    private record PendingOrder(Material item, Stage stage, int amount, long price, long expiresAt) {}
     private static final class OrderHolder implements InventoryHolder {
         final int page; OrderHolder(int page) { this.page = page; } public Inventory getInventory() { return null; }
     }
