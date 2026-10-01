@@ -152,16 +152,13 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         new BukkitRunnable() {
             @Override public void run() {
                 PendingOrder state = pending.get(uuid);
-                if (state == null || state.expiresAt < System.currentTimeMillis()) {
+                if (state == null || state.expiresAt <= System.currentTimeMillis()) {
                     pending.remove(uuid);
                     Player p = Bukkit.getPlayer(uuid);
                     if (p != null) p.sendMessage("§e📦 Order input timed out. Nothing was charged.");
-                    cancel();
-                } else {
-                    runTaskLater(plugin, 20L);
                 }
             }
-        }.runTaskLater(plugin, 20L);
+        }.runTaskLater(plugin, (INPUT_TIMEOUT_MS / 50L) + 1L);
     }
 
     @EventHandler
