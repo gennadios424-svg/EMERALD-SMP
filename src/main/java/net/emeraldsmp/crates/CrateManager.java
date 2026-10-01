@@ -116,7 +116,7 @@ public final class CrateManager implements Listener {
         );
         final long phase2Start=40L;
         final long phase3Start=80L;
-        final long finalTick=140L;
+        final long finalTick=170L;
 
         Bukkit.getScheduler().runTaskLater(plugin,()->{
             for(Player p:Bukkit.getOnlinePlayers()){
