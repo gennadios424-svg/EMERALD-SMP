@@ -1,8 +1,8 @@
 name: EmeraldSMP
-version: '1.5'
+version: '1.6'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP economy, teams, tags, roles, kits, custom spawners, drills, worth, shop, RTP, orders, coin flips, auction house and homes
+description: Emerald SMP economy, teams, tags, roles, kits, custom spawners, drills, worth, shop, RTP, orders, coin flips, auction house, homes and investments
 commands:
   emerald:
     description: Emerald SMP foundation command
@@ -76,7 +76,8 @@ commands:
     permission: emerald.command
   spawner:
     description: Emerald SMP custom spawner administration
-    usage: /spawner give <player> skeleton [amount]
+    usage: /spawner give <player> <skeleton|zombie|spider|creeper> [stack]
+    aliases: [spawners]
     permission: emerald.admin
   drill:
     description: Gives the Original Drill (admin only)
@@ -95,7 +96,7 @@ commands:
     usage: /crate edit <type>
     permission: emerald.admin
   keyall:
-    description: Gives a crate key to all online players
+    description: Gives digital crate keys to all online players
     usage: /keyall <type> [amount]
     permission: emerald.admin
   roles:
@@ -105,6 +106,10 @@ commands:
   kits:
     description: Opens the Emerald SMP kit menu
     usage: /kits
+    permission: emerald.command
+  invest:
+    description: Opens the Emerald SMP investment system
+    usage: /invest [amount|withdraw]
     permission: emerald.command
 permissions:
   emerald.command:
