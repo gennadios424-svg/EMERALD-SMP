@@ -73,7 +73,9 @@ public final class ShopListener implements Listener {
         if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
             // A drag is valid only when every affected top slot is inside the
             // 45-slot input area. Control-row drags are blocked.
-            if (e.getRawSlots().stream().anyMatch(s -> s >= 45 || s < 0)) {
+            // Raw slots >= 45 are the protected control row. Player-inventory raw
+            // slots are >= the top inventory size too, but are valid drag sources.
+            if (e.getRawSlots().stream().anyMatch(s -> s >= 45 && s < e.getView().getTopInventory().getSize())) {
                 e.setCancelled(true);
                 return;
             }
