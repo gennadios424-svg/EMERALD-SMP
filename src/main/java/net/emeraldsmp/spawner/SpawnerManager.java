@@ -41,7 +41,8 @@ public final class SpawnerManager implements Listener {
             this.world=world;this.x=x;this.y=y;this.z=z;this.owner=owner;this.lastCycle=System.currentTimeMillis();
         }
         String key(){return world+":"+x+":"+y+":"+z;}
-        Location loc(){World w=Bukkit.getWorld(world);return w==null?null:new Location(w,x+0.5,y+1.65,z+0.5);}
+        Location loc(){World w=Bukkit.getWorld(world);return w==null?null:new Location(w,x,y,z);}
+        Location holoLoc(){World w=Bukkit.getWorld(world);return w==null?null:new Location(w,x+0.5,y+1.65,z+0.5);}
     }
 
     public SpawnerManager(EmeraldSMP plugin){
@@ -237,7 +238,6 @@ public final class SpawnerManager implements Listener {
         spawners.remove(d.key());removeHolograms(d);
         save();
         giveOrDrop(p,createItem(d.amount));
-        giveOrDrop(p,new ItemStack(Material.BONE,0)); // no-op: stored drops are returned below
         giveStoredOrDrop(p,Material.BONE,d.bones);
         giveStoredOrDrop(p,Material.ARROW,d.arrows);
         giveStoredOrDrop(p,Material.BOW,d.bows);
@@ -330,13 +330,14 @@ public final class SpawnerManager implements Listener {
     }
 
     private void spawnHologram(Data d){
-        Location base=d.loc();if(base==null||base.getWorld()==null||!base.getWorld().isChunkLoaded(d.x>>4,d.z>>4))return;
+        Location base=d.holoLoc();if(base==null||base.getWorld()==null||!base.getWorld().isChunkLoaded(d.x>>4,d.z>>4))return;
         removeHolograms(d);
         String[] lines=holoLines(d);
         for(int i=0;i<lines.length;i++){
-            ArmorStand as=base.getWorld().spawn(base.clone().add(0,-i*0.27,0),ArmorStand.class,stand->{
+            final int lineIndex=i;
+            ArmorStand as=base.getWorld().spawn(base.clone().add(0,-lineIndex*0.27,0),ArmorStand.class,stand->{
                 stand.setInvisible(true);stand.setMarker(true);stand.setGravity(false);stand.setInvulnerable(true);stand.setSilent(true);stand.setCustomNameVisible(true);
-                stand.customName(net.kyori.adventure.text.Component.text(lines[i]));
+                stand.setCustomName(lines[lineIndex]);
                 stand.getPersistentDataContainer().set(hologramKey,PersistentDataType.STRING,d.key());
             });
         }
