@@ -84,8 +84,8 @@ public final class DrillManager implements Listener {
         long existing=pdc.getOrDefault(expiresKey,PersistentDataType.LONG,0L);
         if(existing<=0L) pdc.set(expiresKey,PersistentDataType.LONG,System.currentTimeMillis()+DURATION);
         if(t==Tool.EMERALD_GAINER){
-            pdc.setIfAbsent(progressKey,PersistentDataType.INTEGER,0);
-            pdc.setIfAbsent(targetKey,PersistentDataType.INTEGER,random.nextInt(32)+1);
+            if(!pdc.has(progressKey,PersistentDataType.INTEGER)) pdc.set(progressKey,PersistentDataType.INTEGER,0);
+            if(!pdc.has(targetKey,PersistentDataType.INTEGER)) pdc.set(targetKey,PersistentDataType.INTEGER,random.nextInt(32)+1);
         }
         updateLore(meta,t);
         item.setItemMeta(meta);
