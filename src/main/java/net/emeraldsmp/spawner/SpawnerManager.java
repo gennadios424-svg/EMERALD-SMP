@@ -54,6 +54,7 @@ public final class SpawnerManager implements Listener {
     public static final class Data {
         String world;
         int x, y, z;
+        UUID id;
         UUID owner;
         String type;
         int amount = 1;
@@ -61,8 +62,9 @@ public final class SpawnerManager implements Listener {
         final Map<Material, Long> stored = new EnumMap<>(Material.class);
         final Set<Material> enabled = EnumSet.noneOf(Material.class);
 
-        Data(String world, int x, int y, int z, UUID owner, String type) {
+        Data(String world, int x, int y, int z, UUID id, UUID owner, String type) {
             this.world = world;
+            this.id = id == null ? UUID.nameUUIDFromBytes((world+":"+x+":"+y+":"+z).getBytes(java.nio.charset.StandardCharsets.UTF_8)) : id;
             this.x = x;
             this.y = y;
             this.z = z;
@@ -98,7 +100,9 @@ public final class SpawnerManager implements Listener {
                 String ownerString = y.getString(p + ".owner");
                 if (ownerString == null) continue;
                 String type = normalizeType(y.getString(p + ".type", TYPE_SKELETON));
-                Data d = new Data(y.getString(p + ".world", "world"), y.getInt(p + ".x"), y.getInt(p + ".y"), y.getInt(p + ".z"), UUID.fromString(ownerString), type);
+                String world = y.getString(p + ".world", "world"); int x = y.getInt(p + ".x"); int yy = y.getInt(p + ".y"); int z = y.getInt(p + ".z");
+                UUID id; try { id = UUID.fromString(y.getString(p + ".id")); } catch (Exception ignored) { id = UUID.nameUUIDFromBytes((world+":"+x+":"+yy+":"+z).getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+                Data d = new Data(world, x, yy, z, id, UUID.fromString(ownerString), type);
                 d.amount = clamp(y.getInt(p + ".amount", 1), 1, 64);
                 d.lastCycle = Math.max(0L, y.getLong(p + ".last-cycle", System.currentTimeMillis()));
                 for (Material m : defaultDrops(type)) {
@@ -122,6 +126,7 @@ public final class SpawnerManager implements Listener {
             y.set(p + ".x", d.x);
             y.set(p + ".y", d.y);
             y.set(p + ".z", d.z);
+            y.set(p + ".id", d.id.toString());
             y.set(p + ".owner", d.owner.toString());
             y.set(p + ".type", d.type);
             y.set(p + ".amount", d.amount);
@@ -263,7 +268,7 @@ public final class SpawnerManager implements Listener {
             p.sendMessage("§a🧟 " + pretty(type) + " spawner stacked: §f" + existing.amount + "x");
             return;
         }
-        Data d = new Data(b.getWorld().getName(), b.getX(), b.getY(), b.getZ(), p.getUniqueId(), type);
+        Data d = new Data(b.getWorld().getName(), b.getX(), b.getY(), b.getZ(), UUID.randomUUID(), p.getUniqueId(), type);
         d.amount = incoming;
         spawners.put(d.key(), d);
         configurePhysicalSpawner(d);
