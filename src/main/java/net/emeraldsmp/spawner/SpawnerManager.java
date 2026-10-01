@@ -259,7 +259,7 @@ public final class SpawnerManager implements Listener {
             existing.amount = clamp(existing.amount + incoming, 1, 64);
             b.setType(Material.AIR, false);
             if (existing.amount == old) { p.sendMessage("§cThis spawner stack is already at the 64x limit."); return; }
-            configurePhysicalSpawner(existing); save(); updateHologram(existing);
+            configurePhysicalSpawner(existing); save();
             p.sendMessage("§a🧟 " + pretty(type) + " spawner stacked: §f" + existing.amount + "x");
             return;
         }
