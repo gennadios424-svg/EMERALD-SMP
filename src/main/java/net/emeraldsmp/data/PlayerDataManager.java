@@ -44,7 +44,8 @@ public final class PlayerDataManager {
             long shards = Math.max(0L, yaml.getLong("emerald-shards", 0L));
             long investment = Math.max(0L, yaml.getLong("investment.amount", 0L));
             long investmentEarnings = Math.max(0L, yaml.getLong("investment.earnings", 0L));
-            data = new PlayerData(uuid, username == null ? yaml.getString("username", "Unknown") : username, firstJoin, System.currentTimeMillis(), balance, shards, investment, investmentEarnings);
+            boolean autoCollect = yaml.getBoolean("investment.auto-collect", false);
+            data = new PlayerData(uuid, username == null ? yaml.getString("username", "Unknown") : username, firstJoin, System.currentTimeMillis(), balance, shards, investment, investmentEarnings, autoCollect);
         } else {
             long now = System.currentTimeMillis();
             long starting = Math.max(0L, plugin.getConfigManager().getConfig().getLong("economy.starting-balance", 0L));
@@ -136,6 +137,7 @@ public final class PlayerDataManager {
         yaml.set("emerald-shards", data.getEmeraldShards());
         yaml.set("investment.amount", data.getInvestment());
         yaml.set("investment.earnings", data.getInvestmentEarnings());
+        yaml.set("investment.auto-collect", data.isInvestmentAutoCollect());
         yaml.save(target);
     }
 
