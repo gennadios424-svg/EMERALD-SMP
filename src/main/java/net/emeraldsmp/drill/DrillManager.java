@@ -55,10 +55,10 @@ public final class DrillManager implements Listener {
             lore.add("§7🏗 Designed for Digouts");
             lore.add("§7⏳ 7 Days");
         }else{
-            int target=random.nextInt(32)+1;
+            int target=random.nextInt(92)+1;
             lore.add("§fNormal Mining Pickaxe");
             lore.add("§7💚 Mines blocks for Emerald Shards");
-            lore.add("§7🎲 Random Trigger: §f1–32 Blocks");
+            lore.add("§7🎲 Random Trigger: §f1–92 Blocks");
             lore.add("§7💎 Reward: §f1–5 Emerald Shards");
             lore.add("§7🎯 Current Progress: §f0/"+target);
             meta.getPersistentDataContainer().set(progressKey,PersistentDataType.INTEGER,0);
@@ -85,7 +85,7 @@ public final class DrillManager implements Listener {
         if(existing<=0L) pdc.set(expiresKey,PersistentDataType.LONG,System.currentTimeMillis()+DURATION);
         if(t==Tool.EMERALD_GAINER){
             if(!pdc.has(progressKey,PersistentDataType.INTEGER)) pdc.set(progressKey,PersistentDataType.INTEGER,0);
-            if(!pdc.has(targetKey,PersistentDataType.INTEGER)) pdc.set(targetKey,PersistentDataType.INTEGER,random.nextInt(32)+1);
+            if(!pdc.has(targetKey,PersistentDataType.INTEGER)) pdc.set(targetKey,PersistentDataType.INTEGER,random.nextInt(92)+1);
         }
         updateLore(meta,t);
         item.setItemMeta(meta);
@@ -141,14 +141,14 @@ public final class DrillManager implements Listener {
         block.breakNaturally(tool);
         ItemMeta meta=tool.getItemMeta(); var pdc=meta.getPersistentDataContainer();
         int progress=pdc.getOrDefault(progressKey,PersistentDataType.INTEGER,0)+1;
-        int target=pdc.getOrDefault(targetKey,PersistentDataType.INTEGER,random.nextInt(32)+1);
+        int target=pdc.getOrDefault(targetKey,PersistentDataType.INTEGER,random.nextInt(92)+1);
         if(progress>=target){
             int roll=random.nextInt(100);
             int reward=roll<40?1:roll<60?2:roll<75?3:roll<85?4:5;
             long cur=plugin.getPlayerDataManager().getEmeraldShards(p.getUniqueId());
             plugin.getPlayerDataManager().setEmeraldShards(p.getUniqueId(),cur+reward);
             p.sendMessage(ChatColor.GREEN+"💚 +"+reward+" Emerald Shards");
-            progress=0; target=random.nextInt(32)+1;
+            progress=0; target=random.nextInt(92)+1;
         }
         pdc.set(progressKey,PersistentDataType.INTEGER,progress);
         pdc.set(targetKey,PersistentDataType.INTEGER,target);
