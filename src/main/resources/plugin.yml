@@ -123,6 +123,22 @@ commands:
   tp:
     description: Instant staff teleport
     usage: /tp <player>
+  tpa:
+    description: Request to teleport to another player
+    usage: /tpa <player>
+    permission: emerald.command
+  tpahere:
+    description: Request another player to teleport to you
+    usage: /tpahere <player>
+    permission: emerald.command
+  tpaccept:
+    description: Accept a pending teleport request
+    usage: /tpaccept
+    permission: emerald.command
+  tpdeny:
+    description: Deny a pending teleport request
+    usage: /tpdeny
+    permission: emerald.command
   tphere:
     description: Instantly teleport a player to staff
     usage: /tphere <player>
