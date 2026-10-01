@@ -324,6 +324,15 @@ public final class ShopManager {
         for (String w : s.split(" ")) if (!w.isEmpty()) b.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(' ');
         return b.toString().trim();
     }
+    private static final class SellSession {
+        private final Material material;
+        private int quantity;
+        private SellSession(Material material, int quantity) { this.material = material; this.quantity = quantity; }
+        private Material material() { return material; }
+        private int quantity() { return quantity; }
+        private void quantity(int quantity) { this.quantity = quantity; }
+    }
+
     public record ShopView(boolean sellMode, String category, int page, List<?> items) {}
     public record ShopItem(String key, Material material, String displayName, long buyPrice, List<String> lore) {}
 }
