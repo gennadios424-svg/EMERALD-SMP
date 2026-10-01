@@ -40,7 +40,7 @@ public final class EmeraldSMP extends JavaPlugin {
     @Override public void onEnable() {
         try {
             configManager=new ConfigManager(this);configManager.load(); messageService=new MessageService(this);
-            playerDataManager=new PlayerDataManager(this);playerDataManager.initialize(); economyManager=new EconomyManager(this); shopManager=new ShopManager(this); manualSellManager=new ManualSellManager(this);
+            playerDataManager=new PlayerDataManager(this);playerDataManager.initialize(); economyManager=new EconomyManager(this); shopManager=new ShopManager(this); cleanSellManager=new CleanSellManager(this);
             worthManager=new WorthManager(this);worthManager.load(); afkManager=new AfkManager(this);
             teamManager=new TeamManager(this);teamManager.load(); tagsManager=new TagsManager(this);tagsManager.load();
             roleManager=new RoleManager(this);roleManager.load(); spawnerManager=new SpawnerManager(this);spawnerManager.load();
