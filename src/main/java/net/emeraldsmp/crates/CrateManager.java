@@ -75,7 +75,7 @@ public final class CrateManager implements Listener {
     private String keyType(ItemStack i){if(i==null||!i.hasItemMeta())return null;return i.getItemMeta().getPersistentDataContainer().get(keyKey,PersistentDataType.STRING);}
     public int virtualKeyCount(Player p,String type){EnumMap<KeyType,Integer> m=virtualKeys.get(p.getUniqueId());if(m==null)return 0;return m.getOrDefault(keyEnum(type),0);}
     private KeyType keyEnum(String t){return KeyType.valueOf(normalize(t).toUpperCase(Locale.ROOT));}
-    private boolean consumeVirtualKey(Player p,String type){UUID u=p.getUniqueId();EnumMap<KeyType,Integer> m=virtualKeys.get(u);if(m==null)return false;KeyType k=keyEnum(type);int n=m.getOrDefault(k,0);if(n<=0)return false;if(n==1)m.remove(k);else m.put(k,n-1);if(m.isEmpty())virtualKeys.remove(u.getUniqueId());save();return true;}
+    private boolean consumeVirtualKey(Player p,String type){UUID u=p.getUniqueId();EnumMap<KeyType,Integer> m=virtualKeys.get(u);if(m==null)return false;KeyType k=keyEnum(type);int n=m.getOrDefault(k,0);if(n<=0)return false;if(n==1)m.remove(k);else m.put(k,n-1);if(m.isEmpty())virtualKeys.remove(u);save();return true;}
     private int keySlot(Player p,String type){ItemStack[] c=p.getInventory().getStorageContents();for(int i=0;i<c.length;i++)if(type.equals(keyType(c[i])))return i;return -1;}
     public void keyAll(String type,int amount,CommandSender sender){
         type=normalize(type);KeyType k=keyEnum(type);
