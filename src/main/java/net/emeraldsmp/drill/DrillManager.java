@@ -6,6 +6,8 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -15,8 +17,9 @@ import java.util.*;
 
 public final class DrillManager implements Listener {
     private final EmeraldSMP plugin;
-    private final NamespacedKey toolKey,expiresKey,progressKey,targetKey;
+    private final NamespacedKey toolKey, expiresKey, progressKey, targetKey;
     private final Random random=new Random();
+    private static final long DURATION=7L*24L*60L*60L*1000L;
     private static final DateTimeFormatter EXPIRY=DateTimeFormatter.ofPattern("MMM d, HH:mm").withZone(ZoneId.systemDefault());
     public enum Tool { ORIGINAL_DRILL, EMERALD_GAINER }
 
@@ -27,39 +30,67 @@ public final class DrillManager implements Listener {
         progressKey=new NamespacedKey(plugin,"emerald-gainer-progress");
         targetKey=new NamespacedKey(plugin,"emerald-gainer-target");
     }
-    public void load(){}
+
+    public void load(){
+        plugin.getServer().getScheduler().runTaskTimer(plugin,()->{
+            for(Player p:Bukkit.getOnlinePlayers()){
+                updateInventory(p);
+            }
+        },20L,20L);
+    }
     public void stop(){}
 
+    /**
+     * Creates an INACTIVE tool. No expiration timestamp is written.
+     * Only crate delivery calls activate().
+     */
     public ItemStack createItem(Tool tool,int tier){
         ItemStack item=new ItemStack(Material.DIAMOND_PICKAXE);
         ItemMeta meta=item.getItemMeta();
-        long exp=System.currentTimeMillis()+7L*24L*60L*60L*1000L;
         meta.setDisplayName(tool==Tool.ORIGINAL_DRILL?"§a⛏️ ORIGINAL DRILL":"§a💚 EMERALD GAINER");
         List<String> lore=new ArrayList<>();
         if(tool==Tool.ORIGINAL_DRILL){
             lore.add("§f3×3 Digout Pickaxe");
             lore.add("§7⛏ Mines a 3×3 area");
             lore.add("§7🏗 Designed for Digouts");
+            lore.add("§7⏳ 7 Days");
         }else{
+            int target=random.nextInt(32)+1;
             lore.add("§fNormal Mining Pickaxe");
             lore.add("§7💚 Mines blocks for Emerald Shards");
             lore.add("§7🎲 Random Trigger: §f1–32 Blocks");
             lore.add("§7💎 Reward: §f1–5 Emerald Shards");
-            int target=random.nextInt(32)+1;
+            lore.add("§7🎯 Current Progress: §f0/"+target);
             meta.getPersistentDataContainer().set(progressKey,PersistentDataType.INTEGER,0);
             meta.getPersistentDataContainer().set(targetKey,PersistentDataType.INTEGER,target);
-            lore.add("§7🎯 Current Progress: §f0/"+target);
+            lore.add("§7⏳ 7 Days");
         }
-        lore.add("§7⏳ Expires: §f"+EXPIRY.format(Instant.ofEpochMilli(exp)));
-        lore.add("§7⏱ Remaining: §f7d 0h");
+        lore.add("§8Inactive • Timer starts when won from a crate");
         lore.add("§8Emerald SMP");
         meta.setLore(lore);
         meta.getPersistentDataContainer().set(toolKey,PersistentDataType.STRING,tool.name());
-        meta.getPersistentDataContainer().set(expiresKey,PersistentDataType.LONG,exp);
+        meta.getPersistentDataContainer().remove(expiresKey);
         item.setItemMeta(meta);
         return item;
     }
     public ItemStack createItem(int tier){return createItem(Tool.ORIGINAL_DRILL,tier);}
+
+    public ItemStack activate(ItemStack source){
+        ItemStack item=source==null?null:source.clone();
+        Tool t=tool(item);
+        if(t==null)return item;
+        ItemMeta meta=item.getItemMeta();
+        var pdc=meta.getPersistentDataContainer();
+        long existing=pdc.getOrDefault(expiresKey,PersistentDataType.LONG,0L);
+        if(existing<=0L) pdc.set(expiresKey,PersistentDataType.LONG,System.currentTimeMillis()+DURATION);
+        if(t==Tool.EMERALD_GAINER){
+            pdc.setIfAbsent(progressKey,PersistentDataType.INTEGER,0);
+            pdc.setIfAbsent(targetKey,PersistentDataType.INTEGER,random.nextInt(32)+1);
+        }
+        updateLore(meta,t);
+        item.setItemMeta(meta);
+        return item;
+    }
 
     private Tool tool(ItemStack item){
         if(item==null||item.getType()!=Material.DIAMOND_PICKAXE||!item.hasItemMeta())return null;
@@ -68,15 +99,23 @@ public final class DrillManager implements Listener {
         try{return Tool.valueOf(v);}catch(Exception e){return null;}
     }
     private long expires(ItemStack item){
-        if(item==null||!item.hasItemMeta())return 0;
+        if(item==null||!item.hasItemMeta())return 0L;
         return item.getItemMeta().getPersistentDataContainer().getOrDefault(expiresKey,PersistentDataType.LONG,0L);
     }
-    private boolean expired(ItemStack item){return expires(item)>0&&System.currentTimeMillis()>=expires(item);}
+    private boolean expired(ItemStack item){long e=expires(item);return e>0L&&System.currentTimeMillis()>=e;}
 
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void breakBlock(BlockBreakEvent e){
-        Player p=e.getPlayer(); ItemStack held=p.getInventory().getItemInMainHand(); Tool t=tool(held);
+        Player p=e.getPlayer();
+        ItemStack held=p.getInventory().getItemInMainHand();
+        Tool t=tool(held);
         if(t==null)return;
+        long exp=expires(held);
+        if(exp<=0L){
+            e.setCancelled(true);
+            p.sendMessage(ChatColor.YELLOW+"⚠ This "+(t==Tool.ORIGINAL_DRILL?"Original Drill":"Emerald Gainer")+" is inactive. It can only be activated by winning it from an Emerald Crate.");
+            return;
+        }
         if(expired(held)){
             e.setCancelled(true);
             p.sendMessage(ChatColor.RED+"❌ Your "+(t==Tool.ORIGINAL_DRILL?"Original Drill":"Emerald Gainer")+" has expired!");
@@ -113,26 +152,79 @@ public final class DrillManager implements Listener {
         }
         pdc.set(progressKey,PersistentDataType.INTEGER,progress);
         pdc.set(targetKey,PersistentDataType.INTEGER,target);
-        updateLore(meta,target,progress);
+        updateLore(meta,Tool.EMERALD_GAINER);
         tool.setItemMeta(meta);
     }
 
-    private void updateLore(ItemMeta meta,int target,int progress){
-        long exp=meta.getPersistentDataContainer().getOrDefault(expiresKey,PersistentDataType.LONG,0L);
-        meta.setLore(List.of(
-            "§fNormal Mining Pickaxe",
-            "§7💚 Mines blocks for Emerald Shards",
-            "§7🎲 Random Trigger: §f1–32 Blocks",
-            "§7💎 Reward: §f1–5 Emerald Shards",
-            "§7🎯 Current Progress: §f"+progress+"/"+target,
-            "§7⏳ Expires: §f"+EXPIRY.format(Instant.ofEpochMilli(exp)),
-            "§7⏱ Remaining: §f"+remaining(exp),
-            "§8Emerald SMP"
-        ));
+    private void updateLore(ItemMeta meta,Tool t){
+        var pdc=meta.getPersistentDataContainer();
+        long exp=pdc.getOrDefault(expiresKey,PersistentDataType.LONG,0L);
+        List<String> lore=new ArrayList<>();
+        if(t==Tool.ORIGINAL_DRILL){
+            lore.add("§f3×3 Digout Pickaxe");
+            lore.add("§7⛏ Mines a 3×3 area");
+            lore.add("§7🏗 Designed for Digouts");
+        }else{
+            int progress=pdc.getOrDefault(progressKey,PersistentDataType.INTEGER,0);
+            int target=pdc.getOrDefault(targetKey,PersistentDataType.INTEGER,1);
+            lore.add("§fNormal Mining Pickaxe");
+            lore.add("§7💚 Mines blocks for Emerald Shards");
+            lore.add("§7🎲 Random Trigger: §f1–32 Blocks");
+            lore.add("§7💎 Reward: §f1–5 Emerald Shards");
+            lore.add("§7🎯 Current Progress: §f"+progress+"/"+target);
+        }
+        if(exp>0L){
+            lore.add("§7⏳ Expires: §f"+EXPIRY.format(Instant.ofEpochMilli(exp)));
+            lore.add("§7⏱ Remaining: §f"+remaining(exp));
+        }else{
+            lore.add("§7⏳ 7 Days");
+            lore.add("§8Inactive • Timer starts when won from a crate");
+        }
+        lore.add("§8Emerald SMP");
+        meta.setLore(lore);
     }
+
+    private void updateInventory(Player p){
+        ItemStack[] contents=p.getInventory().getStorageContents();
+        boolean changed=false;
+        for(int i=0;i<contents.length;i++){
+            ItemStack item=contents[i];
+            if(tool(item)==null)continue;
+            ItemStack before=item.clone();
+            ItemMeta meta=item.getItemMeta();
+            Tool t=tool(item);
+            long exp=expires(item);
+            if(exp>0L && !expired(item)){
+                updateLore(meta,t);
+                item.setItemMeta(meta);
+            }else if(exp>0L && expired(item)){
+                updateLore(meta,t);
+                item.setItemMeta(meta);
+            }
+            if(!before.equals(item)) changed=true;
+        }
+        ItemStack off=p.getInventory().getItemInOffHand();
+        if(tool(off)!=null){
+            ItemStack before=off.clone();
+            ItemMeta meta=off.getItemMeta();
+            updateLore(meta,tool(off));
+            off.setItemMeta(meta);
+            if(!before.equals(off)) p.getInventory().setItemInOffHand(off);
+        }
+        if(changed)p.getInventory().setStorageContents(contents);
+    }
+
+    @EventHandler public void itemHeld(PlayerItemHeldEvent e){
+        Bukkit.getScheduler().runTask(plugin,()->updateInventory(e.getPlayer()));
+    }
+    @EventHandler public void join(PlayerJoinEvent e){
+        Bukkit.getScheduler().runTask(plugin,()->updateInventory(e.getPlayer()));
+    }
+
     private String remaining(long exp){
-        long s=Math.max(0,(exp-System.currentTimeMillis())/1000); long d=s/86400; s%=86400; long h=s/3600;
-        return d+"d "+h+"h";
+        long s=Math.max(0,(exp-System.currentTimeMillis())/1000);
+        long d=s/86400; s%=86400; long h=s/3600; s%=3600; long m=s/60;
+        return d+"d "+h+"h "+m+"m";
     }
     private boolean mineable(Block b){
         Material m=b.getType();
