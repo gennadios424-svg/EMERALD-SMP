@@ -3,7 +3,6 @@ package net.emeraldsmp.crates;
 import org.bukkit.*;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import java.util.*;
 
 public final class CrateCommand implements CommandExecutor,TabCompleter{
@@ -23,8 +22,8 @@ public final class CrateCommand implements CommandExecutor,TabCompleter{
         if(args[0].equalsIgnoreCase("give")&&args.length>=3){
             Player target=Bukkit.getPlayerExact(args[1]);if(target==null){sender.sendMessage(ChatColor.RED+"Player must be online.");return true;}
             int amount=1;if(args.length>=4)try{amount=Math.max(1,Math.min(64,Integer.parseInt(args[3])));}catch(Exception e){sender.sendMessage(ChatColor.RED+"Invalid amount.");return true;}
-            for(ItemStack left:target.getInventory().addItem(manager.createKey(args[2],amount)).values())target.getWorld().dropItemNaturally(target.getLocation(),left);
-            sender.sendMessage(ChatColor.GREEN+"Gave "+amount+" "+args[2]+" key(s) to "+target.getName());return true;
+            manager.giveVirtualKeys(target,args[2],amount);
+            sender.sendMessage(ChatColor.GREEN+"Gave "+amount+" digital "+args[2]+" key(s) to "+target.getName());return true;
         }
         if(args[0].equalsIgnoreCase("place")&&sender instanceof Player p&&args.length>=2){manager.place(p,args[1]);return true;}
         if(args[0].equalsIgnoreCase("remove")&&sender instanceof Player p){manager.remove(p);return true;}
