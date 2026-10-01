@@ -7,14 +7,15 @@ import org.bukkit.Material;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
-import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.*;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.*;
 
-public final class RolesCommand implements CommandExecutor, TabCompleter, Listener {
-    private static final String TITLE="§2§l👑 ROLE MANAGEMENT";
+public final class RolesCommand implements CommandExecutor,TabCompleter,Listener {
+    private static final String TITLE="§2§l💚 EMERALD SMP §8• §fROLE COLLECTION";
+    private static final String PICKER_PREFIX="§2§l💚 ROLE §8• §f";
     private final EmeraldSMP plugin;
     private final RoleManager roles;
     private final Map<UUID,UUID> selected=new HashMap<>();
@@ -23,63 +24,145 @@ public final class RolesCommand implements CommandExecutor, TabCompleter, Listen
 
     @Override public boolean onCommand(CommandSender sender,Command command,String label,String[] args){
         if(!sender.isOp()){sender.sendMessage(ChatColor.RED+"Only OP can manage roles.");return true;}
-        if(args.length>=3 && args[0].equalsIgnoreCase("set")){
+        if(args.length>=3&&args[0].equalsIgnoreCase("set")){
             Player target=Bukkit.getPlayerExact(args[1]);
             if(target==null){sender.sendMessage(ChatColor.RED+"Player must be online.");return true;}
             RoleManager.Role role=RoleManager.Role.parse(args[2]);
             if(role==null){sender.sendMessage(ChatColor.RED+"Invalid role. Use OWNER, DEV, MOD, MEDIA, EMERALD, MVP, VIP or MEMBER.");return true;}
-            roles.set(target,role); roles.refresh(target);
-            sender.sendMessage(ChatColor.GREEN+"Set "+target.getName()+"'s role to "+role.label()+".");
+            roles.set(target,role);
+            sender.sendMessage("§a💚 Role updated: §f"+target.getName()+" §8→ "+role.badge());
             return true;
         }
         if(!(sender instanceof Player p)){sender.sendMessage("Use /roles set <player> <role> from console.");return true;}
-        openPlayers(p); return true;
+        openCollection(p);return true;
     }
 
-    private void openPlayers(Player p){
-        Inventory inv=Bukkit.createInventory(null,54,TITLE);
-        for(Player target:Bukkit.getOnlinePlayers()){
-            ItemStack item=new ItemStack(Material.PLAYER_HEAD);
-            ItemMeta m=item.getItemMeta();m.setDisplayName(roles.get(target).color()+target.getName());
-            m.setLore(List.of("§7Current role: "+roles.get(target).color()+roles.get(target).label(),"§eClick to manage"));
-            item.setItemMeta(m);inv.addItem(item);
+    private void openCollection(Player p){
+        Inventory inv=Bukkit.createInventory(null,45,TITLE);
+        inv.setItem(4,icon(Material.EMERALD,"§a§l💚 EMERALD SMP",List.of(
+            "§7Premium server rank collection",
+            "§8Every rank uses the same Emerald SMP badge language"
+        )));
+        int[] slots={10,12,14,16,19,21,23,25};
+        RoleManager.Role[] all=RoleManager.Role.values();
+        for(int i=0;i<all.length;i++){
+            RoleManager.Role r=all[i];
+            List<String> lore=new ArrayList<>();
+            lore.add("§7"+r.description());
+            lore.add("");
+            lore.add("§fBadge: "+r.badge());
+            lore.add("§7Online holders: §f"+count(r));
+            lore.add("");
+            lore.add("§eClick to choose a player");
+            inv.setItem(slots[i],icon(material(r),r.badge(),lore));
         }
+        inv.setItem(40,icon(Material.BARRIER,"§c§l✕ CLOSE",List.of()));
         p.openInventory(inv);
     }
 
-    private void openRolePicker(Player admin,Player target){
-        Inventory inv=Bukkit.createInventory(null,27,"§2§l👑 "+target.getName()+"'S ROLE");
-        int slot=0;
-        for(RoleManager.Role r:RoleManager.Role.values()){
-            ItemStack item=new ItemStack(material(r));ItemMeta m=item.getItemMeta();
-            m.setDisplayName(r.color()+r.label());
-            m.setLore(List.of("§7Set role to "+r.label(),"§eClick to apply"));
-            item.setItemMeta(m);inv.setItem(slot++,item);
+    private void openPlayers(Player admin,RoleManager.Role role){
+        Inventory inv=Bukkit.createInventory(null,54,PICKER_PREFIX+role.label());
+        inv.setItem(4,icon(material(role),role.badge(),List.of(
+            "§7Select an online player",
+            "§7Assign them the "+role.badge()+" §7rank"
+        )));
+        int slot=10;
+        for(Player target:Bukkit.getOnlinePlayers()){
+            if(slot>=44)break;
+            if(slot%9==17||slot%9==18)slot+=2;
+            ItemStack head=new ItemStack(Material.PLAYER_HEAD);
+            ItemMeta m=head.getItemMeta();
+            m.setDisplayName("§f"+target.getName());
+            m.setLore(List.of("§7Current: "+roles.get(target).badge(),"§eClick to assign "+role.badge()));
+            head.setItemMeta(m);
+            inv.setItem(slot++,head);
         }
-        admin.openInventory(inv);selected.put(admin.getUniqueId(),target.getUniqueId());
+        inv.setItem(49,icon(Material.ARROW,"§e§l⬅ BACK",List.of("§7Return to rank collection")));
+        inv.setItem(53,icon(Material.BARRIER,"§c§l✕ CLOSE",List.of()));
+        p.openInventory(inv);
+        selected.put(admin.getUniqueId(),role.ordinal());
     }
 
-    private Material material(RoleManager.Role r){return switch(r){case OWNER->Material.REDSTONE_BLOCK;case DEV->Material.DIAMOND_BLOCK;case MOD->Material.BLUE_WOOL;case MEDIA->Material.PINK_WOOL;case EMERALD->Material.EMERALD_BLOCK;case MVP->Material.GOLD_BLOCK;case VIP->Material.GOLD_INGOT;case MEMBER->Material.IRON_INGOT;};}
+    private void openTargetRoles(Player admin,Player target){
+        Inventory inv=Bukkit.createInventory(null,27,PICKER_PREFIX+target.getName());
+        inv.setItem(4,icon(Material.PLAYER_HEAD,"§f§l"+target.getName(),List.of("§7Current: "+roles.get(target).badge())));
+        RoleManager.Role[] all=RoleManager.Role.values();
+        for(int i=0;i<all.length;i++){
+            RoleManager.Role r=all[i];
+            inv.setItem(10+i,icon(material(r),r.badge(),List.of("§7"+r.description(),"§eClick to apply")));
+        }
+        inv.setItem(22,icon(Material.ARROW,"§e§l⬅ BACK",List.of()));
+        selected.put(admin.getUniqueId(),target.getUniqueId());
+        pSafeOpen(admin,inv);
+    }
 
-    @EventHandler public void click(InventoryClickEvent e){
-        if(!(e.getWhoClicked() instanceof Player p))return;
+    private void pSafeOpen(Player p,Inventory inv){p.openInventory(inv);}
+
+    private int count(RoleManager.Role r){
+        int n=0;for(Player p:Bukkit.getOnlinePlayers())if(roles.get(p)==r)n++;return n;
+    }
+
+    private Material material(RoleManager.Role r){
+        return switch(r){
+            case OWNER->Material.EMERALD_BLOCK;
+            case DEV->Material.REDSTONE_LAMP;
+            case MOD->Material.PRISMARINE;
+            case MEDIA->Material.AMETHYST_BLOCK;
+            case EMERALD->Material.EMERALD;
+            case MVP->Material.DIAMOND;
+            case VIP->Material.GOLD_INGOT;
+            case MEMBER->Material.PLAYER_HEAD;
+        };
+    }
+
+    private ItemStack icon(Material mat,String name,List<String> lore){
+        ItemStack i=new ItemStack(mat);
+        ItemMeta m=i.getItemMeta();m.setDisplayName(name);m.setLore(lore);i.setItemMeta(m);return i;
+    }
+
+    @EventHandler(priority=EventPriority.HIGHEST)
+    public void click(InventoryClickEvent e){
+        if(!(e.getWhoClicked() instanceof Player p)||!p.isOp())return;
         String title=e.getView().getTitle();
-        if(!title.startsWith("§2§l👑") || !p.isOp())return;
+        if(!title.startsWith("§2§l💚")&&!title.startsWith(PICKER_PREFIX))return;
         e.setCancelled(true);
-        if(title.equals(TITLE)){
-            ItemStack item=e.getCurrentItem(); if(item==null||item.getType()!=Material.PLAYER_HEAD)return;
-            String name=ChatColor.stripColor(item.getItemMeta().getDisplayName());
-            Player target=Bukkit.getPlayerExact(name); if(target!=null)openRolePicker(p,target);
-        }else{
-            UUID targetId=selected.get(p.getUniqueId()); if(targetId==null)return;
-            RoleManager.Role[] all=RoleManager.Role.values();int slot=e.getRawSlot();
-            if(slot>=0&&slot<all.length){
-                Player target=Bukkit.getPlayer(targetId);
-                if(target!=null){roles.set(target,all[slot]);roles.refresh(target);p.sendMessage(ChatColor.GREEN+"Role updated for "+target.getName()+": "+all[slot].label());}
-                p.closeInventory();
+        if(e.getClickedInventory()!=e.getView().getTopInventory())return;
+        int slot=e.getRawSlot();
+        if(TITLE.equals(title)){
+            if(slot==40){p.closeInventory();return;}
+            RoleManager.Role[] all=RoleManager.Role.values();
+            int[] slots={10,12,14,16,19,21,23,25};
+            for(int i=0;i<slots.length;i++)if(slot==slots[i]){openPlayers(p,all[i]);return;}
+        }else if(title.startsWith(PICKER_PREFIX)){
+            if(slot==53){p.closeInventory();return;}
+            if(slot==49){openCollection(p);return;}
+            if(title.startsWith(PICKER_PREFIX)){
+                String suffix=ChatColor.stripColor(title.substring(PICKER_PREFIX.length())).trim();
+                RoleManager.Role role=RoleManager.Role.parse(suffix);
+                if(role!=null){
+                    if(e.getCurrentItem()!=null&&e.getCurrentItem().getType()==Material.PLAYER_HEAD){
+                        String name=ChatColor.stripColor(Objects.requireNonNull(e.getCurrentItem().getItemMeta()).getDisplayName());
+                        Player target=Bukkit.getPlayerExact(name);
+                        if(target!=null){roles.set(target,role);p.sendMessage("§a💚 Assigned "+role.badge()+" §ato §f"+target.getName());openCollection(p);}
+                    }
+                }else{
+                    UUID targetId=(UUID)selected.get(p.getUniqueId());
+                    if(targetId!=null){
+                        Player target=Bukkit.getPlayer(targetId);
+                        RoleManager.Role[] all=RoleManager.Role.values();
+                        int idx=slot-10;
+                        if(target!=null&&idx>=0&&idx<all.length){roles.set(target,all[idx]);p.sendMessage("§a💚 Assigned "+all[idx].badge()+" §ato §f"+target.getName());openCollection(p);}
+                    }
+                }
             }
         }
     }
+
+    @EventHandler public void drag(InventoryDragEvent e){
+        if(e.getView().getTitle().startsWith("§2§l💚")||e.getView().getTitle().startsWith(PICKER_PREFIX))e.setCancelled(true);
+    }
+
+    @EventHandler public void close(InventoryCloseEvent e){selected.remove(e.getPlayer().getUniqueId());}
 
     @Override public List<String> onTabComplete(CommandSender sender,Command command,String alias,String[] args){
         if(args.length==1)return List.of("set");
