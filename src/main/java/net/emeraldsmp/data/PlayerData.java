@@ -11,16 +11,21 @@ public final class PlayerData {
     private long emeraldShards;
     private long investment;
     private long investmentEarnings;
+    private boolean investmentAutoCollect;
 
     public PlayerData(UUID uuid, String username, long firstJoin, long lastSeen, long balance) {
-        this(uuid, username, firstJoin, lastSeen, balance, 0L, 0L, 0L);
+        this(uuid, username, firstJoin, lastSeen, balance, 0L, 0L, 0L, false);
     }
 
     public PlayerData(UUID uuid, String username, long firstJoin, long lastSeen, long balance, long emeraldShards) {
-        this(uuid, username, firstJoin, lastSeen, balance, emeraldShards, 0L, 0L);
+        this(uuid, username, firstJoin, lastSeen, balance, emeraldShards, 0L, 0L, false);
     }
 
     public PlayerData(UUID uuid, String username, long firstJoin, long lastSeen, long balance, long emeraldShards, long investment, long investmentEarnings) {
+        this(uuid, username, firstJoin, lastSeen, balance, emeraldShards, investment, investmentEarnings, false);
+    }
+
+    public PlayerData(UUID uuid, String username, long firstJoin, long lastSeen, long balance, long emeraldShards, long investment, long investmentEarnings, boolean investmentAutoCollect) {
         this.uuid = uuid;
         this.username = username;
         this.firstJoin = firstJoin;
@@ -29,6 +34,7 @@ public final class PlayerData {
         this.emeraldShards = Math.max(0L, emeraldShards);
         this.investment = Math.max(0L, investment);
         this.investmentEarnings = Math.max(0L, investmentEarnings);
+        this.investmentAutoCollect = investmentAutoCollect;
     }
 
     public UUID getUuid() { return uuid; }
@@ -45,4 +51,6 @@ public final class PlayerData {
     public void setInvestment(long investment) { this.investment = Math.max(0L, investment); }
     public long getInvestmentEarnings() { return investmentEarnings; }
     public void setInvestmentEarnings(long investmentEarnings) { this.investmentEarnings = Math.max(0L, investmentEarnings); }
+    public boolean isInvestmentAutoCollect() { return investmentAutoCollect; }
+    public void setInvestmentAutoCollect(boolean investmentAutoCollect) { this.investmentAutoCollect = investmentAutoCollect; }
 }
