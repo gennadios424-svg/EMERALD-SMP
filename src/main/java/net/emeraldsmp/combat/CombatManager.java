@@ -100,10 +100,37 @@ public final class CombatManager implements Listener {
         tagBoth(attacker, victim);
     }
 
-    private Player resolveAttacker(Entity damager) {
+    private Player resolveAttacker(EntityDamageByEntityEvent event) {
+        Entity damager = event.getDamager();
         if (damager instanceof Player player) return player;
         if (damager instanceof Projectile projectile && projectile.getShooter() instanceof Player player) return player;
-        if (damager instanceof TNTPrimed tnt && tnt.getSource() instanceof Player player) return player;
+
+        Player fromDamager = reflectPlayerSource(damager);
+        if (fromDamager != null) return fromDamager;
+
+        try {
+            Method getDamageSource = event.getClass().getMethod("getDamageSource");
+            Object source = getDamageSource.invoke(event);
+            if (source != null) {
+                Method getCausingEntity = source.getClass().getMethod("getCausingEntity");
+                Object causing = getCausingEntity.invoke(source);
+                if (causing instanceof Player player) return player;
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // The current Paper damage source does not expose an identifiable player.
+        }
+        return null;
+    }
+
+    private Player reflectPlayerSource(Entity entity) {
+        if (entity == null) return null;
+        try {
+            Method sourceMethod = entity.getClass().getMethod("getSource");
+            Object source = sourceMethod.invoke(entity);
+            if (source instanceof Player player) return player;
+        } catch (ReflectiveOperationException ignored) {
+            // This entity has no player source that can be identified reliably.
+        }
         return null;
     }
 
