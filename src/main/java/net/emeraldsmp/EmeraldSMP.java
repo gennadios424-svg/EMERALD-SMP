@@ -50,7 +50,7 @@ public final class EmeraldSMP extends JavaPlugin {
             lagCleaner=new LagCleaner(this);lagCleaner.start();
 
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
-            register("balance",new BalanceCommand(this),null);register("pay",new PayCommand(this),null);
+            register("balance",new BalanceCommand(this),null);register("pay",new PayCommand(this),null);register("spawn",new SpawnCommand(this),null);register("setspawn",new SetSpawnCommand(this),null);
             EcoCommand eco=new EcoCommand(this);register("eco",eco,eco);register("shop",new ShopCommand(this),null);register("sell",new SellCommand(this),null);
             WorthCommand worth=new WorthCommand(this);register("worth",worth,worth);rtpCommand=new RtpCommand(this);register("rtp",rtpCommand,null);
             CoinFlipCommand cf=new CoinFlipCommand(this);register("cf",cf,null);
