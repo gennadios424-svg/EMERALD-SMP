@@ -37,6 +37,7 @@ public final class ServerUI implements Listener {
     @EventHandler public void join(PlayerJoinEvent e){Bukkit.getScheduler().runTaskLater(plugin,()->update(e.getPlayer()),2L);}
     @EventHandler public void quit(PlayerQuitEvent e){boards.remove(e.getPlayer().getUniqueId());oldEntries.remove(e.getPlayer().getUniqueId());}
     public void refresh(Player p){if(p!=null&&p.isOnline())update(p);}
+    public void refreshAll(){updateAll();}
     private void updateAll(){for(Player p:Bukkit.getOnlinePlayers())update(p);}
 
     private void update(Player viewer){
@@ -53,8 +54,8 @@ public final class ServerUI implements Listener {
             RoleManager.Role role=plugin.getRoleManager().get(target);
             String team=plugin.getTeamManager()==null?"":plugin.getTeamManager().tag(target.getUniqueId());
             String teamText=team.isEmpty()?"§8[§7None§8]":"§a[§l"+team+"§r§a]";
-            target.setPlayerListName(role.icon()+" §f"+target.getName()+" §7"+teamText);
-            target.setCustomName("§a§l"+formatMoney(plugin.getEconomyManager().getBalance(target.getUniqueId())));
+            String live=(plugin.getLiveManager()!=null&&plugin.getLiveManager().isLive(target))?"§c🔴 LIVE §r":""; target.setPlayerListName(live+role.icon()+" §f"+target.getName()+" §7"+teamText);
+            target.setCustomName((plugin.getLiveManager()!=null&&plugin.getLiveManager().isLive(target)?"§c§l🔴 LIVE §r":"")+"§a§l"+formatMoney(plugin.getEconomyManager().getBalance(target.getUniqueId())));
             target.setCustomNameVisible(true);
         }
         // The client sorts the player list by scoreboard team first. Give every role a

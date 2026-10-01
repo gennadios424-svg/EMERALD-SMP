@@ -68,7 +68,7 @@ public final class SpawnerManager implements Listener {
             this.x = x;
             this.y = y;
             this.z = z;
-            this.owner = owner;
+            this.owner = new UUID(0L, 0L);
             this.type = normalizeType(type);
             this.lastCycle = System.currentTimeMillis();
             this.enabled.addAll(defaultDrops(this.type));
@@ -97,8 +97,7 @@ public final class SpawnerManager implements Listener {
         for (String k : root.getKeys(false)) {
             try {
                 String p = "spawners." + k;
-                String ownerString = y.getString(p + ".owner");
-                if (ownerString == null) continue;
+                String ownerString = y.getString(p + ".owner", new UUID(0L, 0L).toString());
                 String type = normalizeType(y.getString(p + ".type", TYPE_SKELETON));
                 String world = y.getString(p + ".world", "world"); int x = y.getInt(p + ".x"); int yy = y.getInt(p + ".y"); int z = y.getInt(p + ".z");
                 UUID id; try { id = UUID.fromString(y.getString(p + ".id")); } catch (Exception ignored) { id = UUID.nameUUIDFromBytes((world+":"+x+":"+yy+":"+z).getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
@@ -280,7 +279,7 @@ public final class SpawnerManager implements Listener {
     private Data findAdjacentOwned(Block b, UUID owner, String type) {
         for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
             Data d = spawners.get(key(b.getRelative(face)));
-            if (d != null && d.owner.equals(owner) && d.type.equals(type)) return d;
+            if (d != null && d.type.equals(type)) return d;
         }
         return null;
     }
@@ -310,22 +309,8 @@ public final class SpawnerManager implements Listener {
         open(p, d);
     }
 
-    private boolean canManage(Player p, Data d) { return d.owner.equals(p.getUniqueId()) || p.isOp(); }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void breakBlock(BlockBreakEvent e) {
-        Data d = spawners.get(key(e.getBlock()));
-        if (d == null) return;
-        Player p = e.getPlayer();
-        if (!canManage(p, d)) { e.setCancelled(true); p.sendMessage("§cOnly the spawner owner can break this spawner."); return; }
-        if (!isPickaxe(p.getInventory().getItemInMainHand().getType())) { e.setCancelled(true); p.sendMessage("§cUse a pickaxe to break an Emerald Spawner."); return; }
-        e.setDropItems(false);
-        spawners.remove(d.key());
-        removeHolograms(d);
-        save();
-        giveOrDrop(p, createItem(d.type, d.amount));
-        for (Material m : defaultDrops(d.type)) giveStoredOrDrop(p, m, d.stored.getOrDefault(m, 0L));
-        p.sendMessage("§a🧟 Spawner broken. Stored drops returned.");
+    private boolean canManage(Player p, Data d) {
+        return true;
     }
 
     private boolean isPickaxe(Material m) { return m.name().endsWith("_PICKAXE"); }

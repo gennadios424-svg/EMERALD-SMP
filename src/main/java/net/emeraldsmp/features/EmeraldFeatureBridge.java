@@ -63,6 +63,6 @@ public final class EmeraldFeatureBridge implements Listener {
     private boolean hasSpace(Player p,int qty){int r=qty;for(ItemStack s:p.getInventory().getStorageContents()){if(r<=0)return true;if(s==null||s.getType().isAir())r-=64;else if(s.getType()==Material.SPAWNER)r-=Math.max(0,64-s.getAmount());}return r<=0;}
     private String key(Block b){return b.getWorld().getName()+":"+b.getX()+":"+b.getY()+":"+b.getZ();}
     @SuppressWarnings("unchecked") private Map<?,?> spawnerMap()throws Exception{Field f=SpawnerManager.class.getDeclaredField("spawners");f.setAccessible(true);return (Map<?,?>)f.get(plugin.getSpawnerManager());}
-    private Object dataAt(Block b)throws Exception{return spawnerMap().get(key(b));}
+    private Object dataAt(Block b){try{return spawnerMap().get(key(b));}catch(Exception e){return null;}}
     private Field field(Object o,String n)throws Exception{Field f=o.getClass().getDeclaredField(n);f.setAccessible(true);return f;}
 }

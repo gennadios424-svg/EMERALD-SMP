@@ -127,6 +127,10 @@ commands:
     description: Request to teleport to another player
     usage: /tpa <player>
     permission: emerald.command
+  live:
+    description: Toggle Emerald SMP live status (MEDIA role only)
+    usage: /live
+    permission: emerald.command
   tpahere:
     description: Request another player to teleport to you
     usage: /tpahere <player>
