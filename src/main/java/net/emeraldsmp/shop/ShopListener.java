@@ -19,7 +19,17 @@ public final class ShopListener implements Listener{
         if(title.contains("EMERALD SMP SHOP")){if(slot==31){p.closeInventory();return;}String key=categoryAt(slot);if(key!=null)plugin.getShopManager().openCategory(p,key,0);return;}
         ShopManager.ShopView v=plugin.getShopManager().view(p);if(v==null)return;
         if(title.startsWith("💚 SHOP")){if(slot==45){plugin.getShopManager().openMain(p);return;}if(slot==53){p.closeInventory();return;}if(slot==48){plugin.getShopManager().openCategory(p,v.category(),v.page()-1);return;}if(slot==50){plugin.getShopManager().openCategory(p,v.category(),v.page()+1);return;}ShopManager.ShopItem item=plugin.getShopManager().itemFor(p,slot);if(item!=null)plugin.getShopManager().openItem(p,item,v.category(),v.page());return;}
-        if(title.equals("💚 BUY ITEM")){if(slot==18){plugin.getShopManager().openCategory(p,v.category(),v.page());return;}if(slot==22){p.closeInventory();return;}ShopManager.ShopItem item=v.items().isEmpty()?null:(ShopManager.ShopItem)v.items().get(0);if(item==null)return;int qty=switch(slot){case 10->1;case 11->16;case 12->32;case 14->64;default->0};if(qty<=0)return;p.sendMessage(plugin.getShopManager().buy(p,item,qty)?"§a💚 Purchase completed.":"§cPurchase could not be completed.");}
+        if(title.equals("💚 BUY ITEM")) {
+            if(slot==18){ plugin.getShopManager().openCategory(p,v.category(),v.page()); return; }
+            if(slot==22){ p.closeInventory(); return; }
+            ShopManager.ShopItem item=v.items().isEmpty() ? null : (ShopManager.ShopItem)v.items().get(0);
+            if(item==null)return;
+            int qty;
+            switch(slot){ case 10: qty=1; break; case 11: qty=16; break; case 12: qty=32; break; case 14: qty=64; break; default: qty=0; }
+            if(qty<=0)return;
+            boolean ok=plugin.getShopManager().buy(p,item,qty);
+            p.sendMessage(ok ? "§a💚 Purchase completed." : "§cPurchase could not be completed.");
+        }
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void drag(InventoryDragEvent e){
