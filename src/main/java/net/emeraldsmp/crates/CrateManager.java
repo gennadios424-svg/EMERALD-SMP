@@ -3,6 +3,7 @@ package net.emeraldsmp.crates;
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.command.*;
 import org.bukkit.entity.*;
 import org.bukkit.event.*;
