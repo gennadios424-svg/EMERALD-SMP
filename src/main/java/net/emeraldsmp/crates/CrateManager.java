@@ -509,7 +509,15 @@ public final class CrateManager implements Listener {
             if(s==null||s.getType().isAir())continue;
             double chance=Math.max(0D,Math.min(100D,chances.getOrDefault(i,1D)));
             if(chance<=0)continue;
-            rewards.add(formatChance(chance)+"|"+encodeItem(s));
+            ItemStack clean=s.clone();
+            ItemMeta cm=clean.getItemMeta();
+            if(cm!=null&&cm.hasLore()){
+                List<String> cleanLore=new ArrayList<>(cm.getLore());
+                cleanLore.removeIf(line->ChatColor.stripColor(line).startsWith("Chance:"));
+                cm.setLore(cleanLore.isEmpty()?null:cleanLore);
+                clean.setItemMeta(cm);
+            }
+            rewards.add(formatChance(chance)+"|"+encodeItem(clean));
         }
         // Preserve configured money/shard rewards that the physical editor cannot represent.
         for(String raw:plugin.getConfig().getStringList("crates.rewards."+type)){
