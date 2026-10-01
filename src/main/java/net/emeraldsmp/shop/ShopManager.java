@@ -42,12 +42,12 @@ public final class ShopManager {
     }
 
     public void openMain(Player p) {
-        Inventory inv = plugin.getServer().createInventory(null, 27, "§2§l💚 EMERALD SMP SHOP");
+        Inventory inv = plugin.getServer().createInventory(null, 36, "§2§l💚 EMERALD SMP SHOP");
         for (int i = 0; i < CATEGORY_SLOTS.length; i++) {
             inv.setItem(CATEGORY_SLOTS[i], icon(CATEGORY_ICONS[i], CATEGORY_NAMES[i],
                     List.of("§7Browse items available to buy")));
         }
-        inv.setItem(22, icon(Material.BARRIER, "§cClose", List.of()));
+        inv.setItem(31, icon(Material.BARRIER, "§cClose", List.of()));
         views.put(p.getUniqueId(), new ShopView(false, null, 0, List.of()));
         p.openInventory(inv);
     }
