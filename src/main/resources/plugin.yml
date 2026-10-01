@@ -79,13 +79,25 @@ commands:
     usage: /spawner give <player> skeleton [amount]
     permission: emerald.admin
   drill:
-    description: Emerald SMP Emerald Miner interface and drill administration
-    usage: /drill [give|gainer]
-    permission: emerald.command
+    description: Gives the Original Drill (admin only)
+    usage: /drill [player]
+    permission: emerald.admin
+  shardgainer:
+    description: Gives an Emerald Gainer (admin only)
+    usage: /shardgainer [player]
+    permission: emerald.admin
   crates:
-    description: Emerald SMP physical crates and key administration
-    usage: /crates [give|place|remove]
+    description: Opens Emerald SMP crate information or manages crates
+    usage: /crates [give|place|remove|edit]
     permission: emerald.command
+  crate:
+    description: Crate management alias
+    usage: /crate edit <type>
+    permission: emerald.admin
+  keyall:
+    description: Gives a crate key to all online players
+    usage: /keyall <type> [amount]
+    permission: emerald.admin
 permissions:
   emerald.command:
     description: Allows use of Emerald SMP commands
