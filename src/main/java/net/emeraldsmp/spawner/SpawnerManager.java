@@ -43,6 +43,7 @@ public final class SpawnerManager implements Listener {
     private final File file;
     private final Map<String, Data> spawners = new ConcurrentHashMap<>();
     private final Map<UUID, String> open = new HashMap<>();
+    private final Map<UUID, Inventory> openInventories = new HashMap<>();
     private final Set<String> collecting = ConcurrentHashMap.newKeySet();
     private final NamespacedKey typeKey;
     private final NamespacedKey stackKey;
@@ -340,7 +341,6 @@ public final class SpawnerManager implements Listener {
     private void giveOrDrop(Player p, ItemStack item) { if (item != null && item.getAmount() > 0) for (ItemStack x : p.getInventory().addItem(item).values()) p.getWorld().dropItemNaturally(p.getLocation(), x); }
 
     private void open(Player p, Data d) {
-        open.put(p.getUniqueId(), d.key());
         Inventory inv = Bukkit.createInventory(null, 45, mainTitle(d.type));
         fill(inv);
         long rate = productionPerCycle(d.type, d.amount);
@@ -350,6 +350,10 @@ public final class SpawnerManager implements Listener {
         inv.setItem(31, item(Material.COMPARATOR, "§b§l⚙ SETTINGS", List.of("§7Choose which drops are stored", "§8Settings are secondary")));
         inv.setItem(40, item(Material.BARRIER, "§c§l✕ CLOSE", List.of()));
         p.openInventory(inv);
+        // Register the new inventory only after openInventory() has fired the close event
+        // for the previous GUI. This prevents that close event from erasing the new session.
+        open.put(p.getUniqueId(), d.key());
+        openInventories.put(p.getUniqueId(), inv);
     }
 
     private List<String> storedLore(Data d) {
@@ -437,7 +441,16 @@ public final class SpawnerManager implements Listener {
         if (t.startsWith("§2§l🧟 ") || t.startsWith("§2§l⚙ ")) e.setCancelled(true);
     }
 
-    @EventHandler public void close(InventoryCloseEvent e) { open.remove(e.getPlayer().getUniqueId()); }
+    @EventHandler public void close(InventoryCloseEvent e) {
+        if (!(e.getPlayer() instanceof Player p)) return;
+        UUID uuid = p.getUniqueId();
+        Inventory current = openInventories.get(uuid);
+        // Only close the active Emerald spawner GUI. Closing another inventory must
+        // never invalidate the server-side spawner session.
+        if (current != e.getInventory()) return;
+        openInventories.remove(uuid);
+        open.remove(uuid);
+    }
 
     private void spawnHologram(Data d) {
         Location base = d.holoLoc();
