@@ -63,7 +63,7 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(order,this);getServer().getPluginManager().registerEvents(cf,this);getServer().getPluginManager().registerEvents(ah,this);
             getServer().getPluginManager().registerEvents(homeCommand,this);getServer().getPluginManager().registerEvents(new AfkListener(afkManager),this);
             getServer().getPluginManager().registerEvents(teams,this);getServer().getPluginManager().registerEvents(tags,this);getServer().getPluginManager().registerEvents(spawnerManager,this);
-            getServer().getPluginManager().registerEvents(drillManager,this);getServer().getPluginManager().registerEvents(crateManager,this);
+            getServer().getPluginManager().registerEvents(drillManager,this);getServer().getPluginManager().registerEvents(crateManager,this);getServer().getPluginManager().registerEvents(new CrateKeyGuard(this),this);
             getServer().getPluginManager().registerEvents(new RolePlayerListener(this),this);getServer().getPluginManager().registerEvents(rolesCommand,this);
             getServer().getPluginManager().registerEvents(new RoleChatListener(this),this);getServer().getPluginManager().registerEvents(kitsManager,this);getServer().getPluginManager().registerEvents(investmentManager,this);
             spawnerManager.start();afkManager.start();serverUI=new ServerUI(this);getServer().getPluginManager().registerEvents(serverUI,this);serverUI.start();
