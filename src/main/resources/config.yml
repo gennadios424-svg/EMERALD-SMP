@@ -211,7 +211,7 @@ emerald-miner:
   levels-per-tier: 10
   gainer:
     min-blocks: 1
-    max-blocks: 128
+    max-blocks: 32
     min-shards: 1
     max-shards: 5
 
