@@ -120,7 +120,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
 
     @EventHandler public void chat(AsyncPlayerChatEvent e) {
         Player p=e.getPlayer(); UUID u=p.getUniqueId(); String msg=e.getMessage().trim();
-        if (searchWaiting.remove(u)) { e.setCancelled(true); Bukkit.getScheduler().runTask(plugin, () -> msg.equalsIgnoreCase("cancel") ? openItemSelection(p,0,"") : openItemSelection(p,0,msg)); return; }
+        if (searchWaiting.remove(u)) { e.setCancelled(true); Bukkit.getScheduler().runTask(plugin, () -> { if (msg.equalsIgnoreCase("cancel")) openItemSelection(p,0,""); else openItemSelection(p,0,msg); }); return; }
         PendingOrder state=pending.get(u); if(state==null)return; e.setCancelled(true);
         if(msg.equalsIgnoreCase("cancel")){pending.remove(u);Bukkit.getScheduler().runTask(plugin,()->openItemSelection(p,0,""));return;}
         if(state.expiresAt<System.currentTimeMillis()){pending.remove(u);p.sendMessage("§e📦 Order input timed out. Nothing was charged.");return;}
