@@ -43,7 +43,7 @@ public final class ShopListener implements Listener {
         if (slot < 0 || slot >= e.getView().getTopInventory().getSize()) return;
 
         if (title.contains("EMERALD SMP SHOP")) {
-            if (slot == 22 || slot == 53) { p.closeInventory(); return; }
+            if (slot == 31 || slot == 53) { p.closeInventory(); return; }
             String key = categoryAt(slot);
             if (key != null) plugin.getShopManager().openCategory(p, key, 0);
             return;
