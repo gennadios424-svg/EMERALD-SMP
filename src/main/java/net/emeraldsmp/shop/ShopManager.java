@@ -16,11 +16,11 @@ public final class ShopManager {
     private static final String[] CATEGORY_NAMES={"§2🌿 Farming","§b💎 Resources","§c🔴 Redstone","§e🔧 Utility","§4🔥 Nether"};
     private static final Material[] CATEGORY_ICONS={Material.WHEAT,Material.IRON_INGOT,Material.REDSTONE,Material.HOPPER,Material.NETHERRACK};
     private static final Map<String,List<Material>> CURATED=Map.of(
-        "farm",List.of(Material.WHEAT,Material.CARROT,Material.POTATO,Material.BEETROOT,Material.SUGAR_CANE,Material.CACTUS,Material.BAMBOO,Material.COCOA_BEANS,Material.NETHER_WART,Material.KELP),
-        "resources",List.of(Material.COBBLESTONE,Material.STONE,Material.COAL,Material.IRON_INGOT,Material.COPPER_INGOT,Material.GOLD_INGOT,Material.REDSTONE,Material.LAPIS_LAZULI,Material.QUARTZ,Material.AMETHYST_SHARD),
-        "redstone",List.of(Material.REDSTONE,Material.RAIL,Material.POWERED_RAIL,Material.PISTON,Material.STICKY_PISTON,Material.OBSERVER,Material.REPEATER,Material.COMPARATOR,Material.HOPPER),
-        "utility",List.of(Material.GLASS,Material.SAND,Material.GRAVEL,Material.CLAY,Material.TORCH,Material.CHEST,Material.BARREL),
-        "nether",List.of(Material.NETHERRACK,Material.SOUL_SAND,Material.SOUL_SOIL,Material.QUARTZ,Material.GLOWSTONE_DUST)
+        "farm",List.of(Material.WHEAT,Material.CARROT,Material.POTATO,Material.BEETROOT,Material.SUGAR_CANE,Material.CACTUS,Material.BAMBOO,Material.COCOA_BEANS,Material.NETHER_WART,Material.KELP,Material.MELON_SLICE,Material.PUMPKIN,Material.APPLE,Material.BREAD,Material.COOKIE),
+        "resources",List.of(Material.COBBLESTONE,Material.STONE,Material.DEEPSLATE,Material.COBBLED_DEEPSLATE,Material.GRANITE,Material.DIORITE,Material.ANDESITE,Material.TUFF,Material.CALCITE,Material.DRIPSTONE_BLOCK,Material.OBSIDIAN,Material.SANDSTONE,Material.RED_SANDSTONE,Material.BRICKS,Material.MOSS_BLOCK),
+        "redstone",List.of(Material.REDSTONE,Material.REDSTONE_BLOCK,Material.RAIL,Material.POWERED_RAIL,Material.DETECTOR_RAIL,Material.ACTIVATOR_RAIL,Material.PISTON,Material.STICKY_PISTON,Material.OBSERVER,Material.REPEATER,Material.COMPARATOR,Material.HOPPER,Material.DISPENSER,Material.DROPPER,Material.TARGET,Material.LEVER,Material.STONE_BUTTON,Material.OAK_BUTTON),
+        "utility",List.of(Material.GLASS,Material.GLASS_PANE,Material.SAND,Material.GRAVEL,Material.CLAY,Material.TORCH,Material.LANTERN,Material.CHEST,Material.BARREL,Material.CRAFTING_TABLE,Material.FURNACE,Material.SMOKER,Material.BLAST_FURNACE,Material.ANVIL,Material.LADDER,Material.SCAFFOLDING,Material.BUCKET,Material.WATER_BUCKET,Material.LAVA_BUCKET),
+        "nether",List.of(Material.NETHERRACK,Material.SOUL_SAND,Material.SOUL_SOIL,Material.BASALT,Material.BLACKSTONE,Material.CRIMSON_NYLIUM,Material.WARPED_NYLIUM,Material.NETHER_BRICKS,Material.NETHER_BRICK_FENCE,Material.NETHER_BRICK_STAIRS,Material.GLOWSTONE_DUST,Material.GLOWSTONE,Material.MAGMA_BLOCK)
     );
     private final EmeraldSMP plugin;
     private final Map<UUID,ShopView> views=new HashMap<>();
@@ -30,7 +30,7 @@ public final class ShopManager {
     public void reload(){views.clear();}
     public void openMain(Player p){
         Inventory inv=plugin.getServer().createInventory(null,36,"§2§l💚 EMERALD SMP SHOP");
-        for(int i=0;i<CATEGORY_SLOTS.length;i++)inv.setItem(CATEGORY_SLOTS[i],icon(CATEGORY_ICONS[i],CATEGORY_NAMES[i],List.of("§7Useful survival resources","§8No gear • No weapons • No mob drops")));
+        for(int i=0;i<CATEGORY_SLOTS.length;i++)inv.setItem(CATEGORY_SLOTS[i],icon(CATEGORY_ICONS[i],CATEGORY_NAMES[i],List.of("§7Useful survival resources","§8No gear • No weapons • No ores")));
         inv.setItem(31,icon(Material.BARRIER,"§cClose",List.of()));views.put(p.getUniqueId(),new ShopView(false,null,0,List.of()));p.openInventory(inv);
     }
     public void openCategory(Player p,String key,int page){
