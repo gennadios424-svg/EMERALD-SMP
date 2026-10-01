@@ -19,6 +19,7 @@ import java.util.*;
 
 public final class OrderCommand implements org.bukkit.command.CommandExecutor, Listener {
     private static final long INPUT_TIMEOUT_MS = 60_000L;
+    private static final long ORDER_EXPIRY_MS = 14L * 24L * 60L * 60L * 1000L;
     private static final int DELIVERY_SLOTS = 45;
     private final EmeraldSMP plugin;
     private final File file;
@@ -35,6 +36,8 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         this.file = new File(plugin.getDataFolder(), "orders.yml");
         this.requestable = buildRequestable();
         load();
+        expireOrders();
+        Bukkit.getScheduler().runTaskTimer(plugin, this::expireOrders, 20L * 60L, 20L * 60L);
     }
 
     private List<Material> buildRequestable() {
@@ -63,7 +66,9 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
             ItemMeta meta = icon.getItemMeta();
             long remaining = o.remaining();
             meta.setDisplayName("§a§l📦 " + pretty(o.item));
-            meta.setLore(List.of("§7Required: §f" + fmt(o.required), "§7Delivered: §f" + fmt(o.delivered) + " / " + fmt(o.required), "§7Remaining: §f" + fmt(remaining), "", "§7Price: §6" + money(o.price) + " §7/ item", "§7Total: §6" + money(o.total), "", "§e📦 Click to deliver"));
+            meta.setLore(o.owner.equals(p.getUniqueId())
+                    ? List.of("§7Order #§f" + shortId(o.id), "§7Delivered: §f" + fmt(o.delivered) + " / " + fmt(o.required), "§7Stored: §f" + fmt(storedCount(o)) + " items", "", "§7Status: " + (o.status == Status.COMPLETED ? "§aREADY TO CLAIM" : o.status == Status.EXPIRED ? "§eEXPIRED • CLAIM AVAILABLE" : "§ePARTIALLY DELIVERED"), "", "§e📦 Click to claim")
+                    : List.of("§7Order #§f" + shortId(o.id), "§7Required: §f" + fmt(o.required), "§7Delivered: §f" + fmt(o.delivered) + " / " + fmt(o.required), "§7Remaining: §f" + fmt(remaining), "", "§7Price: §6" + money(o.price) + " §7/ item", "§7Total: §6" + money(o.total), "§7Expires: §f" + remainingTime(o.expiresAt), "", "§e📦 Click to deliver"));
             icon.setItemMeta(meta);
             inv.setItem(i - from, icon);
         }
@@ -77,8 +82,16 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
 
     private List<Order> getVisible(Player p) {
         List<Order> list = new ArrayList<>();
-        for (Order o : orders.values()) if (!o.owner.equals(p.getUniqueId()) && o.status == Status.OPEN && o.remaining() > 0) list.add(o);
-        Comparator<Order> cmp = sortMode == SortMode.MOST_PAID ? Comparator.comparingLong((Order o) -> o.total).reversed().thenComparingLong(o -> o.price).reversed() : Comparator.comparingLong((Order o) -> o.price).reversed().thenComparingLong(o -> o.total).reversed();
+        for (Order o : orders.values()) {
+            if (o.owner.equals(p.getUniqueId())) {
+                if (!o.storage.isEmpty()) list.add(o);
+            } else if (o.status == Status.OPEN && o.remaining() > 0 && !isExpired(o)) {
+                list.add(o);
+            }
+        }
+        Comparator<Order> cmp = sortMode == SortMode.MOST_PAID
+                ? Comparator.comparingLong((Order o) -> o.total).reversed().thenComparingLong(o -> o.price).reversed()
+                : Comparator.comparingLong((Order o) -> o.price).reversed().thenComparingLong(o -> o.total).reversed();
         list.sort(cmp);
         return list;
     }
@@ -135,15 +148,16 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         UUID u=p.getUniqueId(); long total;
         try{total=Math.multiplyExact(state.price,(long)state.amount);}catch(ArithmeticException ex){pending.remove(u);p.sendMessage("§cOrder value is too large.");return;}
         if(plugin.getEconomyManager().getBalance(u)<total||!plugin.getEconomyManager().withdraw(u,total)){pending.remove(u);p.sendMessage("§cYou need §f"+money(total)+" §cto reserve this order.");return;}
-        Order o=new Order(UUID.randomUUID(),u,p.getName(),state.item,state.amount,state.price,total,0,Status.OPEN,System.currentTimeMillis()); orders.put(o.id,o);pending.remove(u);save();
+        Order o=new Order(UUID.randomUUID(),u,p.getName(),state.item,state.amount,state.price,total,0,Status.OPEN,System.currentTimeMillis(),System.currentTimeMillis()+ORDER_EXPIRY_MS,new ArrayList<>()); orders.put(o.id,o);pending.remove(u);save();
         p.sendMessage("§a§l📦 ORDER CREATED");p.sendMessage("§7Item: §f"+pretty(o.item));p.sendMessage("§7Required: §f"+fmt(o.required));p.sendMessage("§7Price: §6"+money(o.price)+" §7/ item");p.sendMessage("§7Total reserved: §6"+money(o.total));refreshOrders();
     }
 
     @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false) public void click(InventoryClickEvent e) {
         if(!(e.getWhoClicked() instanceof Player p))return;
         Inventory top=e.getView().getTopInventory(); InventoryHolder holder=top.getHolder(); int raw=e.getRawSlot();
-        if(holder instanceof OrderHolder h){e.setCancelled(true);if(raw==45){sortMode=sortMode==SortMode.MOST_PAID?SortMode.MOST_PER_ITEM:SortMode.MOST_PAID;openOrders(p,h.page);return;}if(raw==48&&h.page>0){openOrders(p,h.page-1);return;}if(raw==49){openItemSelection(p,0,"");return;}if(raw==50){List<Order> v=getVisible(p);if((h.page+1)*45<v.size())openOrders(p,h.page+1);return;}if(raw==53){p.closeInventory();return;}if(raw>=0&&raw<45){List<Order> v=getVisible(p);int idx=h.page*45+raw;if(idx<v.size())openDelivery(p,v.get(idx));}return;}
+        if(holder instanceof OrderHolder h){e.setCancelled(true);if(raw==45){sortMode=sortMode==SortMode.MOST_PAID?SortMode.MOST_PER_ITEM:SortMode.MOST_PAID;openOrders(p,h.page);return;}if(raw==48&&h.page>0){openOrders(p,h.page-1);return;}if(raw==49){openItemSelection(p,0,"");return;}if(raw==50){List<Order> v=getVisible(p);if((h.page+1)*45<v.size())openOrders(p,h.page+1);return;}if(raw==53){p.closeInventory();return;}if(raw>=0&&raw<45){List<Order> v=getVisible(p);int idx=h.page*45+raw;if(idx<v.size()){Order o=v.get(idx);if(o.owner.equals(p.getUniqueId()))openClaim(p,o);else openDelivery(p,o);}}return;}
         if(holder instanceof ItemHolder h){e.setCancelled(true);if(raw==36&&h.page>0){openItemSelection(p,h.page-1,h.query);return;}if(raw==40){requestSearch(p);return;}if(raw==44&&((h.page+1)*36<filteredItems(h.query).size())){openItemSelection(p,h.page+1,h.query);return;}if(raw>=0&&raw<36){List<Material> f=filteredItems(h.query);int idx=h.page*36+raw;if(idx<f.size())beginChatOrder(p,f.get(idx));}return;}
+        if(holder instanceof ClaimHolder ch){e.setCancelled(true);if(raw==49)claimOrder(p,ch.orderId);else if(raw==53)p.closeInventory();return;}
         DeliverySession session=deliveries.get(p.getUniqueId()); if(session==null||top!=session.inventory)return;
         if(raw>=DELIVERY_SLOTS){e.setCancelled(true);if(raw==49)finalizeDelivery(p,session);else if(raw==53)p.closeInventory();return;}
         ItemStack cursor=e.getCursor(); ItemStack clicked=e.getCurrentItem();
@@ -167,7 +181,7 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
     private boolean isAllowed(ItemStack item,Material expected){return item==null||item.getType().isAir()||item.getType()==expected;}
 
     private void openDelivery(Player p,Order order){
-        if(order.owner.equals(p.getUniqueId())){p.sendMessage("§cYou cannot fulfill your own order.");return;}if(order.status!=Status.OPEN||order.remaining()<=0){p.sendMessage("§cThat order is already completed.");return;}
+        if(order.owner.equals(p.getUniqueId())){p.sendMessage("§cYou cannot fulfill your own order.");return;}if(isExpired(order)){p.sendMessage("§cThis order has expired.");return;}if(order.status!=Status.OPEN||order.remaining()<=0){p.sendMessage("§cThat order is already completed.");return;}
         Inventory inv=Bukkit.createInventory(new DeliveryHolder(order.id),54,"§2§l📦 DELIVER ORDER #"+shortId(order.id));
         for(int i=45;i<54;i++)inv.setItem(i,button(Material.GRAY_STAINED_GLASS_PANE,"§r",List.of()));
         inv.setItem(47,progressItem(order,0));inv.setItem(49,button(Material.EMERALD_BLOCK,"§a§l📦 DELIVER ITEMS",List.of("§7Place the items you want to deliver here","§eClick to submit this delivery")));inv.setItem(53,button(Material.BARRIER,"§c§l✕ CANCEL",List.of("§7Return all placed items")));
@@ -194,18 +208,15 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
 
     private synchronized void finalizeDelivery(Player p,DeliverySession session){
         UUID u=p.getUniqueId();if(!transactionLocks.add(u))return;try{
-            Order o=orders.get(session.orderId);if(o==null||o.status!=Status.OPEN)return;
-            Player buyer=Bukkit.getPlayer(o.owner);if(buyer==null){p.sendMessage("§cThe buyer must be online to receive this delivery.");return;}
+            Order o=orders.get(session.orderId);if(o==null||o.status!=Status.OPEN||isExpired(o)){p.sendMessage("§cThis order is no longer accepting deliveries.");return;}
             long accepted=Math.min(stagedCount(session,o.item),o.remaining());if(accepted<=0){p.sendMessage("§cPlace some "+pretty(o.item)+" in the delivery area first.");return;}
             long payment=safeMultiply(accepted,o.price);if(payment<=0){p.sendMessage("§cThis delivery could not be valued safely.");return;}
-            if(!hasSpace(buyer,o.item,accepted)){p.sendMessage("§cThe buyer does not have enough inventory space for this delivery.");return;}
             List<ItemStack> snapshot=takeFromDelivery(session.inventory,o.item,accepted);if(snapshot.isEmpty()||snapshot.stream().mapToLong(ItemStack::getAmount).sum()!=accepted){restoreToDelivery(session.inventory,snapshot);return;}
             if(!plugin.getEconomyManager().deposit(u,payment)){restoreToDelivery(session.inventory,snapshot);p.sendMessage("§cPayment failed; nothing was completed.");return;}
-            Map<Integer,ItemStack> extra=buyer.getInventory().addItem(snapshot.toArray(new ItemStack[0]));
-            if(!extra.isEmpty()){plugin.getEconomyManager().withdraw(u,payment);for(ItemStack x:extra.values())giveOrDrop(buyer,x);restoreToDelivery(session.inventory,snapshot);p.sendMessage("§cThe buyer's inventory changed before delivery; transaction rolled back.");return;}
-            o.delivered+=accepted;o.status=o.remaining()==0?Status.COMPLETED:Status.OPEN;save();
-            buyer.sendMessage("§a📦 Your order received §f"+fmt(accepted)+"x "+pretty(o.item)+" §afrom §f"+p.getName()+"§a. Payment: §6"+money(payment)+"§a.");
-            p.sendMessage("§a📦 Delivered §f"+fmt(accepted)+"x "+pretty(o.item)+" §afor §6"+money(payment)+"§a.");
+            for(ItemStack x:snapshot)o.storage.add(x.clone());
+            o.delivered+=accepted;o.status=o.remaining()==0?Status.COMPLETED:Status.OPEN;o.lastSeller=u;save();
+            p.sendMessage("§a📦 Accepted §f"+fmt(accepted)+"x "+pretty(o.item)+" §afor §6"+money(payment)+"§a.");
+            p.sendMessage("§7The items are stored in the order. The buyer must claim them from /order.");
             if(o.status==Status.COMPLETED)p.sendMessage("§a§l✅ ORDER COMPLETED §7("+fmt(o.required)+" / "+fmt(o.required)+")");
             deliveries.remove(u);p.closeInventory();refreshOrders();
         }finally{transactionLocks.remove(u);}
@@ -224,9 +235,26 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
 
     private void refreshOrders(){for(Player p:Bukkit.getOnlinePlayers())if(p.getOpenInventory().getTopInventory().getHolder() instanceof OrderHolder h)openOrders(p,h.page);}
 
-    private synchronized void load(){orders.clear();if(!file.exists())return;YamlConfiguration y=YamlConfiguration.loadConfiguration(file);var root=y.getConfigurationSection("orders");if(root==null)return;for(String k:root.getKeys(false))try{String path="orders."+k;UUID id=UUID.fromString(k),owner=UUID.fromString(y.getString(path+".buyer"));Material item=Material.matchMaterial(y.getString(path+".item","AIR"));if(item==null||item.isAir())continue;long required=Math.max(1,y.getLong(path+".required"));long price=Math.max(1,y.getLong(path+".price-per-item"));long total=Math.max(1,y.getLong(path+".total-price"));long delivered=Math.max(0,Math.min(required,y.getLong(path+".delivered")));Status status=Status.valueOf(y.getString(path+".status","OPEN"));orders.put(id,new Order(id,owner,y.getString(path+".buyer-name","Unknown"),item,required,price,total,delivered,status,y.getLong(path+".created-time",System.currentTimeMillis())));}catch(Exception ex){plugin.getLogger().warning("Skipped invalid order: "+k);}}
-    private synchronized void save(){YamlConfiguration y=new YamlConfiguration();for(Order o:orders.values()){String p="orders."+o.id;y.set(p+".buyer",o.owner.toString());y.set(p+".buyer-name",o.ownerName);y.set(p+".item",o.item.name());y.set(p+".required",o.required);y.set(p+".price-per-item",o.price);y.set(p+".total-price",o.total);y.set(p+".delivered",o.delivered);y.set(p+".remaining",o.remaining());y.set(p+".status",o.status.name());y.set(p+".created-time",o.createdTime);}try{y.save(file);}catch(IOException ex){plugin.getLogger().warning("Could not save orders.yml: "+ex.getMessage());}}
+    private synchronized void load(){orders.clear();if(!file.exists())return;YamlConfiguration y=YamlConfiguration.loadConfiguration(file);var root=y.getConfigurationSection("orders");if(root==null)return;for(String k:root.getKeys(false))try{String path="orders."+k;UUID id=UUID.fromString(k),owner=UUID.fromString(y.getString(path+".buyer"));Material item=Material.matchMaterial(y.getString(path+".item","AIR"));if(item==null||item.isAir())continue;long required=Math.max(1,y.getLong(path+".required"));long price=Math.max(1,y.getLong(path+".price-per-item"));long total=Math.max(1,y.getLong(path+".total-price"));long delivered=Math.max(0,Math.min(required,y.getLong(path+".delivered")));Status status=Status.valueOf(y.getString(path+".status","OPEN"));long created=y.getLong(path+".created-time",System.currentTimeMillis());long expires=y.getLong(path+".expiry-time",created+ORDER_EXPIRY_MS);List<ItemStack> storage=new ArrayList<>();List<?> raw=y.getList(path+".storage",List.of());for(Object x:raw)if(x instanceof ItemStack itemStack&&!itemStack.getType().isAir())storage.add(itemStack.clone());UUID seller=null;String sellerText=y.getString(path+".last-seller");if(sellerText!=null)try{seller=UUID.fromString(sellerText);}catch(Exception ignored){}orders.put(id,new Order(id,owner,y.getString(path+".buyer-name","Unknown"),item,required,price,total,delivered,status,created,expires,storage,seller));}catch(Exception ex){plugin.getLogger().warning("Skipped invalid order: "+k);}}
+    private synchronized void save(){YamlConfiguration y=new YamlConfiguration();for(Order o:orders.values()){String p="orders."+o.id;y.set(p+".buyer",o.owner.toString());y.set(p+".buyer-name",o.ownerName);y.set(p+".item",o.item.name());y.set(p+".required",o.required);y.set(p+".price-per-item",o.price);y.set(p+".total-price",o.total);y.set(p+".delivered",o.delivered);y.set(p+".remaining",o.remaining());y.set(p+".status",o.status.name());y.set(p+".created-time",o.createdTime);y.set(p+".expiry-time",o.expiresAt);if(o.lastSeller!=null)y.set(p+".last-seller",o.lastSeller.toString());y.set(p+".storage",new ArrayList<>(o.storage));}try{y.save(file);}catch(IOException ex){plugin.getLogger().warning("Could not save orders.yml: "+ex.getMessage());}}
 
+
+    private boolean isExpired(Order o){return o.expiresAt>0 && System.currentTimeMillis()>=o.expiresAt && o.remaining()>0 && o.status==Status.OPEN;}
+    private String remainingTime(long at){long s=Math.max(0,(at-System.currentTimeMillis())/1000);long d=s/86400;s%=86400;long h=s/3600;s%=3600;long m=s/60;return d+"d "+h+"h "+m+"m";}
+    private long storedCount(Order o){long n=0;for(ItemStack x:o.storage)n+=x.getAmount();return n;}
+    private void expireOrders(){boolean changed=false;for(Order o:orders.values()){if(!isExpired(o))continue;long refund=safeMultiply(o.remaining(),o.price);if(refund>0)plugin.getEconomyManager().deposit(o.owner,refund);o.status=Status.EXPIRED;changed=true;plugin.getLogger().info("Order "+o.id+" expired; refunded "+refund+" to buyer.");}if(changed){save();refreshOrders();}}
+
+    private void openClaim(Player p,Order o){
+        if(!o.owner.equals(p.getUniqueId())||o.storage.isEmpty()){p.sendMessage("§cThere are no stored items to claim.");return;}
+        Inventory inv=Bukkit.createInventory(new ClaimHolder(o.id),54,"§2§l📦 CLAIM ORDER #"+shortId(o.id));
+        for(int i=0;i<45&&i<o.storage.size();i++)inv.setItem(i,o.storage.get(i).clone());
+        inv.setItem(49,button(Material.CHEST,"§a§l📦 CLAIM ORDER",List.of("§7Stored: §f"+fmt(storedCount(o))+" items","§eClick to transfer to your inventory")));
+        inv.setItem(53,button(Material.BARRIER,"§c§l✕ CLOSE",List.of("§7Leave the order stored")));
+        p.openInventory(inv);
+    }
+    private synchronized void claimOrder(Player p,UUID id){Order o=orders.get(id);if(o==null||!o.owner.equals(p.getUniqueId())||o.storage.isEmpty())return;if(!hasSpaceForItems(p,o.storage)){p.sendMessage("§cYou do not have enough inventory space to claim this order.");return;}List<ItemStack> snapshot=new ArrayList<>();for(ItemStack x:o.storage)snapshot.add(x.clone());o.storage.clear();Map<Integer,ItemStack> extra=p.getInventory().addItem(snapshot.toArray(new ItemStack[0]));if(!extra.isEmpty()){o.storage.addAll(snapshot);for(ItemStack x:extra.values())giveOrDrop(p,x);p.sendMessage("§cClaim failed safely; the order remains stored.");return;}save();p.sendMessage("§a📦 Order #"+shortId(o.id)+" claimed successfully.");p.closeInventory();refreshOrders();}
+    private boolean hasSpaceForItems(Player p,List<ItemStack> items){for(ItemStack x:items)if(!hasSpace(p,x.getType(),x.getAmount()))return false;return true;}
+    private boolean hasSpace(Player p,Material material,long amount){long remaining=amount;for(ItemStack stack:p.getInventory().getStorageContents()){if(remaining<=0)return true;if(stack==null||stack.getType().isAir())remaining-=material.getMaxStackSize();else if(stack.getType()==material)remaining-=Math.max(0,stack.getMaxStackSize()-stack.getAmount());}return remaining<=0;}
     private ItemStack button(Material m,String n,List<String> lore){ItemStack i=new ItemStack(m);ItemMeta meta=i.getItemMeta();if(meta!=null){meta.setDisplayName(n);meta.setLore(lore);i.setItemMeta(meta);}return i;}
     private ItemStack button(Material m,String n,List<String> lore,boolean unused){return button(m,n,lore);}
     private String money(long n){return plugin.getEconomyManager().format(n);}
@@ -239,11 +267,12 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
 
     private enum Stage{AMOUNT,PRICE,CONFIRM}
     private enum SortMode{MOST_PAID("MOST PAID"),MOST_PER_ITEM("MOST PER ITEM");final String label;SortMode(String label){this.label=label;}}
-    private enum Status{OPEN,COMPLETED}
+    private enum Status{OPEN,COMPLETED,EXPIRED}
     private static final class PendingOrder{final Material item;final Stage stage;final int amount;final long price,expiresAt;PendingOrder(Material i,Stage s,int a,long p,long e){item=i;stage=s;amount=a;price=p;expiresAt=e;}}
-    private static final class Order{final UUID id,owner;final String ownerName;final Material item;final long required,price,total,createdTime;long delivered;Status status;Order(UUID i,UUID o,String n,Material m,long r,long p,long t,long d,Status s,long c){id=i;owner=o;ownerName=n;item=m;required=r;price=p;total=t;delivered=d;status=s;createdTime=c;}long remaining(){return Math.max(0,required-delivered);}}
+    private static final class Order{final UUID id,owner;final String ownerName;final Material item;final long required,price,total,createdTime,expiresAt;long delivered;Status status;final List<ItemStack> storage;UUID lastSeller;Order(UUID i,UUID o,String n,Material m,long r,long p,long t,long d,Status s,long c,long e,List<ItemStack> st){id=i;owner=o;ownerName=n;item=m;required=r;price=p;total=t;delivered=d;status=s;createdTime=c;expiresAt=e;storage=st; }long remaining(){return Math.max(0,required-delivered);}}
     private static final class DeliverySession{final UUID orderId;final Inventory inventory;DeliverySession(UUID id,Inventory i){orderId=id;inventory=i;}}
     private static final class OrderHolder implements InventoryHolder{final int page;OrderHolder(int p){page=p;}public Inventory getInventory(){return null;}}
     private static final class ItemHolder implements InventoryHolder{final int page;final String query;ItemHolder(int p,String q){page=p;query=q;}public Inventory getInventory(){return null;}}
     private static final class DeliveryHolder implements InventoryHolder{final UUID orderId;DeliveryHolder(UUID id){orderId=id;}public Inventory getInventory(){return null;}}
+    private static final class ClaimHolder implements InventoryHolder{final UUID orderId;ClaimHolder(UUID id){orderId=id;}public Inventory getInventory(){return null;}}
 }
