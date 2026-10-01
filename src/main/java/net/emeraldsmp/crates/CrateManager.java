@@ -95,7 +95,12 @@ public final class CrateManager implements Listener {
     public void interact(PlayerInteractEvent e){if(e.getClickedBlock()==null)return;String t=type(e.getClickedBlock());if(t==null)return;e.setCancelled(true);if(e.getAction()==Action.RIGHT_CLICK_BLOCK)openPreview(e.getPlayer(),t);else if(e.getAction()==Action.LEFT_CLICK_BLOCK)open(e.getPlayer(),t);}
 
     private void open(Player p,String type){
-        UUID u=p.getUniqueId();if(opening.contains(u)){p.sendMessage("§e⏳ Your crate is already rolling.");return;}
+        UUID u=p.getUniqueId();
+        if(opening.contains(u)){p.sendMessage("§e⏳ Your crate is already rolling.");return;}
+        if(rewardEntries(type).isEmpty()){
+            p.sendMessage("§c🎁 This crate has no rewards configured yet.");
+            return;
+        }
         if(consumeVirtualKey(p,type) || consumePhysicalKey(p,type)){
             Reward reward=selectReward(type);pending.put(u,new Pending(type,reward.raw()));opening.add(u);save();
             Inventory inv=Bukkit.createInventory(null,27,"§2§l🎁 "+cap(type)+" CRATE");p.openInventory(inv);animate(p,type,inv,reward);
@@ -128,7 +133,13 @@ public final class CrateManager implements Listener {
         int raw=e.getRawSlot();
         if(raw>=45){e.setCancelled(true);if(raw==49)saveEditor(p);else if(raw==50)p.closeInventory();else if(raw==48){chancePrompts.put(u,-1);p.sendMessage("§eEnter reward slot 1-45, then chance 0-100 (example: 3 5). Type cancel.");}return;}
     }
-    @EventHandler public void crateAnimationDrag(InventoryDragEvent e){if(e.getWhoClicked() instanceof Player p&&opening.contains(p.getUniqueId())&&e.getView().getTitle().contains("CRATE"))e.setCancelled(true);}
+    @EventHandler public void crateAnimationDrag(InventoryDragEvent e){
+        if(!(e.getWhoClicked() instanceof Player p))return;
+        UUID u=p.getUniqueId();
+        String title=e.getView().getTitle();
+        if(opening.contains(u)&&title.contains("CRATE")){e.setCancelled(true);return;}
+        if(editors.containsKey(u)&&title.contains("CRATE EDITOR"))e.setCancelled(true);
+    }
     @EventHandler public void chatChance(AsyncPlayerChatEvent e){
         Player p=e.getPlayer();Integer marker=chancePrompts.get(p.getUniqueId());if(marker==null)return;e.setCancelled(true);String msg=e.getMessage().trim();
         Bukkit.getScheduler().runTask(plugin,()->{
