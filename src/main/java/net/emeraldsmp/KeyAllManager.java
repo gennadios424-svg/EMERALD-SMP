@@ -61,12 +61,17 @@ public final class KeyAllManager implements Listener {
     private void tick() {
         long now = System.currentTimeMillis();
         if (now >= nextKeyAllAt) {
-            int amount = 1 + random.nextInt(3);
-            nextKeyAllAt = now + INTERVAL_MS;
-            save();
-            Bukkit.broadcastMessage("§a§l💚 COMMON KEYALL! §fEveryone online received §e" + amount
-                    + " Common Key" + (amount == 1 ? "" : "s") + "§f!");
-            plugin.getCrateManager().keyAll("common", amount, Bukkit.getConsoleSender());
+            if (plugin.getCrateManager().isKeyAllRunning()) {
+                nextKeyAllAt = now + 5000L;
+                save();
+            } else {
+                int amount = 1 + random.nextInt(3);
+                nextKeyAllAt = now + INTERVAL_MS;
+                save();
+                Bukkit.broadcastMessage("§a§l💚 COMMON KEYALL! §fEveryone online received §e" + amount
+                        + " Common Key" + (amount == 1 ? "" : "s") + "§f!");
+                plugin.getCrateManager().keyAll("common", amount, Bukkit.getConsoleSender());
+            }
         }
         long remaining = Math.max(0L, nextKeyAllAt - now);
         long seconds = remaining / 1000L;
