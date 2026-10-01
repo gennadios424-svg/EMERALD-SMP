@@ -396,8 +396,8 @@ public final class CrateManager implements Listener {
         editorChances.put(u,chances);
         editorOriginals.put(u,originals);
         inv.setItem(48,button(Material.PAPER,"§e✏ SET CHANCE",List.of("§7Right-click a reward first","§7Then enter a number from 0 to 100 in chat")));
-        inv.setItem(49,button(Material.EMERALD,"§a§l💾 SAVE","§7Save the reward pool","§7Changes are not saved on close"));
-        inv.setItem(50,button(Material.ARROW,"§eCancel / Close","§7Close without saving","§7New items are returned"));
+        inv.setItem(49,button(Material.EMERALD,"§a§l💾 SAVE",List.of("§7Save the reward pool","§7Changes are not saved on close")));
+        inv.setItem(50,button(Material.ARROW,"§eCancel / Close",List.of("§7Close without saving","§7New items are returned")));
         p.openInventory(inv);
     }
 
