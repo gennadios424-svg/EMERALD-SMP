@@ -87,7 +87,8 @@ public final class ServerUI implements Listener {
         for(Team t:new ArrayList<>(b.getTeams()))if(t.getName().startsWith("emr_"))t.unregister();
         for(Player target:Bukkit.getOnlinePlayers()){
             String id=target.getUniqueId().toString().replace("-","");
-            Team t=b.registerNewTeam("emr_"+id.substring(0,12));
+            int order=7-plugin.getRoleManager().get(target).weight();
+            Team t=b.registerNewTeam(String.format(Locale.US,"emr%d%s",order,id.substring(0,12)));
             RoleManager.Role r=plugin.getRoleManager().get(target);
             String team=plugin.getTeamManager()==null?"":plugin.getTeamManager().tag(target.getUniqueId());
             String tag=plugin.getTagsManager()==null?"":plugin.getTagsManager().active(target.getUniqueId());
