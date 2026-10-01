@@ -2,7 +2,8 @@ package net.emeraldsmp.drill;
 
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.*;
-import org.bukkit.block.Block;\nimport org.bukkit.block.BlockFace;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -117,11 +118,12 @@ public final class DrillManager implements Listener {
     }
     private int weightedShardReward(Random rng){
         int roll=rng.nextInt(100);
-        if(roll<40)return 1;       // 40%
-        if(roll<60)return 2;       // 20%
-        if(roll<75)return 3;       // 15%
-        if(roll<85)return 4;       // 10%
-        return 5;                  // 15%?\n    }
+        if(roll<50)return 1;       // 50%
+        if(roll<70)return 2;       // 20%
+        if(roll<85)return 3;       // 15%
+        if(roll<95)return 4;       // 10%
+        return 5;                  // 5%
+    }
     private void gainerReward(Player p,Stats s){
         long min=Math.max(1,plugin.getConfig().getLong("emerald-miner.gainer.min-blocks",1));
         long max=Math.max(min,plugin.getConfig().getLong("emerald-miner.gainer.max-blocks",128));
