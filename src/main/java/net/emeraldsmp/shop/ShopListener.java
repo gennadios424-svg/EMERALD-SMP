@@ -5,6 +5,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.Bukkit;
 
 public final class ShopListener implements Listener {
     private final net.emeraldsmp.EmeraldSMP plugin;
@@ -15,21 +16,17 @@ public final class ShopListener implements Listener {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
             int slot = e.getRawSlot();
-            // The lower control row is never a valid item destination. Shift-click,
-            // double-click and keyboard transfers are disabled to close duplication paths.
-            if (e.isShiftClick() || e.getClick().isKeyboardClick() || e.getClick() == ClickType.DOUBLE_CLICK) {
-                e.setCancelled(true);
-                return;
-            }
-            if (slot >= 45) {
+            // Only the five control-row slots are protected. The 45-slot sell area is
+            // a real inventory: normal clicks, shift-clicks, number-key swaps and
+            // drag/drop are intentionally allowed so players can manage their items.
+            if (slot >= 45 || slot < 0) {
                 e.setCancelled(true);
                 plugin.getShopManager().handleSellClick(p, slot);
                 return;
             }
-            if (slot >= 0 && slot < 45) {
-                // Normal clicks are allowed inside the sell input area.
-                plugin.getShopManager().handleSellClick(p, slot);
-            }
+            // For clicks originating in the player's bottom inventory, shift-click
+            // transfers into the sell area normally. Do not cancel it.
+            Bukkit.getScheduler().runTask(plugin, () -> plugin.getShopManager().refreshSellDisplay(p));
             return;
         }
 
@@ -74,8 +71,13 @@ public final class ShopListener implements Listener {
     public void drag(InventoryDragEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (plugin.getShopManager().isSellInventory(p, e.getView().getTopInventory())) {
-            if (e.getRawSlots().stream().anyMatch(s -> s >= 45) || e.getRawSlots().stream().anyMatch(s -> s < 0)) e.setCancelled(true);
-            else plugin.getShopManager().handleSellClick(p, e.getRawSlots().iterator().next());
+            // A drag is valid only when every affected top slot is inside the
+            // 45-slot input area. Control-row drags are blocked.
+            if (e.getRawSlots().stream().anyMatch(s -> s >= 45 || s < 0)) {
+                e.setCancelled(true);
+                return;
+            }
+            Bukkit.getScheduler().runTask(plugin, () -> plugin.getShopManager().refreshSellDisplay(p));
             return;
         }
         String title = ChatColor.stripColor(e.getView().getTitle());
