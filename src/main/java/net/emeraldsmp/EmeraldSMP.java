@@ -20,6 +20,7 @@ import net.emeraldsmp.drill.*;
 import net.emeraldsmp.crates.*;
 import net.emeraldsmp.roles.*;
 import net.emeraldsmp.kits.*;
+import net.emeraldsmp.invest.*;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -30,6 +31,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private ShopManager shopManager; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
     private AuctionManager auctionManager; private HomeCommand homeCommand; private AfkManager afkManager; private TeamManager teamManager; private TagsManager tagsManager;
     private SpawnerManager spawnerManager; private DrillManager drillManager; private CrateManager crateManager; private LagCleaner lagCleaner; private RoleManager roleManager; private KitsManager kitsManager;
+    private InvestmentManager investmentManager;
 
     @Override public void onEnable() {
         try {
@@ -39,7 +41,8 @@ public final class EmeraldSMP extends JavaPlugin {
             teamManager=new TeamManager(this);teamManager.load(); tagsManager=new TagsManager(this);tagsManager.load();
             roleManager=new RoleManager(this);roleManager.load(); spawnerManager=new SpawnerManager(this);spawnerManager.load();
             drillManager=new DrillManager(this);drillManager.load(); crateManager=new CrateManager(this);crateManager.load();
-            kitsManager=new KitsManager(this);kitsManager.loadPersisted(); lagCleaner=new LagCleaner(this);lagCleaner.start();
+            kitsManager=new KitsManager(this);kitsManager.loadPersisted(); investmentManager=new InvestmentManager(this); investmentManager.start();
+            lagCleaner=new LagCleaner(this);lagCleaner.start();
 
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
             register("balance",new BalanceCommand(this),null);register("pay",new PayCommand(this),null);
@@ -53,6 +56,7 @@ public final class EmeraldSMP extends JavaPlugin {
             DrillCommand drill=new DrillCommand(this,drillManager);register("drill",drill,drill);CrateCommand crates=new CrateCommand(crateManager);
             register("crates",crates,crates);register("crate",crates,crates);register("keyall",crates,crates);register("shardgainer",drill,drill);
             RolesCommand rolesCommand=new RolesCommand(this,roleManager);register("roles",rolesCommand,rolesCommand);KitsCommand kitsCommand=new KitsCommand(this);register("kits",kitsCommand,null);
+            register("invest",new InvestCommand(this,investmentManager),null);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);getServer().getPluginManager().registerEvents(new ShopListener(this),this);
             worthListener=new WorthListener(this);getServer().getPluginManager().registerEvents(worthListener,this);getServer().getPluginManager().registerEvents(rtpCommand,this);
@@ -61,16 +65,16 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(teams,this);getServer().getPluginManager().registerEvents(tags,this);getServer().getPluginManager().registerEvents(spawnerManager,this);
             getServer().getPluginManager().registerEvents(drillManager,this);getServer().getPluginManager().registerEvents(crateManager,this);
             getServer().getPluginManager().registerEvents(new RolePlayerListener(this),this);getServer().getPluginManager().registerEvents(rolesCommand,this);
-            getServer().getPluginManager().registerEvents(new RoleChatListener(this),this);getServer().getPluginManager().registerEvents(kitsManager,this);
+            getServer().getPluginManager().registerEvents(new RoleChatListener(this),this);getServer().getPluginManager().registerEvents(kitsManager,this);getServer().getPluginManager().registerEvents(investmentManager,this);
             spawnerManager.start();afkManager.start();serverUI=new ServerUI(this);getServer().getPluginManager().registerEvents(serverUI,this);serverUI.start();
             getLogger().info("EmeraldSMP has been enabled!");getLogger().info("Worth database loaded: "+worthManager.all().size()+" supported items.");
         } catch(Exception ex){getLogger().log(Level.SEVERE,"ERROR: EmeraldSMP could not start safely.",ex);getServer().getPluginManager().disablePlugin(this);}
     }
     private void register(String n,org.bukkit.command.CommandExecutor e,org.bukkit.command.TabCompleter t){PluginCommand c=getCommand(n);if(c==null)throw new IllegalStateException("Command '"+n+"' is missing from plugin.yml");c.setExecutor(e);if(t!=null)c.setTabCompleter(t);}
-    @Override public void onDisable(){if(serverUI!=null)serverUI.stop();if(afkManager!=null)afkManager.stop();if(spawnerManager!=null)spawnerManager.stop();if(drillManager!=null)drillManager.stop();if(crateManager!=null)crateManager.stop();if(teamManager!=null)teamManager.save();if(tagsManager!=null)tagsManager.save();if(roleManager!=null)roleManager.save();if(kitsManager!=null)kitsManager.save();if(playerDataManager!=null)playerDataManager.shutdown();getLogger().info("EmeraldSMP has been disabled.");}
+    @Override public void onDisable(){if(serverUI!=null)serverUI.stop();if(afkManager!=null)afkManager.stop();if(spawnerManager!=null)spawnerManager.stop();if(drillManager!=null)drillManager.stop();if(crateManager!=null)crateManager.stop();if(investmentManager!=null)investmentManager.stop();if(teamManager!=null)teamManager.save();if(tagsManager!=null)tagsManager.save();if(roleManager!=null)roleManager.save();if(kitsManager!=null)kitsManager.save();if(playerDataManager!=null)playerDataManager.shutdown();getLogger().info("EmeraldSMP has been disabled.");}
     public void beginWorthSearch(Player p){if(worthListener!=null)worthListener.beginSearch(p);}
     public ConfigManager getConfigManager(){return configManager;} public MessageService getMessageService(){return messageService;} public PlayerDataManager getPlayerDataManager(){return playerDataManager;}
     public EconomyManager getEconomyManager(){return economyManager;} public ShopManager getShopManager(){return shopManager;} public WorthManager getWorthManager(){return worthManager;} public AuctionManager getAuctionManager(){return auctionManager;}
     public AfkManager getAfkManager(){return afkManager;} public TeamManager getTeamManager(){return teamManager;} public TagsManager getTagsManager(){return tagsManager;} public SpawnerManager getSpawnerManager(){return spawnerManager;}
-    public DrillManager getDrillManager(){return drillManager;} public CrateManager getCrateManager(){return crateManager;} public RoleManager getRoleManager(){return roleManager;} public KitsManager getKitsManager(){return kitsManager;} public ServerUI getServerUI(){return serverUI;}
+    public DrillManager getDrillManager(){return drillManager;} public CrateManager getCrateManager(){return crateManager;} public RoleManager getRoleManager(){return roleManager;} public KitsManager getKitsManager(){return kitsManager;} public ServerUI getServerUI(){return serverUI;} public InvestmentManager getInvestmentManager(){return investmentManager;}
 }
