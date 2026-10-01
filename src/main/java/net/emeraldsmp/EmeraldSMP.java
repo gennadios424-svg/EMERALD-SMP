@@ -75,7 +75,7 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(drillManager,this);getServer().getPluginManager().registerEvents(crateManager,this);getServer().getPluginManager().registerEvents(new CrateKeyGuard(this),this);
             getServer().getPluginManager().registerEvents(new RolePlayerListener(this),this);getServer().getPluginManager().registerEvents(rolesCommand,this);
             getServer().getPluginManager().registerEvents(new RoleChatListener(this),this);getServer().getPluginManager().registerEvents(kitsManager,this);getServer().getPluginManager().registerEvents(investmentManager,this); getServer().getPluginManager().registerEvents(staffCommand,this);
-            getServer().getPluginManager().registerEvents(new FlightAntiCheat(this,susListManager),this); getServer().getPluginManager().registerEvents(susListCommand,this);
+            getServer().getPluginManager().registerEvents(new FlightAntiCheat(this,susListManager),this); getServer().getPluginManager().registerEvents(new MacroAntiCheat(this),this); getServer().getPluginManager().registerEvents(susListCommand,this);
             spawnerManager.start();afkManager.start();serverUI=new ServerUI(this);getServer().getPluginManager().registerEvents(serverUI,this);serverUI.start();
             getLogger().info("EmeraldSMP has been enabled!");getLogger().info("Worth database loaded: "+worthManager.all().size()+" supported items.");
         } catch(Exception ex){getLogger().log(Level.SEVERE,"ERROR: EmeraldSMP could not start safely.",ex);getServer().getPluginManager().disablePlugin(this);}
