@@ -1,210 +1,32 @@
 server:
   name: "Emerald SMP"
-
 afk:
   enabled: true
   auto-afk-minutes: 10
   show-in-tab: true
-
 economy:
   starting-balance: 0
   currency-symbol: "$"
-  # /sell always pays the central /worth value.
   sell-multiplier: 1.0
-
 visual:
   primary-color: "GREEN"
   secondary-color: "DARK_GREEN"
   accent-color: "LIME"
-
 messages:
   prefix: "&a💚 &2&lEmerald SMP &8»"
-  rtp:
-    searching: "&7Finding a safe random location..."\n    countdown: "&aTeleporting in &f%time%&a..."\n    cancelled: "&cRTP cancelled because you moved."
-    success: "&aRTP complete! You have been safely teleported."
-    cooldown: "&cYou must wait &f%time%&c before using RTP again."
-    failed: "&cCould not find a safe RTP location. Please try again."
-    not-allowed: "&cRTP is not allowed in this world."
-    homes:
-      countdown: "&aTeleporting to &f%home% &ain &f%time%&a..."
-
-# Curated player shop.
-# buy: -1 means the existing Worth buy value is used automatically.
-# This shop uses the central /worth database. Configured items with buy: -1 use the central buy formula.
-shop:
-  buy-multiplier: 2.5
-  categories:
-    blocks:
-      enabled: true
-      display-name: "§a🧱 Blocks"
-      icon: STONE
-      slot: 10
-      lore: ["§7Common building and survival blocks"]
-      items:
-        stone: {enabled: true, material: STONE, display-name: "§fStone", buy: -1, sell: -1, lore: []}
-        cobblestone: {enabled: true, material: COBBLESTONE, display-name: "§7Cobblestone", buy: -1, sell: -1, lore: []}
-        stone_bricks: {enabled: true, material: STONE_BRICKS, display-name: "§fStone Bricks", buy: -1, sell: -1, lore: []}
-        deepslate: {enabled: true, material: DEEPSLATE, display-name: "§8Deepslate", buy: -1, sell: -1, lore: []}
-        deepslate_bricks: {enabled: true, material: DEEPSLATE_BRICKS, display-name: "§8Deepslate Bricks", buy: -1, sell: -1, lore: []}
-        dirt: {enabled: true, material: DIRT, display-name: "§6Dirt", buy: -1, sell: -1, lore: []}
-        grass_block: {enabled: true, material: GRASS_BLOCK, display-name: "§aGrass Block", buy: -1, sell: -1, lore: []}
-        sand: {enabled: true, material: SAND, display-name: "§eSand", buy: -1, sell: -1, lore: []}
-        gravel: {enabled: true, material: GRAVEL, display-name: "§7Gravel", buy: -1, sell: -1, lore: []}
-        glass: {enabled: true, material: GLASS, display-name: "§fGlass", buy: -1, sell: -1, lore: []}
-        glass_pane: {enabled: true, material: GLASS_PANE, display-name: "§fGlass Pane", buy: -1, sell: -1, lore: []}
-        bricks: {enabled: true, material: BRICKS, display-name: "§6Bricks", buy: -1, sell: -1, lore: []}
-        terracotta: {enabled: true, material: TERRACOTTA, display-name: "§6Terracotta", buy: -1, sell: -1, lore: []}
-        white_concrete: {enabled: true, material: WHITE_CONCRETE, display-name: "§fWhite Concrete", buy: -1, sell: -1, lore: []}
-        white_wool: {enabled: true, material: WHITE_WOOL, display-name: "§fWhite Wool", buy: -1, sell: -1, lore: []}
-        oak_log: {enabled: true, material: OAK_LOG, display-name: "§6Oak Log", buy: -1, sell: -1, lore: []}
-        spruce_log: {enabled: true, material: SPRUCE_LOG, display-name: "§6Spruce Log", buy: -1, sell: -1, lore: []}
-        birch_log: {enabled: true, material: BIRCH_LOG, display-name: "§fBirch Log", buy: -1, sell: -1, lore: []}
-        jungle_log: {enabled: true, material: JUNGLE_LOG, display-name: "§6Jungle Log", buy: -1, sell: -1, lore: []}
-        acacia_log: {enabled: true, material: ACACIA_LOG, display-name: "§6Acacia Log", buy: -1, sell: -1, lore: []}
-        dark_oak_log: {enabled: true, material: DARK_OAK_LOG, display-name: "§6Dark Oak Log", buy: -1, sell: -1, lore: []}
-        mangrove_log: {enabled: true, material: MANGROVE_LOG, display-name: "§4Mangrove Log", buy: -1, sell: -1, lore: []}
-        cherry_log: {enabled: true, material: CHERRY_LOG, display-name: "§dCherry Log", buy: -1, sell: -1, lore: []}
-        crimson_stem: {enabled: true, material: CRIMSON_STEM, display-name: "§4Crimson Stem", buy: -1, sell: -1, lore: []}
-        warped_stem: {enabled: true, material: WARPED_STEM, display-name: "§3Warped Stem", buy: -1, sell: -1, lore: []}
-        oak_planks: {enabled: true, material: OAK_PLANKS, display-name: "§6Oak Planks", buy: -1, sell: -1, lore: []}
-        spruce_planks: {enabled: true, material: SPRUCE_PLANKS, display-name: "§6Spruce Planks", buy: -1, sell: -1, lore: []}
-        birch_planks: {enabled: true, material: BIRCH_PLANKS, display-name: "§fBirch Planks", buy: -1, sell: -1, lore: []}
-        jungle_planks: {enabled: true, material: JUNGLE_PLANKS, display-name: "§6Jungle Planks", buy: -1, sell: -1, lore: []}
-        acacia_planks: {enabled: true, material: ACACIA_PLANKS, display-name: "§6Acacia Planks", buy: -1, sell: -1, lore: []}
-        dark_oak_planks: {enabled: true, material: DARK_OAK_PLANKS, display-name: "§6Dark Oak Planks", buy: -1, sell: -1, lore: []}
-        mangrove_planks: {enabled: true, material: MANGROVE_PLANKS, display-name: "§4Mangrove Planks", buy: -1, sell: -1, lore: []}
-        cherry_planks: {enabled: true, material: CHERRY_PLANKS, display-name: "§dCherry Planks", buy: -1, sell: -1, lore: []}
-        oak_stairs: {enabled: true, material: OAK_STAIRS, display-name: "§6Oak Stairs", buy: -1, sell: -1, lore: []}
-        oak_slab: {enabled: true, material: OAK_SLAB, display-name: "§6Oak Slab", buy: -1, sell: -1, lore: []}
-        oak_fence: {enabled: true, material: OAK_FENCE, display-name: "§6Oak Fence", buy: -1, sell: -1, lore: []}
-        oak_door: {enabled: true, material: OAK_DOOR, display-name: "§6Oak Door", buy: -1, sell: -1, lore: []}
-        oak_trapdoor: {enabled: true, material: OAK_TRAPDOOR, display-name: "§6Oak Trapdoor", buy: -1, sell: -1, lore: []}
-
-    cpvp:
-      enabled: true
-      display-name: "§c⚔ CPVP"
-      icon: END_CRYSTAL
-      slot: 11
-      lore: ["§7Crystal PvP supplies"]
-      items:
-        end_crystal: {enabled: true, material: END_CRYSTAL, display-name: "§dEnd Crystal", buy: -1, sell: -1, lore: []}
-        totem_of_undying: {enabled: true, material: TOTEM_OF_UNDYING, display-name: "§6Totem of Undying", buy: -1, sell: -1, lore: []}
-
-    redstone:
-      enabled: true
-      display-name: "§c🔴 Redstone"
-      icon: REDSTONE
-      slot: 12
-      lore: ["§7Common redstone components"]
-      items:
-        redstone: {enabled: true, material: REDSTONE, display-name: "§cRedstone Dust", buy: -1, sell: -1, lore: []}
-        redstone_torch: {enabled: true, material: REDSTONE_TORCH, display-name: "§cRedstone Torch", buy: -1, sell: -1, lore: []}
-        repeater: {enabled: true, material: REPEATER, display-name: "§cRepeater", buy: -1, sell: -1, lore: []}
-        comparator: {enabled: true, material: COMPARATOR, display-name: "§cComparator", buy: -1, sell: -1, lore: []}
-        piston: {enabled: true, material: PISTON, display-name: "§cPiston", buy: -1, sell: -1, lore: []}
-        sticky_piston: {enabled: true, material: STICKY_PISTON, display-name: "§cSticky Piston", buy: -1, sell: -1, lore: []}
-        observer: {enabled: true, material: OBSERVER, display-name: "§7Observer", buy: -1, sell: -1, lore: []}
-        hopper: {enabled: true, material: HOPPER, display-name: "§7Hopper", buy: -1, sell: -1, lore: []}
-        dropper: {enabled: true, material: DROPPER, display-name: "§7Dropper", buy: -1, sell: -1, lore: []}
-        dispenser: {enabled: true, material: DISPENSER, display-name: "§7Dispenser", buy: -1, sell: -1, lore: []}
-        lever: {enabled: true, material: LEVER, display-name: "§7Lever", buy: -1, sell: -1, lore: []}
-        stone_button: {enabled: true, material: STONE_BUTTON, display-name: "§7Stone Button", buy: -1, sell: -1, lore: []}
-        stone_pressure_plate: {enabled: true, material: STONE_PRESSURE_PLATE, display-name: "§7Stone Pressure Plate", buy: -1, sell: -1, lore: []}
-        rail: {enabled: true, material: RAIL, display-name: "§7Rail", buy: -1, sell: -1, lore: []}
-        powered_rail: {enabled: true, material: POWERED_RAIL, display-name: "§6Powered Rail", buy: -1, sell: -1, lore: []}
-        minecart: {enabled: true, material: MINECART, display-name: "§7Minecart", buy: -1, sell: -1, lore: []}
-
-    food:
-      enabled: true
-      display-name: "§6🍖 Food"
-      icon: COOKED_BEEF
-      slot: 13
-      lore: ["§7Normal survival food"]
-      items:
-        steak: {enabled: true, material: COOKED_BEEF, display-name: "§6Steak", buy: -1, sell: -1, lore: []}
-        cooked_porkchop: {enabled: true, material: COOKED_PORKCHOP, display-name: "§6Cooked Porkchop", buy: -1, sell: -1, lore: []}
-        cooked_chicken: {enabled: true, material: COOKED_CHICKEN, display-name: "§fCooked Chicken", buy: -1, sell: -1, lore: []}
-        cooked_mutton: {enabled: true, material: COOKED_MUTTON, display-name: "§fCooked Mutton", buy: -1, sell: -1, lore: []}
-        cooked_salmon: {enabled: true, material: COOKED_SALMON, display-name: "§fCooked Salmon", buy: -1, sell: -1, lore: []}
-        cooked_cod: {enabled: true, material: COOKED_COD, display-name: "§fCooked Cod", buy: -1, sell: -1, lore: []}
-        bread: {enabled: true, material: BREAD, display-name: "§eBread", buy: -1, sell: -1, lore: []}
-        golden_carrot: {enabled: true, material: GOLDEN_CARROT, display-name: "§6Golden Carrot", buy: -1, sell: -1, lore: []}
-        apple: {enabled: true, material: APPLE, display-name: "§cApple", buy: -1, sell: -1, lore: []}
-        potato: {enabled: true, material: POTATO, display-name: "§ePotato", buy: -1, sell: -1, lore: []}
-        carrot: {enabled: true, material: CARROT, display-name: "§6Carrot", buy: -1, sell: -1, lore: []}
-
-    farm:
-      enabled: true
-      display-name: "§2🌾 Farm"
-      icon: WHEAT
-      slot: 14
-      lore: ["§7Common farming resources"]
-      items:
-        wheat: {enabled: true, material: WHEAT, display-name: "§eWheat", buy: -1, sell: -1, lore: []}
-        wheat_seeds: {enabled: true, material: WHEAT_SEEDS, display-name: "§aWheat Seeds", buy: -1, sell: -1, lore: []}
-        carrots: {enabled: true, material: CARROT, display-name: "§6Carrots", buy: -1, sell: -1, lore: []}
-        potatoes: {enabled: true, material: POTATO, display-name: "§ePotatoes", buy: -1, sell: -1, lore: []}
-        beetroot: {enabled: true, material: BEETROOT, display-name: "§cBeetroot", buy: -1, sell: -1, lore: []}
-        beetroot_seeds: {enabled: true, material: BEETROOT_SEEDS, display-name: "§aBeetroot Seeds", buy: -1, sell: -1, lore: []}
-        sugar_cane: {enabled: true, material: SUGAR_CANE, display-name: "§aSugar Cane", buy: -1, sell: -1, lore: []}
-        bamboo: {enabled: true, material: BAMBOO, display-name: "§aBamboo", buy: -1, sell: -1, lore: []}
-        cactus: {enabled: true, material: CACTUS, display-name: "§2Cactus", buy: -1, sell: -1, lore: []}
-        pumpkin: {enabled: true, material: PUMPKIN, display-name: "§6Pumpkin", buy: -1, sell: -1, lore: []}
-        melon: {enabled: true, material: MELON, display-name: "§aMelon", buy: -1, sell: -1, lore: []}
-        cocoa_beans: {enabled: true, material: COCOA_BEANS, display-name: "§6Cocoa Beans", buy: -1, sell: -1, lore: []}
-        nether_wart: {enabled: true, material: NETHER_WART, display-name: "§4Nether Wart", buy: -1, sell: -1, lore: []}
-        egg: {enabled: true, material: EGG, display-name: "§fEgg", buy: -1, sell: -1, lore: []}
-
-    end:
-      enabled: true
-      display-name: "§5🟢 End"
-      icon: ENDER_CHEST
-      slot: 15
-      lore: ["§7Useful End resources"]
-      items:
-        ender_pearl: {enabled: true, material: ENDER_PEARL, display-name: "§5Ender Pearl", buy: -1, sell: -1, lore: []}
-        ender_eye: {enabled: true, material: ENDER_EYE, display-name: "§5Eye of Ender", buy: -1, sell: -1, lore: []}
-        end_stone: {enabled: true, material: END_STONE, display-name: "§fEnd Stone", buy: -1, sell: -1, lore: []}
-        chorus_fruit: {enabled: true, material: CHORUS_FRUIT, display-name: "§dChorus Fruit", buy: -1, sell: -1, lore: []}
-        purpur_block: {enabled: true, material: PURPUR_BLOCK, display-name: "§dPurpur Block", buy: -1, sell: -1, lore: []}
-        ender_chest: {enabled: true, material: ENDER_CHEST, display-name: "§5Ender Chest", buy: -1, sell: -1, lore: []}
-
-    spawners:
-      enabled: true
-      display-name: "§a🧟 Spawners"
-      icon: SPAWNER
-      slot: 16
-      lore: ["§7Custom Emerald SMP spawners"]
-      items:
-        spawner_skeleton: {enabled: true, material: SPAWNER, display-name: "§a🧟 Skeleton Spawner", buy: 1500, sell: 0, lore: ["§7Price: §a1,500 Emerald Shards", "§7Custom stackable spawner", "§7Produces Bones, Arrows and Bows"]}
-
-# /rtp settings.
-# Add world names to the list to allow RTP in those worlds.
-# Empty worlds list = RTP is allowed in every loaded world.
 rtp:
   countdown: 5
   min-distance: 500
   max-distance: 5000
   cooldown: 60
-  worlds:
-    - world
-    - world_nether
-    - world_the_end
-
-
-# /homes settings.
+  worlds: [world, world_nether, world_the_end]
 homes:
   max: 3
   teleport-countdown: 3
-
-# Custom Emerald SMP spawners.
 spawners:
   skeleton:
     amount: 8
     interval-seconds: 12
-
-
-# 💚 Emerald Miner progression. Both tools are separate and expire in real time.
 emerald-miner:
   expiration-days: 7
   xp-per-block: 1
@@ -215,9 +37,13 @@ emerald-miner:
     max-blocks: 32
     min-shards: 1
     max-shards: 5
-
-
-# 🎁 Physical Emerald SMP crates. Rewards are server-side and configurable.
+lag-cleaner:
+  enabled: true
+  interval-minutes: 5
+  clear-dropped-items: true
+  announce: true
+shop:
+  buy-multiplier: 2.5
 crates:
   animation:
     common: 35
@@ -227,33 +53,33 @@ crates:
     emerald: 75
   rewards:
     common:
-      - "COAL:16"
-      - "IRON_INGOT:8"
-      - "GOLD_INGOT:6"
-      - "DIAMOND:2"
-      - "shards:2"
-      - "$5000"
+      - "25|COAL:16"
+      - "20|IRON_INGOT:8"
+      - "15|GOLD_INGOT:6"
+      - "10|DIAMOND:2"
+      - "15|shards:2"
+      - "15|$5000"
     spawner:
-      - "BONE:64"
-      - "ARROW:64"
-      - "shards:5"
-      - "$10000"
-      - "DIAMOND:4"
+      - "25|BONE:64"
+      - "20|ARROW:64"
+      - "20|shards:5"
+      - "20|$10000"
+      - "15|DIAMOND:4"
     gold:
-      - "GOLD_INGOT:32"
-      - "DIAMOND:8"
-      - "EMERALD:16"
-      - "shards:10"
-      - "$25000"
+      - "20|GOLD_INGOT:32"
+      - "20|DIAMOND:8"
+      - "20|EMERALD:16"
+      - "20|shards:10"
+      - "20|$25000"
     crimson:
-      - "DIAMOND:16"
-      - "EMERALD:32"
-      - "NETHERITE_SCRAP:4"
-      - "shards:20"
-      - "$50000"
+      - "20|DIAMOND:16"
+      - "20|EMERALD:32"
+      - "20|NETHERITE_SCRAP:4"
+      - "20|shards:20"
+      - "20|$50000"
     emerald:
-      - "DIAMOND:32"
-      - "EMERALD:64"
-      - "NETHERITE_INGOT:2"
-      - "shards:40"
-      - "$100000"
+      - "20|DIAMOND:32"
+      - "20|EMERALD:64"
+      - "20|NETHERITE_INGOT:2"
+      - "20|shards:40"
+      - "20|$100000"
