@@ -1,0 +1,76 @@
+name: Emerald SMP Finalize
+on:
+  push:
+    branches: [ main ]
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+      - name: Integrate features
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root=Path('.')
+          main=root/'src/main/java/net/emeraldsmp/EmeraldSMP.java'
+          s=main.read_text()
+          s=s.replace('import net.emeraldsmp.anticheat.SusListManager;', 'import net.emeraldsmp.anticheat.SusListManager;\nimport net.emeraldsmp.anticheat.MovementAntiCheat;\nimport net.emeraldsmp.live.LiveManager;\nimport net.emeraldsmp.tpa.TpaUpgradeManager;\nimport net.emeraldsmp.features.EmeraldFeatureBridge;')
+          s=s.replace('private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager; private KeyAllManager keyAllManager; private TpaManager tpaManager; private CombatManager combatManager;', 'private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager; private KeyAllManager keyAllManager; private TpaManager tpaManager; private CombatManager combatManager; private LiveManager liveManager; private TpaUpgradeManager tpaUpgradeManager;')
+          old='tpaManager=new TpaManager(this); register("tpa",new TpaCommand(tpaManager,TpaCommand.Mode.TPA),null); register("tpahere",new TpaCommand(tpaManager,TpaCommand.Mode.TPAHERE),null); register("tpaccept",new TpaCommand(tpaManager,TpaCommand.Mode.ACCEPT),null); register("tpdeny",new TpaCommand(tpaManager,TpaCommand.Mode.DENY),null); getServer().getPluginManager().registerEvents(tpaManager,this);'
+          new='tpaManager=new TpaManager(this); tpaUpgradeManager=new TpaUpgradeManager(this); register("tpa",tpaUpgradeManager.command(TpaUpgradeManager.Mode.TPA),null); register("tpahere",tpaUpgradeManager.command(TpaUpgradeManager.Mode.TPAHERE),null); register("tpaccept",tpaUpgradeManager.command(TpaUpgradeManager.Mode.ACCEPT),null); register("tpdeny",tpaUpgradeManager.command(TpaUpgradeManager.Mode.DENY),null); getServer().getPluginManager().registerEvents(tpaUpgradeManager,this);'
+          if old not in s: raise SystemExit('TPA registration block not found')
+          s=s.replace(old,new)
+          s=s.replace('register("suslist",susListCommand,susListCommand);', 'register("suslist",susListCommand,susListCommand); liveManager=new LiveManager(this); register("live",liveManager,null); getServer().getPluginManager().registerEvents(liveManager,this);')
+          s=s.replace('getServer().getPluginManager().registerEvents(new FlightAntiCheat(this,susListManager),this); getServer().getPluginManager().registerEvents(new MacroAntiCheat(this),this);', 'getServer().getPluginManager().registerEvents(new FlightAntiCheat(this,susListManager),this); getServer().getPluginManager().registerEvents(new MacroAntiCheat(this),this); getServer().getPluginManager().registerEvents(new MovementAntiCheat(this),this); getServer().getPluginManager().registerEvents(new EmeraldFeatureBridge(this),this);')
+          s=s.replace('if(combatManager!=null)combatManager.disable();if(tpaManager!=null)tpaManager.disable();', 'if(combatManager!=null)combatManager.disable();if(tpaUpgradeManager!=null)tpaUpgradeManager.shutdown();if(tpaManager!=null)tpaManager.disable();')
+          s=s.replace('if(investmentManager!=null)investmentManager.stop();', 'if(investmentManager!=null)investmentManager.stop();if(liveManager!=null)liveManager.disable();')
+          s=s.replace('public InvestmentManager getInvestmentManager(){return investmentManager;} public SusListManager getSusListManager(){return susListManager;} public KeyAllManager getKeyAllManager(){return keyAllManager;} public TpaManager getTpaManager(){return tpaManager;} public CombatManager getCombatManager(){return combatManager;}', 'public InvestmentManager getInvestmentManager(){return investmentManager;} public SusListManager getSusListManager(){return susListManager;} public KeyAllManager getKeyAllManager(){return keyAllManager;} public TpaManager getTpaManager(){return tpaManager;} public CombatManager getCombatManager(){return combatManager;} public LiveManager getLiveManager(){return liveManager;}')
+          main.write_text(s)
+
+          py=root/'src/main/resources/plugin.yml'
+          s=py.read_text()
+          marker='  tpa:\n    description: Request to teleport to another player\n    usage: /tpa <player>\n    permission: emerald.command\n'
+          if '  live:\n' not in s: s=s.replace(marker, marker+'  live:\n    description: Toggle Emerald SMP live status (MEDIA role only)\n    usage: /live\n    permission: emerald.command\n')
+          py.write_text(s)
+
+          ui=root/'src/main/java/net/emeraldsmp/ServerUI.java'
+          s=ui.read_text()
+          s=s.replace('public void refresh(Player p){if(p!=null&&p.isOnline())update(p);}', 'public void refresh(Player p){if(p!=null&&p.isOnline())update(p);}\n    public void refreshAll(){updateAll();}')
+          s=s.replace('target.setPlayerListName(role.icon()+" §f"+target.getName()+" §7"+teamText);', 'String live=(plugin.getLiveManager()!=null&&plugin.getLiveManager().isLive(target))?"§c🔴 LIVE §r":""; target.setPlayerListName(live+role.icon()+" §f"+target.getName()+" §7"+teamText);')
+          s=s.replace('target.setCustomName("§a§l"+formatMoney(plugin.getEconomyManager().getBalance(target.getUniqueId())));', 'target.setCustomName((plugin.getLiveManager()!=null&&plugin.getLiveManager().isLive(target)?"§c§l🔴 LIVE §r":"")+"§a§l"+formatMoney(plugin.getEconomyManager().getBalance(target.getUniqueId())));')
+          ui.write_text(s)
+
+          # Remove gameplay ownership from the existing spawner manager while keeping old saved files readable.
+          sp=root/'src/main/java/net/emeraldsmp/spawner/SpawnerManager.java'
+          s=sp.read_text()
+          s=s.replace('this.owner = owner;', 'this.owner = new UUID(0L, 0L);')
+          s=s.replace('String ownerString = y.getString(p + ".owner");\n                if (ownerString == null) continue;', 'String ownerString = y.getString(p + ".owner", new UUID(0L, 0L).toString());')
+          s=re.sub(r'private Data findAdjacentOwned\(Block b, UUID owner, String type\) \{.*?\n    \}', 'private Data findAdjacentOwned(Block b, UUID owner, String type) {\n        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {\n            Data d = spawners.get(key(b.getRelative(face)));\n            if (d != null && d.type.equals(type)) return d;\n        }\n        return null;\n    }', s, flags=re.S)
+          s=re.sub(r'private boolean canManage\(Player p, Data d\) \{.*?\n    \}', 'private boolean canManage(Player p, Data d) {\n        return true;\n    }', s, count=1, flags=re.S)
+          sp.write_text(s)
+          PY
+      - name: Build JAR
+        run: mvn --batch-mode --update-snapshots clean package
+      - name: Remove one-time workflow and commit
+        run: |
+          rm -f .github/workflows/emerald-finalize.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/main .github/workflows/emerald-finalize.yml
+          git commit -m '[emerald-feature-update] Live spawners anticheat TPA upgrade'
+          git push
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: EmeraldSMP-live-spawners-anticheat-tpa
+          path: target/EmeraldSMP-1.0.jar
+          retention-days: 7
