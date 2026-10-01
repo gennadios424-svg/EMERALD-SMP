@@ -132,6 +132,10 @@ commands:
   ipban:
     description: OWNER-only Emerald SMP IP ban
     usage: /ipban <player> [reason]
+  suslist:
+    description: Opens the Emerald SMP anti-cheat suspect list
+    usage: /suslist [tp|remove|clear] [player]
+    permission: emerald.anticheat
 permissions:
   emerald.command:
     description: Allows use of Emerald SMP commands
@@ -162,3 +166,6 @@ permissions:
   emerald.staff:
     description: Legacy staff node; actual access is enforced by Emerald role data
     default: false
+  emerald.anticheat:
+    description: Allows access to the Emerald SMP anti-cheat suspect list
+    default: op
