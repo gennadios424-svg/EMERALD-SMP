@@ -24,7 +24,8 @@ public final class CrateManager implements Listener{
  private Material icon(String n){return switch(n){case"EMERALD"->Material.EMERALD;case"GOLD"->Material.GOLD_INGOT;case"CRIMSON"->Material.CRIMSON_NYLIUM;case"SPAWNER"->Material.SPAWNER;default->Material.CHEST;};}
  private String normalize(String t){t=t.toLowerCase(Locale.ROOT);return List.of("common","spawner","gold","crimson","emerald").contains(t)?t:"common";}
  private String cap(String t){return t.substring(0,1).toUpperCase()+t.substring(1);}
- @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void breakCrate(BlockBreakEvent e){if(type(e.getBlock())==null)return;if(!e.getPlayer().hasPermission("emerald.admin")){e.setCancelled(true);e.getPlayer().sendMessage(ChatColor.RED+"Only an admin can remove a physical crate.");return;}crates.remove(loc(e.getBlock()));save();}\n @EventHandler public void inventoryClose(InventoryCloseEvent e){if(opening.contains(e.getPlayer().getUniqueId())){Bukkit.getScheduler().runTaskLater(plugin,()->{if(!e.getPlayer().isOnline())opening.remove(e.getPlayer().getUniqueId());},2L);}}
+ @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void breakCrate(BlockBreakEvent e){if(type(e.getBlock())==null)return;if(!e.getPlayer().hasPermission("emerald.admin")){e.setCancelled(true);e.getPlayer().sendMessage(ChatColor.RED+"Only an admin can remove a physical crate.");return;}crates.remove(loc(e.getBlock()));save();}
+ @EventHandler public void inventoryClose(InventoryCloseEvent e){if(opening.contains(e.getPlayer().getUniqueId())){Bukkit.getScheduler().runTaskLater(plugin,()->{if(!e.getPlayer().isOnline())opening.remove(e.getPlayer().getUniqueId());},2L);}}
  public boolean isCrate(Block b){return type(b)!=null;}
  public void remove(Block b){crates.remove(loc(b));save();}
 }
