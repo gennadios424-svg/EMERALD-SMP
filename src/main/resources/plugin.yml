@@ -37,10 +37,6 @@ commands:
     description: Teleports you to a random safe location
     usage: /rtp
     permission: emerald.command
-  order:
-    description: Opens player-to-player item orders
-    usage: /order
-    permission: emerald.command
   cf:
     description: Opens coin flip
     usage: /cf
