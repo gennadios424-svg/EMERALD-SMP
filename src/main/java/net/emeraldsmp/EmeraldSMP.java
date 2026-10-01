@@ -32,7 +32,7 @@ import java.util.logging.Level;
 
 public final class EmeraldSMP extends JavaPlugin {
     private ConfigManager configManager; private MessageService messageService; private PlayerDataManager playerDataManager; private EconomyManager economyManager;
-    private ShopManager shopManager; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
+    private ShopManager shopManager; private ManualSellManager manualSellManager; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
     private AuctionManager auctionManager; private HomeCommand homeCommand; private AfkManager afkManager; private TeamManager teamManager; private TagsManager tagsManager;
     private SpawnerManager spawnerManager; private DrillManager drillManager; private CrateManager crateManager; private LagCleaner lagCleaner; private RoleManager roleManager; private KitsManager kitsManager;
     private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager;
@@ -40,7 +40,7 @@ public final class EmeraldSMP extends JavaPlugin {
     @Override public void onEnable() {
         try {
             configManager=new ConfigManager(this);configManager.load(); messageService=new MessageService(this);
-            playerDataManager=new PlayerDataManager(this);playerDataManager.initialize(); economyManager=new EconomyManager(this); shopManager=new ShopManager(this);
+            playerDataManager=new PlayerDataManager(this);playerDataManager.initialize(); economyManager=new EconomyManager(this); shopManager=new ShopManager(this); manualSellManager=new ManualSellManager(this);
             worthManager=new WorthManager(this);worthManager.load(); afkManager=new AfkManager(this);
             teamManager=new TeamManager(this);teamManager.load(); tagsManager=new TagsManager(this);tagsManager.load();
             roleManager=new RoleManager(this);roleManager.load(); spawnerManager=new SpawnerManager(this);spawnerManager.load();
@@ -84,7 +84,7 @@ public final class EmeraldSMP extends JavaPlugin {
     @Override public void onDisable(){if(serverUI!=null)serverUI.stop();if(afkManager!=null)afkManager.stop();if(spawnerManager!=null)spawnerManager.stop();if(drillManager!=null)drillManager.stop();if(crateManager!=null)crateManager.stop();if(investmentManager!=null)investmentManager.stop();if(teamManager!=null)teamManager.save();if(tagsManager!=null)tagsManager.save();if(roleManager!=null)roleManager.save();if(kitsManager!=null)kitsManager.save();if(playerDataManager!=null)playerDataManager.shutdown();getLogger().info("EmeraldSMP has been disabled.");}
     public void beginWorthSearch(Player p){if(worthListener!=null)worthListener.beginSearch(p);}
     public ConfigManager getConfigManager(){return configManager;} public MessageService getMessageService(){return messageService;} public PlayerDataManager getPlayerDataManager(){return playerDataManager;}
-    public EconomyManager getEconomyManager(){return economyManager;} public ShopManager getShopManager(){return shopManager;} public WorthManager getWorthManager(){return worthManager;} public AuctionManager getAuctionManager(){return auctionManager;}
+    public EconomyManager getEconomyManager(){return economyManager;} public ShopManager getShopManager(){return shopManager;} public ManualSellManager getManualSellManager(){return manualSellManager;} public WorthManager getWorthManager(){return worthManager;} public AuctionManager getAuctionManager(){return auctionManager;}
     public AfkManager getAfkManager(){return afkManager;} public TeamManager getTeamManager(){return teamManager;} public TagsManager getTagsManager(){return tagsManager;} public SpawnerManager getSpawnerManager(){return spawnerManager;}
     public DrillManager getDrillManager(){return drillManager;} public CrateManager getCrateManager(){return crateManager;} public RoleManager getRoleManager(){return roleManager;} public KitsManager getKitsManager(){return kitsManager;} public ServerUI getServerUI(){return serverUI;} public InvestmentManager getInvestmentManager(){return investmentManager;}
 }
