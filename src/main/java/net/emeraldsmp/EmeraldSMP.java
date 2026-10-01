@@ -32,7 +32,7 @@ import java.util.logging.Level;
 
 public final class EmeraldSMP extends JavaPlugin {
     private ConfigManager configManager; private MessageService messageService; private PlayerDataManager playerDataManager; private EconomyManager economyManager;
-    private ShopManager shopManager; private ManualSellManager manualSellManager; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
+    private ShopManager shopManager; private CleanSellManager cleanSellManager; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
     private AuctionManager auctionManager; private HomeCommand homeCommand; private AfkManager afkManager; private TeamManager teamManager; private TagsManager tagsManager;
     private SpawnerManager spawnerManager; private DrillManager drillManager; private CrateManager crateManager; private LagCleaner lagCleaner; private RoleManager roleManager; private KitsManager kitsManager;
     private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager;
