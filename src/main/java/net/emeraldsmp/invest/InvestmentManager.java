@@ -6,12 +6,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
+import org.bukkit.event.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
@@ -30,6 +29,7 @@ public final class InvestmentManager implements Listener {
     private final Map<UUID, Long> lastAccrual = new HashMap<>();
     private final Map<UUID, Long> fractionalNumerator = new HashMap<>();
     private final Set<UUID> transactions = new HashSet<>();
+    private final Map<UUID, Long> depositWaiting = new HashMap<>();
     private BukkitTask task;
 
     public InvestmentManager(EmeraldSMP plugin) { this.plugin = plugin; }
@@ -47,6 +47,7 @@ public final class InvestmentManager implements Listener {
         lastAccrual.clear();
         fractionalNumerator.clear();
         transactions.clear();
+        depositWaiting.clear();
     }
 
     public void open(Player p) {
@@ -61,35 +62,39 @@ public final class InvestmentManager implements Listener {
         PlayerData d = data(p);
         long investment = d.getInvestment();
         long earnings = d.getInvestmentEarnings();
-        inv.setItem(13, icon(Material.EMERALD_BLOCK, "§a§l💚 YOUR INVESTMENT", List.of(
+
+        inv.setItem(13, icon(Material.EMERALD_BLOCK, "§a§l💚 INVESTED", List.of(
                 "§7Invested: §f" + money(investment),
                 "§7Maximum: §f" + money(MAX_INVESTMENT),
-                "§7Rate: §a" + rateText(investment) + "§7 / second"
+                "§7Earnings: §a" + rateText(investment) + "§7 / second"
         )));
-        inv.setItem(22, icon(Material.GOLD_INGOT, "§6§l📈 EARNINGS", List.of(
-                "§7Accumulated: §f" + money(earnings),
-                "§8Earnings are active while you are online",
-                "§8Original investment is separate"
+        inv.setItem(22, icon(Material.GOLD_INGOT, "§6§l⚡ EARNINGS", List.of(
+                "§7Available: §f" + money(earnings),
+                "§8Generated from your active investment",
+                "§8Withdraw whenever you want"
         )));
-        inv.setItem(31, icon(Material.EMERALD, "§a§l💰 INVEST", List.of(
-                "§7Choose an amount below",
-                "§8Funds are deducted server-side",
-                "§8Maximum investment: §f$125M"
+        inv.setItem(31, icon(Material.EMERALD, "§a§l💰 DEPOSIT", List.of(
+                "§7Enter any investment amount in chat",
+                "§7Maximum total: §f$125,000,000",
+                "§eClick to enter amount"
         )));
-        inv.setItem(40, icon(Material.BOOK, "§b§l📊 STATUS", List.of(
+        inv.setItem(40, icon(d.isInvestmentAutoCollect() ? Material.EMERALD_BLOCK : Material.REDSTONE_BLOCK,
+                d.isInvestmentAutoCollect() ? "§a§l⚙ AUTO COLLECT: ON" : "§c§l⚙ AUTO COLLECT: OFF",
+                List.of(
+                    d.isInvestmentAutoCollect() ? "§7Earnings are paid directly to your balance" : "§7Earnings stay here until withdrawn",
+                    "§eClick to toggle"
+                )));
+        inv.setItem(42, icon(Material.GOLD_BLOCK, "§e§l💵 WITHDRAW", List.of(
+                "§7Withdraw accumulated earnings",
+                "§7Available: §f" + money(earnings),
+                "§8Original investment remains invested"
+        )));
+        inv.setItem(44, icon(Material.BOOK, "§b§l📊 STATUS", List.of(
                 "§7Investment: §f" + money(investment),
                 "§7Earnings: §f" + money(earnings),
-                "§7Rate: §a" + rateText(investment) + "§7 / second"
+                "§7Rate: §a" + rateText(investment) + "§7 / second",
+                "§7Auto collect: " + (d.isInvestmentAutoCollect() ? "§aON" : "§cOFF")
         )));
-        inv.setItem(42, icon(Material.GOLD_BLOCK, "§e§l💵 WITHDRAW", List.of(
-                "§7Withdraw accumulated earnings only",
-                "§7Available: §f" + money(earnings),
-                "§8Your original investment stays invested"
-        )));
-        inv.setItem(45, icon(Material.EMERALD, "§a§l+$1M", List.of("§7Invest $1,000,000")));
-        inv.setItem(47, icon(Material.EMERALD, "§a§l+$10M", List.of("§7Invest $10,000,000")));
-        inv.setItem(49, icon(Material.EMERALD_BLOCK, "§a§l+$25M", List.of("§7Invest $25,000,000")));
-        inv.setItem(51, icon(Material.DIAMOND, "§b§l+$100M", List.of("§7Invest $100,000,000")));
         inv.setItem(53, icon(Material.BARRIER, "§c§l✕ CLOSE", List.of()));
     }
 
@@ -137,7 +142,11 @@ public final class InvestmentManager implements Listener {
             long amount = d.getInvestmentEarnings();
             if (amount <= 0) { p.sendMessage(ChatColor.RED + "You have no investment earnings to withdraw."); return false; }
             d.setInvestmentEarnings(0L);
-            if (!plugin.getPlayerDataManager().save(d)) { d.setInvestmentEarnings(amount); p.sendMessage(ChatColor.RED + "Withdrawal failed safely; earnings were preserved."); return false; }
+            if (!plugin.getPlayerDataManager().save(d)) {
+                d.setInvestmentEarnings(amount);
+                p.sendMessage(ChatColor.RED + "Withdrawal failed safely; earnings were preserved.");
+                return false;
+            }
             if (!plugin.getEconomyManager().deposit(u, amount)) {
                 d.setInvestmentEarnings(amount);
                 plugin.getPlayerDataManager().save(d);
@@ -149,7 +158,45 @@ public final class InvestmentManager implements Listener {
         } finally { transactions.remove(u); }
     }
 
-    private void tick() { for (Player p : Bukkit.getOnlinePlayers()) accrue(p); }
+    public void beginDeposit(Player p) {
+        UUID u = p.getUniqueId();
+        if (transactions.contains(u)) {
+            p.sendMessage("§e⏳ Investment transaction already processing.");
+            return;
+        }
+        depositWaiting.put(u, System.currentTimeMillis() + 60_000L);
+        p.closeInventory();
+        p.sendTitle("§a§l💚 INVESTMENT DEPOSIT", "§f§lHOW MUCH?", 5, 40, 10);
+        p.sendMessage("§a§l💚 INVESTMENT DEPOSIT");
+        p.sendMessage("§fHOW MUCH?");
+        p.sendMessage("§7Type the amount in chat.");
+        p.sendMessage("§7Maximum: §f$125,000,000");
+        p.sendMessage("§7Type §ccancel §7to cancel.");
+    }
+
+    public void toggleAutoCollect(Player p) {
+        UUID u = p.getUniqueId();
+        if (!transactions.add(u)) {
+            p.sendMessage("§e⏳ Investment transaction already processing.");
+            return;
+        }
+        try {
+            accrue(p);
+            PlayerData d = data(p);
+            boolean next = !d.isInvestmentAutoCollect();
+            d.setInvestmentAutoCollect(next);
+            if (!plugin.getPlayerDataManager().save(d)) {
+                d.setInvestmentAutoCollect(!next);
+                p.sendMessage("§cCould not save auto collect setting.");
+                return;
+            }
+            p.sendMessage(next ? "§a⚙ Auto Collect enabled." : "§c⚙ Auto Collect disabled.");
+        } finally { transactions.remove(u); }
+    }
+
+    private void tick() {
+        for (Player p : Bukkit.getOnlinePlayers()) accrue(p);
+    }
 
     private void accrue(Player p) {
         UUID u = p.getUniqueId();
@@ -159,17 +206,30 @@ public final class InvestmentManager implements Listener {
         long last = lastAccrual.getOrDefault(u, now);
         lastAccrual.put(u, now);
         if (investment <= 0 || now <= last) return;
+
         long elapsed = Math.min(now - last, 86_400_000L);
         long numerator;
         try {
             numerator = Math.addExact(fractionalNumerator.getOrDefault(u, 0L), Math.multiplyExact(investment, elapsed));
-        } catch (ArithmeticException ex) { return; }
+        } catch (ArithmeticException ex) {
+            plugin.getLogger().warning("Investment accrual overflow prevented for " + p.getName());
+            return;
+        }
         long earned = numerator / NUMERATOR_DIVISOR;
-        long remainder = numerator % NUMERATOR_DIVISOR;
-        fractionalNumerator.put(u, remainder);
+        fractionalNumerator.put(u, numerator % NUMERATOR_DIVISOR);
         if (earned <= 0) return;
+
         long old = d.getInvestmentEarnings();
-        if (Long.MAX_VALUE - old < earned) return;
+        if (d.isInvestmentAutoCollect()) {
+            if (plugin.getEconomyManager().deposit(u, earned)) {
+                plugin.getPlayerDataManager().save(d);
+                return;
+            }
+        }
+        if (Long.MAX_VALUE - old < earned) {
+            plugin.getLogger().warning("Investment earnings overflow prevented for " + p.getName());
+            return;
+        }
         d.setInvestmentEarnings(old + earned);
         plugin.getPlayerDataManager().save(d);
     }
@@ -208,22 +268,70 @@ public final class InvestmentManager implements Listener {
         e.setCancelled(true);
         if (e.getRawSlot() < 0 || e.getRawSlot() >= e.getView().getTopInventory().getSize()) return;
         switch (e.getRawSlot()) {
-            case 45 -> invest(p, 1_000_000L);
-            case 47 -> invest(p, 10_000_000L);
-            case 49 -> invest(p, 25_000_000L);
-            case 51 -> invest(p, 100_000_000L);
+            case 31 -> beginDeposit(p);
+            case 40 -> toggleAutoCollect(p);
             case 42 -> withdraw(p);
             case 53 -> { p.closeInventory(); return; }
             default -> { return; }
         }
-        if (p.isOnline() && !p.getOpenInventory().getTopInventory().equals(e.getView().getTopInventory())) return;
-        draw(e.getView().getTopInventory(), p);
+        if (p.isOnline() && p.getOpenInventory().getTopInventory() == e.getView().getTopInventory()) draw(e.getView().getTopInventory(), p);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void drag(InventoryDragEvent e) { if (TITLE.equals(e.getView().getTitle())) e.setCancelled(true); }
+    public void drag(InventoryDragEvent e) {
+        if (TITLE.equals(e.getView().getTitle())) e.setCancelled(true);
+    }
 
-    @EventHandler public void close(InventoryCloseEvent e) { if (e.getView().getTitle().equals(TITLE)) lastAccrual.put(e.getPlayer().getUniqueId(), System.currentTimeMillis()); }
-    @EventHandler public void join(PlayerJoinEvent e) { lastAccrual.put(e.getPlayer().getUniqueId(), System.currentTimeMillis()); fractionalNumerator.remove(e.getPlayer().getUniqueId()); }
-    @EventHandler public void quit(PlayerQuitEvent e) { accrue(e.getPlayer()); lastAccrual.remove(e.getPlayer().getUniqueId()); fractionalNumerator.remove(e.getPlayer().getUniqueId()); transactions.remove(e.getPlayer().getUniqueId()); }
+    @EventHandler
+    public void close(InventoryCloseEvent e) {
+        if (TITLE.equals(e.getView().getTitle())) lastAccrual.put(e.getPlayer().getUniqueId(), System.currentTimeMillis());
+    }
+
+    @EventHandler
+    public void chat(AsyncPlayerChatEvent e) {
+        Player p = e.getPlayer();
+        UUID u = p.getUniqueId();
+        Long expires = depositWaiting.get(u);
+        if (expires == null) return;
+        e.setCancelled(true);
+        String message = e.getMessage().trim();
+        if (message.equalsIgnoreCase("cancel")) {
+            depositWaiting.remove(u);
+            p.sendMessage("§e💚 Investment deposit cancelled.");
+            Bukkit.getScheduler().runTask(plugin, () -> open(p));
+            return;
+        }
+        if (expires <= System.currentTimeMillis()) {
+            depositWaiting.remove(u);
+            p.sendMessage("§e💚 Investment deposit timed out. Nothing was charged.");
+            return;
+        }
+        long amount = plugin.getEconomyManager().parseAmount(message);
+        if (amount <= 0 || amount > MAX_INVESTMENT) {
+            p.sendMessage("§cEnter a positive whole number from $1 to $125,000,000.");
+            return;
+        }
+        depositWaiting.remove(u);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (invest(p, amount)) open(p);
+            else open(p);
+        });
+    }
+
+    @EventHandler
+    public void join(PlayerJoinEvent e) {
+        lastAccrual.put(e.getPlayer().getUniqueId(), System.currentTimeMillis());
+        fractionalNumerator.remove(e.getPlayer().getUniqueId());
+        depositWaiting.remove(e.getPlayer().getUniqueId());
+    }
+
+    @EventHandler
+    public void quit(PlayerQuitEvent e) {
+        UUID u = e.getPlayer().getUniqueId();
+        accrue(e.getPlayer());
+        lastAccrual.remove(u);
+        fractionalNumerator.remove(u);
+        transactions.remove(u);
+        depositWaiting.remove(u);
+    }
 }
