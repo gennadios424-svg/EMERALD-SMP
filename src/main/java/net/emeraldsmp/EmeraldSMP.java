@@ -22,6 +22,9 @@ import net.emeraldsmp.roles.*;
 import net.emeraldsmp.kits.*;
 import net.emeraldsmp.invest.*;
 import net.emeraldsmp.staff.StaffCommand;
+import net.emeraldsmp.anticheat.FlightAntiCheat;
+import net.emeraldsmp.anticheat.SusListCommand;
+import net.emeraldsmp.anticheat.SusListManager;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -32,7 +35,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private ShopManager shopManager; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
     private AuctionManager auctionManager; private HomeCommand homeCommand; private AfkManager afkManager; private TeamManager teamManager; private TagsManager tagsManager;
     private SpawnerManager spawnerManager; private DrillManager drillManager; private CrateManager crateManager; private LagCleaner lagCleaner; private RoleManager roleManager; private KitsManager kitsManager;
-    private InvestmentManager investmentManager; private StaffCommand staffCommand;
+    private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager;
 
     @Override public void onEnable() {
         try {
@@ -59,7 +62,9 @@ public final class EmeraldSMP extends JavaPlugin {
             RolesCommand rolesCommand=new RolesCommand(this,roleManager);register("roles",rolesCommand,rolesCommand);KitsCommand kitsCommand=new KitsCommand(this);register("kits",kitsCommand,null);
             register("invest",new InvestCommand(this,investmentManager),null);
             staffCommand=new StaffCommand(this);
+            susListManager=new SusListManager(this);
             register("vanish",staffCommand,null); register("fly",staffCommand,null); register("tp",staffCommand,null);
+            SusListCommand susListCommand=new SusListCommand(this,susListManager); register("suslist",susListCommand,susListCommand);
             register("tphere",staffCommand,null); register("kick",staffCommand,null); register("ban",staffCommand,null); register("ipban",staffCommand,null);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);getServer().getPluginManager().registerEvents(new ShopListener(this),this);
@@ -70,6 +75,7 @@ public final class EmeraldSMP extends JavaPlugin {
             getServer().getPluginManager().registerEvents(drillManager,this);getServer().getPluginManager().registerEvents(crateManager,this);getServer().getPluginManager().registerEvents(new CrateKeyGuard(this),this);
             getServer().getPluginManager().registerEvents(new RolePlayerListener(this),this);getServer().getPluginManager().registerEvents(rolesCommand,this);
             getServer().getPluginManager().registerEvents(new RoleChatListener(this),this);getServer().getPluginManager().registerEvents(kitsManager,this);getServer().getPluginManager().registerEvents(investmentManager,this); getServer().getPluginManager().registerEvents(staffCommand,this);
+            getServer().getPluginManager().registerEvents(new FlightAntiCheat(this,susListManager),this); getServer().getPluginManager().registerEvents(susListCommand,this);
             spawnerManager.start();afkManager.start();serverUI=new ServerUI(this);getServer().getPluginManager().registerEvents(serverUI,this);serverUI.start();
             getLogger().info("EmeraldSMP has been enabled!");getLogger().info("Worth database loaded: "+worthManager.all().size()+" supported items.");
         } catch(Exception ex){getLogger().log(Level.SEVERE,"ERROR: EmeraldSMP could not start safely.",ex);getServer().getPluginManager().disablePlugin(this);}
