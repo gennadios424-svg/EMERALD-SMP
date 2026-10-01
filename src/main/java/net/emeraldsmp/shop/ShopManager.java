@@ -218,7 +218,7 @@ public final class ShopManager {
         for (Material m : mats) {
             WorthEntry w = plugin.getWorthManager().get(m);
             if (w == null || !w.enabled()) continue;
-            long buy = plugin.getWorthManager().buyValue(m, 1);
+            long buy = m == Material.END_CRYSTAL ? 500L : plugin.getWorthManager().buyValue(m, 1);
             if (buy <= w.worth()) continue;
             out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT), m, roleStyledName(m), buy, List.of("§7Buy: §a" + plugin.getEconomyManager().format(buy) + " §7/ item", "§7Sell: §a" + plugin.getEconomyManager().format(w.worth()) + " §7/ item", "§8Click for purchase amounts")));
         }
