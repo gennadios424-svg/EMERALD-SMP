@@ -29,14 +29,8 @@ public final class ShopListener implements Listener {
                 e.setCancelled(true);
                 return;
             }
-            if (e.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
-                    || e.getAction() == InventoryAction.HOTBAR_SWAP
-                    || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD) {
-                e.setCancelled(true);
-                return;
-            }
-            // Normal clicks may move items between the player's inventory and
-            // sell slots 0-44. Bottom-inventory clicks are also allowed.
+            // All normal inventory actions are intentionally allowed in slots 0-44.
+            // This includes shift-click, hotbar swaps, right/left click and stack splitting.
             return;
         }
 
