@@ -125,8 +125,9 @@ public final class CrateManager implements Listener {
         String[] lines={"§a§l"+icon(type)+" "+cap(type).toUpperCase()+" CRATE","§7🔑 "+cap(type)+" Key","§fRight-Click to Open"};
         List<UUID> created=new ArrayList<>();
         for(int i=0;i<3;i++){
-            ArmorStand as=b.getWorld().spawn(base.clone().add(0,-i*.28,0),ArmorStand.class,a->{
-                a.setInvisible(true);a.setMarker(true);a.setGravity(false);a.setInvulnerable(true);a.setCustomNameVisible(true);a.setCustomName(lines[i]);
+            int lineIndex=i;
+            ArmorStand as=b.getWorld().spawn(base.clone().add(0,-lineIndex*.28,0),ArmorStand.class,a->{
+                a.setInvisible(true);a.setMarker(true);a.setGravity(false);a.setInvulnerable(true);a.setCustomNameVisible(true);a.setCustomName(lines[lineIndex]);
                 a.getPersistentDataContainer().set(holoKey,PersistentDataType.STRING,key);
             });
             created.add(as.getUniqueId());
