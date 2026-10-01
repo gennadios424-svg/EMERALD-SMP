@@ -148,18 +148,18 @@ public final class OrderCommand implements org.bukkit.command.CommandExecutor, L
         if(raw>=DELIVERY_SLOTS){e.setCancelled(true);if(raw==49)finalizeDelivery(p,session);else if(raw==53)p.closeInventory();return;}
         ItemStack cursor=e.getCursor(); ItemStack clicked=e.getCurrentItem();
         if(e.isShiftClick()){
-            if(e.getClickedInventory()==top){e.setCancelled(false);} else if(e.getClickedInventory()==p.getInventory()){if(!isAllowed(cursorOrClicked(clicked,cursor),session.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(session.order.item)+" to this order.");}}
+            if(e.getClickedInventory()==top){e.setCancelled(false);} else if(e.getClickedInventory()==p.getInventory()){if(!isAllowed(cursorOrClicked(clicked,cursor),orders.get(session.orderId).item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(orders.get(session.orderId).item)+" to this order.");}}
         } else if(e.getClickedInventory()==top){
-            if(clicked!=null&&!clicked.getType().isAir()&&!isAllowed(clicked,session.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(session.order.item)+" to this order.");}
-            if(cursor!=null&&!cursor.getType().isAir()&&!isAllowed(cursor,session.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(session.order.item)+" to this order.");}
-        } else if(e.getClickedInventory()==p.getInventory() && cursor!=null&&!cursor.getType().isAir()&&!isAllowed(cursor,session.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(session.order.item)+" to this order.");}
+            if(clicked!=null&&!clicked.getType().isAir()&&!isAllowed(clicked,orders.get(session.orderId).item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(orders.get(session.orderId).item)+" to this order.");}
+            if(cursor!=null&&!cursor.getType().isAir()&&!isAllowed(cursor,orders.get(session.orderId).item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(orders.get(session.orderId).item)+" to this order.");}
+        } else if(e.getClickedInventory()==p.getInventory() && cursor!=null&&!cursor.getType().isAir()&&!isAllowed(cursor,orders.get(session.orderId).item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(orders.get(session.orderId).item)+" to this order.");}
         if(!e.isCancelled()) Bukkit.getScheduler().runTask(plugin,()->normalizeDelivery(p,session));
     }
 
     @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false) public void drag(InventoryDragEvent e){
         if(!(e.getWhoClicked() instanceof Player p))return;DeliverySession s=deliveries.get(p.getUniqueId());if(s==null||e.getView().getTopInventory()!=s.inventory)return;
         boolean bad=false;for(int raw:e.getRawSlots())if(raw>=DELIVERY_SLOTS){bad=true;break;}if(bad){e.setCancelled(true);return;}
-        for(ItemStack x:e.getNewItems().values())if(!isAllowed(x,s.order.item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(s.order.item)+" to this order.");return;}
+        for(ItemStack x:e.getNewItems().values())if(!isAllowed(x,orders.get(s.orderId).item)){e.setCancelled(true);p.sendMessage("§c❌ You can only deliver "+pretty(orders.get(s.orderId).item)+" to this order.");return;}
         Bukkit.getScheduler().runTask(plugin,()->normalizeDelivery(p,s));
     }
 
