@@ -31,9 +31,12 @@ public final class CrateManager implements Listener {
     private final Map<UUID,Map<String,Integer>> editorOriginals=new HashMap<>();
     private final Map<UUID,Integer> chancePrompts=new HashMap<>();
     private final Map<UUID,EnumMap<KeyType,Integer>> virtualKeys=new HashMap<>();
+    private final Map<UUID,PendingKeyAll> pendingKeyAll=new HashMap<>();
+    private boolean keyAllRunning=false;
     private final NamespacedKey keyKey,holoKey;
     private final Random random=new Random();
     private record Pending(String type,String reward){}
+    private record PendingKeyAll(String type,int amount){}
     private record Reward(double chance,String raw,ItemStack item){}
     private enum KeyType { COMMON,SPAWNER,GOLD,CRIMSON,EMERALD }
 
@@ -42,7 +45,7 @@ public final class CrateManager implements Listener {
         keyKey=new NamespacedKey(plugin,"emerald-crate-key");holoKey=new NamespacedKey(plugin,"emerald-crate-hologram");
     }
     public void load(){
-        crates.clear();holograms.clear();pending.clear();virtualKeys.clear();
+        crates.clear();holograms.clear();pending.clear();virtualKeys.clear();pendingKeyAll.clear();keyAllRunning=false;
         if(!file.exists())return;
         var y=org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
         var s=y.getConfigurationSection("crates");
@@ -50,6 +53,7 @@ public final class CrateManager implements Listener {
             List<UUID> ids=new ArrayList<>();for(String id:y.getStringList("crates."+k+".holograms"))try{ids.add(UUID.fromString(id));}catch(Exception ignored){}holograms.put(k,ids);}
         var p=y.getConfigurationSection("pending");if(p!=null)for(String id:p.getKeys(false))try{UUID u=UUID.fromString(id);String t=normalize(y.getString("pending."+id+".type","common"));String r=y.getString("pending."+id+".reward");if(r!=null&&!r.isBlank())pending.put(u,new Pending(t,r));}catch(Exception ignored){}
         var vk=y.getConfigurationSection("virtual-keys");if(vk!=null)for(String id:vk.getKeys(false))try{UUID u=UUID.fromString(id);EnumMap<KeyType,Integer> map=new EnumMap<>(KeyType.class);for(String t:TYPES){int n=vk.getInt(id+"."+t,0);if(n>0)map.put(KeyType.valueOf(t.toUpperCase(Locale.ROOT)),n);}virtualKeys.put(u,map);}catch(Exception ignored){}
+        var pk=y.getConfigurationSection("pending-keyall");if(pk!=null)for(String id:pk.getKeys(false))try{UUID u=UUID.fromString(id);String t=normalize(pk.getString(id+".type","common"));int amount=Math.max(1,pk.getInt(id+".amount",1));pendingKeyAll.put(u,new PendingKeyAll(t,amount));}catch(Exception ignored){}
         for(String k:crates.keySet())ensureHologram(k);
     }
     public void save(){
@@ -57,6 +61,7 @@ public final class CrateManager implements Listener {
         for(var e:crates.entrySet()){y.set("crates."+e.getKey()+".type",e.getValue());List<String> ids=new ArrayList<>();for(UUID id:holograms.getOrDefault(e.getKey(),List.of()))ids.add(id.toString());y.set("crates."+e.getKey()+".holograms",ids);}
         for(var e:pending.entrySet()){y.set("pending."+e.getKey()+".type",e.getValue().type());y.set("pending."+e.getKey()+".reward",e.getValue().reward());}
         for(var e:virtualKeys.entrySet())for(var k:e.getValue().entrySet())y.set("virtual-keys."+e.getKey()+"."+k.getKey().name().toLowerCase(Locale.ROOT),k.getValue());
+        for(var e:pendingKeyAll.entrySet()){y.set("pending-keyall."+e.getKey()+".type",e.getValue().type());y.set("pending-keyall."+e.getKey()+".amount",e.getValue().amount());}
         try{y.save(file);}catch(IOException ex){plugin.getLogger().warning("Could not save crates.yml: "+ex.getMessage());}
     }
     public void stop(){for(BukkitTask t:animations.values())t.cancel();save();}
@@ -77,15 +82,100 @@ public final class CrateManager implements Listener {
     private KeyType keyEnum(String t){return KeyType.valueOf(normalize(t).toUpperCase(Locale.ROOT));}
     private boolean consumeVirtualKey(Player p,String type){UUID u=p.getUniqueId();EnumMap<KeyType,Integer> m=virtualKeys.get(u);if(m==null)return false;KeyType k=keyEnum(type);int n=m.getOrDefault(k,0);if(n<=0)return false;if(n==1)m.remove(k);else m.put(k,n-1);if(m.isEmpty())virtualKeys.remove(u);save();return true;}
     private int keySlot(Player p,String type){ItemStack[] c=p.getInventory().getStorageContents();for(int i=0;i<c.length;i++)if(type.equals(keyType(c[i])))return i;return -1;}
-    public void keyAll(String type,int amount,CommandSender sender){
-        type=normalize(type);KeyType k=keyEnum(type);
-        for(Player p:Bukkit.getOnlinePlayers()){EnumMap<KeyType,Integer> m=virtualKeys.computeIfAbsent(p.getUniqueId(),x->new EnumMap<>(KeyType.class));long n=(long)m.getOrDefault(k,0)+amount;m.put(k,(int)Math.min(Integer.MAX_VALUE,n));}
-        save();animateKeyAll(type,amount);sender.sendMessage(ChatColor.GREEN+"💚 Keyall distributed "+amount+" virtual "+cap(type)+" Key(s) to all online players.");
+    public synchronized void keyAll(String type,int amount,CommandSender sender){
+        type=normalize(type);amount=Math.max(1,Math.min(64,amount));
+        if(keyAllRunning){
+            sender.sendMessage(ChatColor.YELLOW+"⏳ A Keyall animation is already running. Please wait for it to finish.");
+            return;
+        }
+        keyAllRunning=true;
+        KeyType k=keyEnum(type);
+        for(Player p:Bukkit.getOnlinePlayers()){
+            UUID u=p.getUniqueId();
+            PendingKeyAll existing=pendingKeyAll.get(u);
+            if(existing==null) pendingKeyAll.put(u,new PendingKeyAll(type,amount));
+            else pendingKeyAll.put(u,new PendingKeyAll(existing.type(),Math.min(64,existing.amount()+amount)));
+        }
+        save();
+        sender.sendMessage(ChatColor.GREEN+"💚 Keyall started: "+amount+" virtual "+cap(type)+" Key(s) for all online players.");
+        animateKeyAll(type,amount);
     }
+
     private void animateKeyAll(String type,int amount){
-        List<String> frames=List.of("§a§l💚 EMERALD SMP §8» §f🔑 KEYALL §8• §aROLLING","§b§l💎   §a🔑   §e💚   §b🔑   §a💎","§a§l🔑   §b💚   §e🔑   §a💚   §b🔑","§e§l✨   🔑   💚   🔑   ✨","§a§l🎉 KEYALL! 🎉 §f"+cap(type)+" Key ×"+amount);
-        for(int i=0;i<frames.size();i++){int n=i;Bukkit.getScheduler().runTaskLater(plugin,()->{for(Player p:Bukkit.getOnlinePlayers()){p.sendTitle(frames.get(n),n==frames.size()-1?"§aEveryone received a virtual key!":"§7Rolling...",0,12,4);p.playSound(p.getLocation(),n==frames.size()-1?Sound.ENTITY_PLAYER_LEVELUP:Sound.BLOCK_NOTE_BLOCK_HAT,.7f,n==frames.size()-1?1.1f:1.7f);}},i*5L);}
+        final String title="§a§l💚 EMERALD SMP";
+        final String keyall="§f§l🔑 KEYALL";
+        final String finalTitle="§a§l🎉 KEYALL 🎉";
+        final List<String> rolling=List.of(
+            "§7     🔑   💎   💚",
+            "§7       💚   🔑",
+            "§7     💎   💚   🔑",
+            "§7       🔑   💎",
+            "§7     💚   🔑   💎",
+            "§7       💎   💚",
+            "§7          🔑"
+        );
+        final long phase2Start=40L;
+        final long phase3Start=80L;
+        final long finalTick=140L;
+
+        Bukkit.getScheduler().runTaskLater(plugin,()->{
+            for(Player p:Bukkit.getOnlinePlayers()){
+                p.sendTitle(title,keyall+"\n§7Preparing...",0,40,0);
+                p.playSound(p.getLocation(),Sound.BLOCK_NOTE_BLOCK_CHIME,.45f,1.15f);
+            }
+        },0L);
+
+        for(int i=0;i<rolling.size();i++){
+            final int frame=i;
+            Bukkit.getScheduler().runTaskLater(plugin,()->{
+                if(!keyAllRunning)return;
+                for(Player p:Bukkit.getOnlinePlayers()){
+                    p.sendTitle(title,keyall+"\n§e§lROLLING...\n"+rolling.get(frame),0,10,0);
+                    if(frame==0||frame%2==0)p.playSound(p.getLocation(),Sound.BLOCK_NOTE_BLOCK_HAT,.28f,1.15f);
+                }
+            },phase2Start+i*5L);
+        }
+
+        final int[] slowFrames={0,1,2,3,4,5,6};
+        final long[] slowDelays={80L,87L,95L,104L,114L,125L,135L};
+        for(int i=0;i<slowFrames.length;i++){
+            final int frame=i;
+            Bukkit.getScheduler().runTaskLater(plugin,()->{
+                if(!keyAllRunning)return;
+                for(Player p:Bukkit.getOnlinePlayers()){
+                    String arrow=frame<6?"§7        ↓":"§a§l        🔑";
+                    p.sendTitle(title,keyall+"\n§6§lSLOWING...\n"+rolling.get(slowFrames[frame])+"\n"+arrow,0,12,0);
+                    p.playSound(p.getLocation(),Sound.BLOCK_NOTE_BLOCK_HAT,.32f,1.35f-(frame*.1f));
+                }
+            },slowDelays[i]);
+        }
+
+        Bukkit.getScheduler().runTaskLater(plugin,()->{
+            if(!keyAllRunning)return;
+            awardPendingKeyAll(type,amount);
+            for(Player p:Bukkit.getOnlinePlayers()){
+                p.sendTitle(finalTitle,"§f§l"+cap(type)+" KEY §8×§a"+amount+"\n§7Everyone receives "+amount+" key"+(amount==1?"":"s")+"!",0,30,10);
+                p.playSound(p.getLocation(),Sound.UI_TOAST_CHALLENGE_COMPLETE,1f,1.05f);
+            }
+            keyAllRunning=false;
+            save();
+        },finalTick);
     }
+
+    private synchronized void awardPendingKeyAll(String type,int amount){
+        Iterator<Map.Entry<UUID,PendingKeyAll>> it=pendingKeyAll.entrySet().iterator();
+        while(it.hasNext()){
+            Map.Entry<UUID,PendingKeyAll> e=it.next();
+            PendingKeyAll q=e.getValue();
+            if(q==null) { it.remove(); continue; }
+            EnumMap<KeyType,Integer> m=virtualKeys.computeIfAbsent(e.getKey(),x->new EnumMap<>(KeyType.class));
+            KeyType k=keyEnum(q.type());
+            long n=(long)m.getOrDefault(k,0)+Math.max(1,q.amount());
+            m.put(k,(int)Math.min(Integer.MAX_VALUE,n));
+            it.remove();
+        }
+    }
+
     public void place(Player p,String type){type=normalize(type);Block clicked=p.getTargetBlockExact(6);if(clicked==null||clicked.getType().isAir()){p.sendMessage("§cLook at a solid block within 6 blocks.");return;}BlockFace face=p.getTargetBlockFace(6);if(face==null)face=BlockFace.UP;Block target=clicked.getRelative(face);if(!target.getType().isAir()&&!target.isReplaceable()){p.sendMessage("§cThere is no empty space there.");return;}String k=loc(target);if(crates.containsKey(k)){p.sendMessage("§cA crate is already registered there.");return;}target.setType(crateMaterial(type),false);crates.put(k,type);ensureHologram(k);save();p.sendMessage("§aPlaced "+cap(type)+" Crate.");}
     public void remove(Player p){Block b=p.getTargetBlockExact(6);String t=type(b);if(t==null){p.sendMessage("§cLook at an Emerald SMP crate.");return;}String k=loc(b);removeHologram(k);crates.remove(k);b.setType(Material.AIR,false);save();p.sendMessage("§aRemoved "+cap(t)+" Crate.");}
     private void ensureHologram(String k){Block b=block(k);if(b==null||!b.getType().equals(crateMaterial(crates.get(k))))return;List<UUID> ids=holograms.getOrDefault(k,new ArrayList<>());boolean ok=ids.size()==3;for(UUID id:ids){Entity e=Bukkit.getEntity(id);if(e==null||!e.isValid())ok=false;}if(ok)return;removeHologram(k);String t=crates.get(k);Location base=b.getLocation().add(.5,1.85,.5);String[] lines={"§a§l"+icon(t)+" "+cap(t).toUpperCase()+" CRATE","§7🔑 "+cap(t)+" Key","§fRight-Click Preview • Left-Click Open"};List<UUID> made=new ArrayList<>();for(int i=0;i<3;i++){int n=i;ArmorStand as=b.getWorld().spawn(base.clone().add(0,-n*.28,0),ArmorStand.class,a->{a.setInvisible(true);a.setMarker(true);a.setGravity(false);a.setInvulnerable(true);a.setCustomNameVisible(true);a.setCustomName(lines[n]);a.getPersistentDataContainer().set(holoKey,PersistentDataType.STRING,k);});made.add(as.getUniqueId());}holograms.put(k,made);save();}
