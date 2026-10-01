@@ -24,9 +24,11 @@ import java.util.*;
 public final class InvestmentManager implements Listener {
     public static final long MAX_INVESTMENT = 125_000_000L;
     private static final long RATE_DIVISOR = 1_000_000L;
+    private static final long NUMERATOR_DIVISOR = 1_000_000_000L;
     private static final String TITLE = "§2§l💚 EMERALD INVESTMENTS";
     private final EmeraldSMP plugin;
     private final Map<UUID, Long> lastAccrual = new HashMap<>();
+    private final Map<UUID, Long> fractionalNumerator = new HashMap<>();
     private final Set<UUID> transactions = new HashSet<>();
     private BukkitTask task;
 
@@ -43,6 +45,7 @@ public final class InvestmentManager implements Listener {
         if (task != null) task.cancel();
         for (Player p : Bukkit.getOnlinePlayers()) accrue(p);
         lastAccrual.clear();
+        fractionalNumerator.clear();
         transactions.clear();
     }
 
@@ -91,20 +94,33 @@ public final class InvestmentManager implements Listener {
     }
 
     public boolean invest(Player p, long amount) {
-        if (amount <= 0 || amount > MAX_INVESTMENT) return false;
+        if (amount <= 0 || amount > MAX_INVESTMENT) {
+            p.sendMessage(ChatColor.RED + "Investment amount must be between $1 and $125,000,000.");
+            return false;
+        }
         UUID u = p.getUniqueId();
-        if (!transactions.add(u)) return false;
+        if (!transactions.add(u)) { p.sendMessage(ChatColor.YELLOW + "⏳ Investment transaction already processing."); return false; }
         try {
             accrue(p);
             PlayerData d = data(p);
             long old = d.getInvestment();
-            if (old > MAX_INVESTMENT - amount) return false;
-            if (plugin.getEconomyManager().getBalance(u) < amount) return false;
-            if (!plugin.getEconomyManager().withdraw(u, amount)) return false;
+            if (old > MAX_INVESTMENT - amount) {
+                p.sendMessage(ChatColor.RED + "Your total investment cannot exceed $125,000,000.");
+                return false;
+            }
+            if (plugin.getEconomyManager().getBalance(u) < amount) {
+                p.sendMessage(ChatColor.RED + "You do not have enough money to invest that amount.");
+                return false;
+            }
+            if (!plugin.getEconomyManager().withdraw(u, amount)) {
+                p.sendMessage(ChatColor.RED + "Investment failed safely; no money was changed.");
+                return false;
+            }
             d.setInvestment(old + amount);
             if (!plugin.getPlayerDataManager().save(d)) {
                 d.setInvestment(old);
                 plugin.getEconomyManager().deposit(u, amount);
+                p.sendMessage(ChatColor.RED + "Investment save failed; your money was restored.");
                 return false;
             }
             p.sendMessage(ChatColor.GREEN + "💚 Invested " + money(amount) + ". Total investment: " + money(d.getInvestment()) + ".");
@@ -114,17 +130,18 @@ public final class InvestmentManager implements Listener {
 
     public boolean withdraw(Player p) {
         UUID u = p.getUniqueId();
-        if (!transactions.add(u)) return false;
+        if (!transactions.add(u)) { p.sendMessage(ChatColor.YELLOW + "⏳ Investment transaction already processing."); return false; }
         try {
             accrue(p);
             PlayerData d = data(p);
             long amount = d.getInvestmentEarnings();
             if (amount <= 0) { p.sendMessage(ChatColor.RED + "You have no investment earnings to withdraw."); return false; }
             d.setInvestmentEarnings(0L);
-            if (!plugin.getPlayerDataManager().save(d)) { d.setInvestmentEarnings(amount); return false; }
+            if (!plugin.getPlayerDataManager().save(d)) { d.setInvestmentEarnings(amount); p.sendMessage(ChatColor.RED + "Withdrawal failed safely; earnings were preserved."); return false; }
             if (!plugin.getEconomyManager().deposit(u, amount)) {
                 d.setInvestmentEarnings(amount);
                 plugin.getPlayerDataManager().save(d);
+                p.sendMessage(ChatColor.RED + "Withdrawal failed safely; earnings were preserved.");
                 return false;
             }
             p.sendMessage(ChatColor.GREEN + "💵 Withdrawn " + money(amount) + " investment earnings.");
@@ -132,9 +149,7 @@ public final class InvestmentManager implements Listener {
         } finally { transactions.remove(u); }
     }
 
-    private void tick() {
-        for (Player p : Bukkit.getOnlinePlayers()) accrue(p);
-    }
+    private void tick() { for (Player p : Bukkit.getOnlinePlayers()) accrue(p); }
 
     private void accrue(Player p) {
         UUID u = p.getUniqueId();
@@ -146,9 +161,12 @@ public final class InvestmentManager implements Listener {
         if (investment <= 0 || now <= last) return;
         long elapsed = Math.min(now - last, 86_400_000L);
         long numerator;
-        try { numerator = Math.multiplyExact(investment, elapsed); }
-        catch (ArithmeticException ex) { return; }
-        long earned = numerator / (RATE_DIVISOR * 1000L);
+        try {
+            numerator = Math.addExact(fractionalNumerator.getOrDefault(u, 0L), Math.multiplyExact(investment, elapsed));
+        } catch (ArithmeticException ex) { return; }
+        long earned = numerator / NUMERATOR_DIVISOR;
+        long remainder = numerator % NUMERATOR_DIVISOR;
+        fractionalNumerator.put(u, remainder);
         if (earned <= 0) return;
         long old = d.getInvestmentEarnings();
         if (Long.MAX_VALUE - old < earned) return;
@@ -195,7 +213,7 @@ public final class InvestmentManager implements Listener {
             case 49 -> invest(p, 25_000_000L);
             case 51 -> invest(p, 100_000_000L);
             case 42 -> withdraw(p);
-            case 53 -> p.closeInventory();
+            case 53 -> { p.closeInventory(); return; }
             default -> { return; }
         }
         if (p.isOnline() && !p.getOpenInventory().getTopInventory().equals(e.getView().getTopInventory())) return;
@@ -203,18 +221,9 @@ public final class InvestmentManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void drag(InventoryDragEvent e) {
-        if (TITLE.equals(e.getView().getTitle())) e.setCancelled(true);
-    }
+    public void drag(InventoryDragEvent e) { if (TITLE.equals(e.getView().getTitle())) e.setCancelled(true); }
 
-    @EventHandler
-    public void close(InventoryCloseEvent e) {
-        if (e.getView().getTitle().equals(TITLE)) lastAccrual.put(e.getPlayer().getUniqueId(), System.currentTimeMillis());
-    }
-
-    @EventHandler
-    public void join(PlayerJoinEvent e) { lastAccrual.put(e.getPlayer().getUniqueId(), System.currentTimeMillis()); }
-
-    @EventHandler
-    public void quit(PlayerQuitEvent e) { accrue(e.getPlayer()); lastAccrual.remove(e.getPlayer().getUniqueId()); transactions.remove(e.getPlayer().getUniqueId()); }
+    @EventHandler public void close(InventoryCloseEvent e) { if (e.getView().getTitle().equals(TITLE)) lastAccrual.put(e.getPlayer().getUniqueId(), System.currentTimeMillis()); }
+    @EventHandler public void join(PlayerJoinEvent e) { lastAccrual.put(e.getPlayer().getUniqueId(), System.currentTimeMillis()); fractionalNumerator.remove(e.getPlayer().getUniqueId()); }
+    @EventHandler public void quit(PlayerQuitEvent e) { accrue(e.getPlayer()); lastAccrual.remove(e.getPlayer().getUniqueId()); fractionalNumerator.remove(e.getPlayer().getUniqueId()); transactions.remove(e.getPlayer().getUniqueId()); }
 }
