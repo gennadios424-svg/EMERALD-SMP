@@ -3,214 +3,148 @@ package net.emeraldsmp.drill;
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.*;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
-import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
-import java.io.File;
-import java.io.IOException;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public final class DrillManager implements Listener {
-    private static final String TITLE="§2§l💚 EMERALD MINER";
     private final EmeraldSMP plugin;
-    private final File file;
-    private final Map<UUID,Stats> stats=new HashMap<>();
-    private final NamespacedKey toolKey,expiresKey;
+    private final NamespacedKey toolKey,expiresKey,progressKey,targetKey;
     private final Random random=new Random();
-
+    private static final DateTimeFormatter EXPIRY=DateTimeFormatter.ofPattern("MMM d, HH:mm").withZone(ZoneId.systemDefault());
     public enum Tool { ORIGINAL_DRILL, EMERALD_GAINER }
-    public static final class Stats {
-        int tier=1; long level=1,xp=0,totalBlocks=0,originalBlocks=0,gainerBlocks=0,shardsEarned=0,shardTriggers=0,gainerProgress=0,gainerTarget=0;
-    }
+
     public DrillManager(EmeraldSMP plugin){
-        this.plugin=plugin; file=new File(plugin.getDataFolder(),"drills.yml");
-        toolKey=new NamespacedKey(plugin,"emerald-miner-tool"); expiresKey=new NamespacedKey(plugin,"emerald-miner-expires");
+        this.plugin=plugin;
+        toolKey=new NamespacedKey(plugin,"emerald-miner-tool");
+        expiresKey=new NamespacedKey(plugin,"emerald-miner-expires");
+        progressKey=new NamespacedKey(plugin,"emerald-gainer-progress");
+        targetKey=new NamespacedKey(plugin,"emerald-gainer-target");
     }
-    public void load(){
-        stats.clear(); if(!file.exists()) return;
-        YamlConfiguration y=YamlConfiguration.loadConfiguration(file); ConfigurationSection root=y.getConfigurationSection("players");
-        if(root==null)return;
-        for(String id:root.getKeys(false))try{
-            UUID u=UUID.fromString(id); Stats s=new Stats(); String p="players."+id;
-            s.tier=Math.max(1,y.getInt(p+".tier",1)); s.level=Math.max(1,y.getLong(p+".level",1)); s.xp=Math.max(0,y.getLong(p+".xp",0));
-            s.totalBlocks=Math.max(0,y.getLong(p+".total-blocks",0)); s.originalBlocks=Math.max(0,y.getLong(p+".original-blocks",0));
-            s.gainerBlocks=Math.max(0,y.getLong(p+".gainer-blocks",0)); s.gainerProgress=Math.max(0,y.getLong(p+".gainer-progress",0)); s.gainerTarget=Math.max(0,y.getLong(p+".gainer-target",0)); s.shardsEarned=Math.max(0,y.getLong(p+".shards-earned",0)); s.shardTriggers=Math.max(0,y.getLong(p+".shard-triggers",0));
-            stats.put(u,s);
-        }catch(Exception ignored){}
-    }
-    public void save(){
-        YamlConfiguration y=new YamlConfiguration();
-        for(var e:stats.entrySet()){String p="players."+e.getKey();Stats s=e.getValue();
-            y.set(p+".tier",s.tier);y.set(p+".level",s.level);y.set(p+".xp",s.xp);y.set(p+".total-blocks",s.totalBlocks);
-            y.set(p+".original-blocks",s.originalBlocks);y.set(p+".gainer-blocks",s.gainerBlocks);y.set(p+".gainer-progress",s.gainerProgress);y.set(p+".gainer-target",s.gainerTarget);y.set(p+".shards-earned",s.shardsEarned);y.set(p+".shard-triggers",s.shardTriggers);
-        }
-        try{y.save(file);}catch(IOException ex){plugin.getLogger().warning("Could not save drills.yml: "+ex.getMessage());}
-    }
-    public void stop(){save();}
+    public void load(){}
+    public void stop(){}
 
     public ItemStack createItem(Tool tool,int tier){
-        tier=Math.max(1,Math.min(5,tier)); ItemStack i=new ItemStack(Material.DIAMOND_PICKAXE); ItemMeta m=i.getItemMeta();
-        String name=tool==Tool.ORIGINAL_DRILL?"§a⛏️ ORIGINAL DRILL":"§a💚 EMERALD GAINER";
-        m.setDisplayName(name+" §fTier "+roman(tier));
-        long exp=System.currentTimeMillis()+Math.max(1,plugin.getConfig().getLong("emerald-miner.expiration-days",7))*86400000L;
+        ItemStack item=new ItemStack(Material.DIAMOND_PICKAXE);
+        ItemMeta meta=item.getItemMeta();
+        long exp=System.currentTimeMillis()+7L*24L*60L*60L*1000L;
+        meta.setDisplayName(tool==Tool.ORIGINAL_DRILL?"§a⛏️ ORIGINAL DRILL":"§a💚 EMERALD GAINER");
         List<String> lore=new ArrayList<>();
-        if(tool==Tool.ORIGINAL_DRILL){lore.add("§7💚 EMERALD MINER");lore.add("§f3×3 Mining Tool");lore.add("§7⛏ Mines a 3×3 area");lore.add("§7🏗 Designed for Digouts");}
-        else {lore.add("§7💚 EMERALD MINER");lore.add("§fShard-farming pickaxe");lore.add("§7💚 Earn Emerald Shards while mining");lore.add("§7🎲 Random trigger: §f1–32 blocks");lore.add("§7💎 Reward: §f1–5 Emerald Shards");}
-        lore.add("§7⏳ Expires In: §f"+remaining(exp)); lore.add("§8Emerald SMP");
-        m.setLore(lore); m.getPersistentDataContainer().set(toolKey,PersistentDataType.STRING,tool.name()); m.getPersistentDataContainer().set(expiresKey,PersistentDataType.LONG,exp); i.setItemMeta(m); return i;
+        if(tool==Tool.ORIGINAL_DRILL){
+            lore.add("§f3×3 Digout Pickaxe");
+            lore.add("§7⛏ Mines a 3×3 area");
+            lore.add("§7🏗 Designed for Digouts");
+        }else{
+            lore.add("§fNormal Mining Pickaxe");
+            lore.add("§7💚 Mines blocks for Emerald Shards");
+            lore.add("§7🎲 Random Trigger: §f1–32 Blocks");
+            lore.add("§7💎 Reward: §f1–5 Emerald Shards");
+            int target=random.nextInt(32)+1;
+            meta.getPersistentDataContainer().set(progressKey,PersistentDataType.INTEGER,0);
+            meta.getPersistentDataContainer().set(targetKey,PersistentDataType.INTEGER,target);
+            lore.add("§7🎯 Current Progress: §f0/"+target);
+        }
+        lore.add("§7⏳ Expires: §f"+EXPIRY.format(Instant.ofEpochMilli(exp)));
+        lore.add("§7⏱ Remaining: §f7d 0h");
+        lore.add("§8Emerald SMP");
+        meta.setLore(lore);
+        meta.getPersistentDataContainer().set(toolKey,PersistentDataType.STRING,tool.name());
+        meta.getPersistentDataContainer().set(expiresKey,PersistentDataType.LONG,exp);
+        item.setItemMeta(meta);
+        return item;
     }
     public ItemStack createItem(int tier){return createItem(Tool.ORIGINAL_DRILL,tier);}
-    private Tool tool(ItemStack i){
-        if(i==null||i.getType()!=Material.DIAMOND_PICKAXE||!i.hasItemMeta())return null;
-        String v=i.getItemMeta().getPersistentDataContainer().get(toolKey,PersistentDataType.STRING); if(v==null)return null;
+
+    private Tool tool(ItemStack item){
+        if(item==null||item.getType()!=Material.DIAMOND_PICKAXE||!item.hasItemMeta())return null;
+        String v=item.getItemMeta().getPersistentDataContainer().get(toolKey,PersistentDataType.STRING);
+        if(v==null)return null;
         try{return Tool.valueOf(v);}catch(Exception e){return null;}
     }
-    private long expires(ItemStack i){return i==null||!i.hasItemMeta()?0:i.getItemMeta().getPersistentDataContainer().getOrDefault(expiresKey,PersistentDataType.LONG,0L);}
-    private boolean expired(ItemStack i){return expires(i)>0&&System.currentTimeMillis()>=expires(i);}
-    private void expiredMessage(Player p,Tool t){p.sendMessage(ChatColor.RED+"❌ Your "+(t==Tool.ORIGINAL_DRILL?"Original Drill":"Emerald Gainer")+" has expired!");}
+    private long expires(ItemStack item){
+        if(item==null||!item.hasItemMeta())return 0;
+        return item.getItemMeta().getPersistentDataContainer().getOrDefault(expiresKey,PersistentDataType.LONG,0L);
+    }
+    private boolean expired(ItemStack item){return expires(item)>0&&System.currentTimeMillis()>=expires(item);}
 
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void breakBlock(BlockBreakEvent e){
-        Player p=e.getPlayer(); ItemStack held=p.getInventory().getItemInMainHand(); Tool t=tool(held); if(t==null)return;
-        if(expired(held)){e.setCancelled(true);expiredMessage(p,t);return;}
-        if(t==Tool.EMERALD_GAINER){e.setCancelled(true);mineGainer(p,e.getBlock(),held);return;}
-        e.setCancelled(true);mineDrill(p,e.getBlock(),held);
+        Player p=e.getPlayer(); ItemStack held=p.getInventory().getItemInMainHand(); Tool t=tool(held);
+        if(t==null)return;
+        if(expired(held)){
+            e.setCancelled(true);
+            p.sendMessage(ChatColor.RED+"❌ Your "+(t==Tool.ORIGINAL_DRILL?"Original Drill":"Emerald Gainer")+" has expired!");
+            return;
+        }
+        if(t==Tool.EMERALD_GAINER) mineGainer(p,e.getBlock(),held);
+        else {e.setCancelled(true);mineDrill(p,e.getBlock(),held);}
     }
+
     private void mineDrill(Player p,Block origin,ItemStack tool){
-        if(!isMineable(origin.getType()))return;
-        BlockFaceBasis basis=BlockFaceBasis.of(p);
+        if(!mineable(origin))return;
+        Basis b=Basis.forPlayer(p);
         List<Block> blocks=new ArrayList<>();
-        for(int a=-1;a<=1;a++)for(int b=-1;b<=1;b++){
-            Block target=origin.getRelative(basis.u[0]*a+basis.v[0]*b,basis.u[1]*a+basis.v[1]*b,basis.u[2]*a+basis.v[2]*b);
-            if(isMineable(target.getType()))blocks.add(target);
+        for(int a=-1;a<=1;a++)for(int c=-1;c<=1;c++){
+            Block target=origin.getRelative(b.u[0]*a+b.v[0]*c,b.u[1]*a+b.v[1]*c,b.u[2]*a+b.v[2]*c);
+            if(mineable(target))blocks.add(target);
         }
-        for(Block b:blocks)b.breakNaturally(tool);
-        recordMine(p,Tool.ORIGINAL_DRILL,blocks.size());
+        for(Block block:blocks)block.breakNaturally(tool);
     }
-    private void mineGainer(Player p,Block origin,ItemStack tool){
-        if(!isMineable(origin.getType()))return;
-        origin.breakNaturally(tool); recordMine(p,Tool.EMERALD_GAINER,1);
-    }
-    private static final class BlockFaceBasis{
-        int[] u,v; BlockFaceBasis(int[]u,int[]v){this.u=u;this.v=v;}
-        static BlockFaceBasis of(Player p){
-            float pitch=p.getLocation().getPitch(); float yaw=p.getLocation().getYaw();
-            if(Math.abs(pitch)>60) return new BlockFaceBasis(new int[]{1,0,0},new int[]{0,0,1});
-            int dir=Math.floorMod((int)Math.floor((yaw+45)/90),4);
-            return switch(dir){case 0,2->new BlockFaceBasis(new int[]{0,1,0},new int[]{1,0,0});default->new BlockFaceBasis(new int[]{0,1,0},new int[]{0,0,1});};
-        }
-    }
-    private String roman(int n){return switch(n){case 1->"I";case 2->"II";case 3->"III";case 4->"IV";case 5->"V";default->Integer.toString(n);};}
-    private String remaining(long exp){long ms=Math.max(0,exp-System.currentTimeMillis());long sec=ms/1000;long days=sec/86400;sec%=86400;long h=sec/3600;sec%=3600;long m=sec/60;sec%=60;return days+"d "+h+"h "+m+"m "+sec+"s";}
-    private boolean isMineable(Material m){return m!=Material.AIR&&!m.isAir()&&m!=Material.WATER&&m!=Material.LAVA&&m!=Material.BEDROCK&&m!=Material.BARRIER&&m!=Material.END_PORTAL&&m!=Material.END_GATEWAY;}
-    private long xpRequired(long level,int tier){long base=Math.max(1,plugin.getConfig().getLong("emerald-miner.blocks-per-level",100));return base*Math.max(1,tier)+Math.max(0,level-1)*10;}
-    public void open(Player p){
-        Inventory inv=Bukkit.createInventory(null,27,TITLE);
-        Stats s=stats.computeIfAbsent(p.getUniqueId(),k->new Stats());
 
-        if (p.hasPermission("emerald.admin")) {
-            ItemStack drill=createItem(Tool.ORIGINAL_DRILL,s.tier);
-            ItemMeta dm=drill.getItemMeta();
-            dm.setLore(List.of(
-                    "§a⛏️ Original Drill",
-                    "§f3×3 mining / digout tool",
-                    "§7Tier: §f"+s.tier,
-                    "§7Blocks mined: §f"+s.originalBlocks,
-                    "§7Expiration is stored on the actual tool"
-            ));
-            drill.setItemMeta(dm);
-
-            ItemStack gainer=createItem(Tool.EMERALD_GAINER,s.tier);
-            ItemMeta gm=gainer.getItemMeta();
-            gm.setLore(List.of(
-                    "§a💚 Emerald Gainer",
-                    "§fNormal mining + shard triggers",
-                    "§7Tier: §f"+s.tier,
-                    "§7Progress: §f"+s.gainerProgress+"/"+Math.max(1,s.gainerTarget),
-                    "§7Shards earned: §f"+s.shardsEarned
-            ));
-            gainer.setItemMeta(gm);
-
-            ItemStack tiers=new ItemStack(Material.EMERALD);
-            ItemMeta tm=tiers.getItemMeta();
-            tm.setDisplayName("§a§l📈 ALL TIERS");
-            List<String> tl=new ArrayList<>();
-            tl.add("§7Current Tier: §f"+s.tier);
-            for(int tier=1;tier<=5;tier++) tl.add("§8• §fTier "+roman(tier)+" §7"+(tier==s.tier?"(current)":""));
-            tl.add("§7Level: §f"+s.level);
-            tl.add("§7XP: §f"+s.xp);
-            tiers.setItemMeta(tm);
-            tm.setLore(tl);
-            tiers.setItemMeta(tm);
-
-            ItemStack statsItem=new ItemStack(Material.PAPER);
-            ItemMeta sm=statsItem.getItemMeta();
-            sm.setDisplayName("§a§l📊 STATISTICS");
-            sm.setLore(List.of(
-                    "§7Total Blocks: §f"+s.totalBlocks,
-                    "§7Original Drill Blocks: §f"+s.originalBlocks,
-                    "§7Gainer Blocks: §f"+s.gainerBlocks,
-                    "§7Shard Triggers: §f"+s.shardTriggers,
-                    "§7Shards Earned: §f"+s.shardsEarned,
-                    "§7Current Gainer Target: §f"+Math.max(1,s.gainerTarget)
-            ));
-            statsItem.setItemMeta(sm);
-
-            inv.setItem(10,drill);
-            inv.setItem(12,tiers);
-            inv.setItem(14,statsItem);
-            inv.setItem(16,gainer);
-        } else {
-            ItemStack statsItem=new ItemStack(Material.EMERALD);
-            ItemMeta im=statsItem.getItemMeta();
-            im.setDisplayName("§a§l📊 YOUR STATISTICS");
-            im.setLore(List.of(
-                    "§7⛏️ Blocks Mined: §f"+s.totalBlocks,
-                    "§7💚 Shards Earned: §f"+s.shardsEarned,
-                    "§7🎯 Shard Triggers: §f"+s.shardTriggers
-            ));
-            statsItem.setItemMeta(im);
-            inv.setItem(13,statsItem);
-        }
-
-        p.openInventory(inv);
-    }
-    private void recordMine(Player p,Tool t,int blocks){
-        if(blocks<=0)return; Stats s=stats.computeIfAbsent(p.getUniqueId(),k->new Stats()); s.totalBlocks+=blocks;
-        if(t==Tool.ORIGINAL_DRILL)s.originalBlocks+=blocks; else {s.gainerBlocks+=blocks; gainerReward(p,s);}
-        long xp=plugin.getConfig().getLong("emerald-miner.xp-per-block",1); s.xp+=xp*blocks; long req=xpRequired(s.level,s.tier);
-        while(s.xp>=req){s.xp-=req;s.level++;if(s.level>plugin.getConfig().getLong("emerald-miner.levels-per-tier",10)&&s.tier<5){s.tier++;s.level=1;}}
-        save();
-    }
-    private int weightedShardReward(Random rng){
-        int roll=rng.nextInt(100);
-        if(roll<40)return 1;       // 40%
-        if(roll<70)return 2;       // 20%
-        if(roll<85)return 3;       // 15%
-        if(roll<95)return 4;       // 10%
-        return 5;                  // 5%
-    }
-    private void gainerReward(Player p,Stats s){
-        long min=Math.max(1,plugin.getConfig().getLong("emerald-miner.gainer.min-blocks",1));
-        long max=Math.max(min,plugin.getConfig().getLong("emerald-miner.gainer.max-blocks",128));
-        if(s.gainerTarget<=0)s.gainerTarget=min+random.nextLong(max-min+1);
-        s.gainerProgress++;
-        if(s.gainerProgress>=s.gainerTarget){
-            int lo=(int)Math.max(1,plugin.getConfig().getLong("emerald-miner.gainer.min-shards",1));
-            int hi=(int)Math.max(lo,plugin.getConfig().getLong("emerald-miner.gainer.max-shards",5));
-            int reward=weightedShardReward(random);
-            s.shardsEarned+=reward;s.shardTriggers++; s.gainerProgress=0;s.gainerTarget=min+random.nextLong(max-min+1);
-            UUID u=p.getUniqueId();long cur=plugin.getPlayerDataManager().getEmeraldShards(u);
-            plugin.getPlayerDataManager().setEmeraldShards(u,cur+reward);
+    private void mineGainer(Player p,Block block,ItemStack tool){
+        if(!mineable(block))return;
+        block.breakNaturally(tool);
+        ItemMeta meta=tool.getItemMeta(); var pdc=meta.getPersistentDataContainer();
+        int progress=pdc.getOrDefault(progressKey,PersistentDataType.INTEGER,0)+1;
+        int target=pdc.getOrDefault(targetKey,PersistentDataType.INTEGER,random.nextInt(32)+1);
+        if(progress>=target){
+            int roll=random.nextInt(100);
+            int reward=roll<40?1:roll<60?2:roll<75?3:roll<85?4:5;
+            long cur=plugin.getPlayerDataManager().getEmeraldShards(p.getUniqueId());
+            plugin.getPlayerDataManager().setEmeraldShards(p.getUniqueId(),cur+reward);
             p.sendMessage(ChatColor.GREEN+"💚 +"+reward+" Emerald Shards");
+            progress=0; target=random.nextInt(32)+1;
         }
-    }}
+        pdc.set(progressKey,PersistentDataType.INTEGER,progress);
+        pdc.set(targetKey,PersistentDataType.INTEGER,target);
+        updateLore(meta,target,progress);
+        tool.setItemMeta(meta);
+    }
+
+    private void updateLore(ItemMeta meta,int target,int progress){
+        long exp=meta.getPersistentDataContainer().getOrDefault(expiresKey,PersistentDataType.LONG,0L);
+        meta.setLore(List.of(
+            "§fNormal Mining Pickaxe",
+            "§7💚 Mines blocks for Emerald Shards",
+            "§7🎲 Random Trigger: §f1–32 Blocks",
+            "§7💎 Reward: §f1–5 Emerald Shards",
+            "§7🎯 Current Progress: §f"+progress+"/"+target,
+            "§7⏳ Expires: §f"+EXPIRY.format(Instant.ofEpochMilli(exp)),
+            "§7⏱ Remaining: §f"+remaining(exp),
+            "§8Emerald SMP"
+        ));
+    }
+    private String remaining(long exp){
+        long s=Math.max(0,(exp-System.currentTimeMillis())/1000); long d=s/86400; s%=86400; long h=s/3600;
+        return d+"d "+h+"h";
+    }
+    private boolean mineable(Block b){
+        Material m=b.getType();
+        return !m.isAir()&&m!=Material.WATER&&m!=Material.LAVA&&m!=Material.BEDROCK&&m!=Material.BARRIER&&m!=Material.END_PORTAL&&m!=Material.END_GATEWAY;
+    }
+    private static final class Basis{
+        final int[] u,v; Basis(int[]u,int[]v){this.u=u;this.v=v;}
+        static Basis forPlayer(Player p){
+            float pitch=p.getLocation().getPitch(),yaw=p.getLocation().getYaw();
+            if(Math.abs(pitch)>60)return new Basis(new int[]{1,0,0},new int[]{0,0,1});
+            int dir=Math.floorMod((int)Math.floor((yaw+45)/90),4);
+            return switch(dir){case 0,2->new Basis(new int[]{0,1,0},new int[]{1,0,0});default->new Basis(new int[]{0,1,0},new int[]{0,0,1});};
+        }
+    }
+}
