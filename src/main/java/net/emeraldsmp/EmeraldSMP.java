@@ -40,7 +40,7 @@ import java.util.logging.Level;
 
 public final class EmeraldSMP extends JavaPlugin {
     private ConfigManager configManager; private MessageService messageService; private PlayerDataManager playerDataManager; private EconomyManager economyManager;
-    private ShopManager shopManager; private CleanSellManager cleanSellManager; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
+    private ShopManager shopManager; private SellMenu sellMenu; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
     private AuctionManager auctionManager; private HomeCommand homeCommand; private AfkManager afkManager; private TeamManager teamManager; private TagsManager tagsManager;
     private SpawnerManager spawnerManager; private DrillManager drillManager; private CrateManager crateManager; private LagCleaner lagCleaner; private RoleManager roleManager; private KitsManager kitsManager;
     private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager; private KeyAllManager keyAllManager; private TpaManager tpaManager; private CombatManager combatManager; private LiveManager liveManager; private TpaUpgradeManager tpaUpgradeManager;
@@ -48,7 +48,7 @@ public final class EmeraldSMP extends JavaPlugin {
     @Override public void onEnable() {
         try {
             configManager=new ConfigManager(this);configManager.load(); messageService=new MessageService(this);
-            playerDataManager=new PlayerDataManager(this);playerDataManager.initialize(); economyManager=new EconomyManager(this); shopManager=new ShopManager(this); cleanSellManager=new CleanSellManager(this);
+            playerDataManager=new PlayerDataManager(this);playerDataManager.initialize(); economyManager=new EconomyManager(this); shopManager=new ShopManager(this); sellMenu=new SellMenu(this);
             worthManager=new WorthManager(this);worthManager.load(); afkManager=new AfkManager(this);
             teamManager=new TeamManager(this);teamManager.load(); tagsManager=new TagsManager(this);tagsManager.load();
             roleManager=new RoleManager(this);roleManager.load(); spawnerManager=new SpawnerManager(this);spawnerManager.load();
@@ -58,7 +58,7 @@ public final class EmeraldSMP extends JavaPlugin {
 
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
             register("balance",new BalanceCommand(this),null);register("pay",new PayCommand(this),null);
-            EcoCommand eco=new EcoCommand(this);register("eco",eco,eco);register("shop",new ShopCommand(this),null);register("sell",cleanSellManager,null);
+            EcoCommand eco=new EcoCommand(this);register("eco",eco,eco);register("shop",new ShopCommand(this),null);SellCommand sellCommand=new SellCommand(sellMenu);register("sell",sellCommand,null);
             WorthCommand worth=new WorthCommand(this);register("worth",worth,worth);rtpCommand=new RtpCommand(this);register("rtp",rtpCommand,null);SpawnCommand spawnCommand=new SpawnCommand(this);register("spawn",spawnCommand,null);register("setspawn",spawnCommand,null);
             CoinFlipCommand cf=new CoinFlipCommand(this);register("cf",cf,null);
             auctionManager=new AuctionManager(this);AuctionCommand ah=new AuctionCommand(this,auctionManager);register("ah",ah,null);
@@ -77,7 +77,7 @@ public final class EmeraldSMP extends JavaPlugin {
             tpaManager=new TpaManager(this); tpaUpgradeManager=new TpaUpgradeManager(this); register("tpa",tpaUpgradeManager.command(TpaUpgradeManager.Mode.TPA),null); register("tpahere",tpaUpgradeManager.command(TpaUpgradeManager.Mode.TPAHERE),null); register("tpaccept",tpaUpgradeManager.command(TpaUpgradeManager.Mode.ACCEPT),null); register("tpdeny",tpaUpgradeManager.command(TpaUpgradeManager.Mode.DENY),null); getServer().getPluginManager().registerEvents(tpaUpgradeManager,this);
             register("tphere",staffCommand,null); register("kick",staffCommand,null); register("ban",staffCommand,null); register("ipban",staffCommand,null); register("unban",staffCommand,null); register("ipunban",staffCommand,null);
 
-            getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);getServer().getPluginManager().registerEvents(new ShopListener(this),this);
+            getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);getServer().getPluginManager().registerEvents(new ShopListener(this),this);getServer().getPluginManager().registerEvents(sellMenu,this);
             worthListener=new WorthListener(this);getServer().getPluginManager().registerEvents(worthListener,this);getServer().getPluginManager().registerEvents(rtpCommand,this);
             getServer().getPluginManager().registerEvents(cf,this);getServer().getPluginManager().registerEvents(ah,this);
             getServer().getPluginManager().registerEvents(homeCommand,this);getServer().getPluginManager().registerEvents(new AfkListener(afkManager),this);
@@ -91,10 +91,10 @@ public final class EmeraldSMP extends JavaPlugin {
         } catch(Exception ex){getLogger().log(Level.SEVERE,"ERROR: EmeraldSMP could not start safely.",ex);getServer().getPluginManager().disablePlugin(this);}
     }
     private void register(String n,org.bukkit.command.CommandExecutor e,org.bukkit.command.TabCompleter t){PluginCommand c=getCommand(n);if(c==null)throw new IllegalStateException("Command '"+n+"' is missing from plugin.yml");c.setExecutor(e);if(t!=null)c.setTabCompleter(t);}
-    @Override public void onDisable(){if(combatManager!=null)combatManager.disable();if(tpaUpgradeManager!=null)tpaUpgradeManager.shutdown();if(keyAllManager!=null)keyAllManager.stop();if(serverUI!=null)serverUI.stop();if(afkManager!=null)afkManager.stop();if(cleanSellManager!=null)cleanSellManager.disable();if(spawnerManager!=null)spawnerManager.stop();if(drillManager!=null)drillManager.stop();if(crateManager!=null)crateManager.stop();if(investmentManager!=null)investmentManager.stop();if(liveManager!=null)liveManager.disable();if(teamManager!=null)teamManager.save();if(tagsManager!=null)tagsManager.save();if(roleManager!=null)roleManager.save();if(kitsManager!=null)kitsManager.save();if(playerDataManager!=null)playerDataManager.shutdown();getLogger().info("EmeraldSMP has been disabled.");}
+    @Override public void onDisable(){if(combatManager!=null)combatManager.disable();if(tpaUpgradeManager!=null)tpaUpgradeManager.shutdown();if(keyAllManager!=null)keyAllManager.stop();if(serverUI!=null)serverUI.stop();if(afkManager!=null)afkManager.stop();if(sellMenu!=null)sellMenu.disable();if(spawnerManager!=null)spawnerManager.stop();if(drillManager!=null)drillManager.stop();if(crateManager!=null)crateManager.stop();if(investmentManager!=null)investmentManager.stop();if(liveManager!=null)liveManager.disable();if(teamManager!=null)teamManager.save();if(tagsManager!=null)tagsManager.save();if(roleManager!=null)roleManager.save();if(kitsManager!=null)kitsManager.save();if(playerDataManager!=null)playerDataManager.shutdown();getLogger().info("EmeraldSMP has been disabled.");}
     public void beginWorthSearch(Player p){if(worthListener!=null)worthListener.beginSearch(p);}
     public ConfigManager getConfigManager(){return configManager;} public MessageService getMessageService(){return messageService;} public PlayerDataManager getPlayerDataManager(){return playerDataManager;}
-    public EconomyManager getEconomyManager(){return economyManager;} public ShopManager getShopManager(){return shopManager;} public CleanSellManager getCleanSellManager(){return cleanSellManager;} public WorthManager getWorthManager(){return worthManager;} public AuctionManager getAuctionManager(){return auctionManager;}
+    public EconomyManager getEconomyManager(){return economyManager;} public ShopManager getShopManager(){return shopManager;} public SellMenu getSellMenu(){return sellMenu;} public WorthManager getWorthManager(){return worthManager;} public AuctionManager getAuctionManager(){return auctionManager;}
     public AfkManager getAfkManager(){return afkManager;} public TeamManager getTeamManager(){return teamManager;} public TagsManager getTagsManager(){return tagsManager;} public SpawnerManager getSpawnerManager(){return spawnerManager;}
     public DrillManager getDrillManager(){return drillManager;} public CrateManager getCrateManager(){return crateManager;} public RoleManager getRoleManager(){return roleManager;} public KitsManager getKitsManager(){return kitsManager;} public ServerUI getServerUI(){return serverUI;} public InvestmentManager getInvestmentManager(){return investmentManager;} public SusListManager getSusListManager(){return susListManager;} public KeyAllManager getKeyAllManager(){return keyAllManager;} public TpaManager getTpaManager(){return tpaManager;} public CombatManager getCombatManager(){return combatManager;} public LiveManager getLiveManager(){return liveManager;}
 }
