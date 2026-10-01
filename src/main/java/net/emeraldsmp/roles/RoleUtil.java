@@ -5,29 +5,34 @@ import org.bukkit.entity.Player;
 
 public final class RoleUtil {
     private RoleUtil() {}
+
     public static String role(Player player) {
-        if (player.hasPermission("emerald.owner")) return "OWNER";
-        if (player.hasPermission("emerald.dev")) return "DEV";
-        if (player.hasPermission("emerald.mod")) return "MOD";
-        if (player.hasPermission("emerald.media")) return "MEDIA";
-        return "PLAYER";
+        return "MEMBER";
     }
-    public static String rolePrefix(Player player) {
-        return switch (role(player)) {
-            case "OWNER" -> ChatColor.GOLD + "👑 OWNER ";
-            case "DEV" -> ChatColor.AQUA + "🛠 DEV ";
-            case "MOD" -> ChatColor.RED + "🛡 MOD ";
-            case "MEDIA" -> ChatColor.LIGHT_PURPLE + "🎥 MEDIA ";
-            default -> ChatColor.GREEN + "💚 PLAYER ";
-        };
+
+    public static String role(Player player, RoleManager manager) {
+        return manager.get(player).label();
     }
-    public static String roleLabel(Player player) {
-        return switch (role(player)) {
-            case "OWNER" -> ChatColor.GOLD + "👑 OWNER";
-            case "DEV" -> ChatColor.AQUA + "🛠 DEV";
-            case "MOD" -> ChatColor.RED + "🛡 MOD";
-            case "MEDIA" -> ChatColor.LIGHT_PURPLE + "🎥 MEDIA";
-            default -> ChatColor.GREEN + "💚 PLAYER";
+
+    public static String rolePrefix(Player player, RoleManager manager) {
+        RoleManager.Role r=manager.get(player);
+        return r.color()+r.label()+" ";
+    }
+
+    public static String roleLabel(Player player, RoleManager manager) {
+        RoleManager.Role r=manager.get(player);
+        return r.color()+r.label();
+    }
+
+    public static String tabName(Player player, RoleManager manager) {
+        return rolePrefix(player,manager)+"§f"+player.getName();
+    }
+
+    public static ChatColor chatColor(RoleManager.Role role) {
+        return switch(role){
+            case OWNER->ChatColor.RED; case DEV->ChatColor.AQUA; case MOD->ChatColor.BLUE;
+            case MEDIA->ChatColor.LIGHT_PURPLE; case EMERALD->ChatColor.DARK_GREEN;
+            case MVP->ChatColor.GOLD; case VIP->ChatColor.YELLOW; case MEMBER->ChatColor.GRAY;
         };
     }
 }

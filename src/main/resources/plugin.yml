@@ -1,8 +1,8 @@
 name: EmeraldSMP
-version: '1.4'
+version: '1.5'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
-description: Emerald SMP economy, teams, tags, roles, spawners, drills, worth, shop, RTP, orders, coin flips, auction house and homes
+description: Emerald SMP economy, teams, tags, roles, kits, custom spawners, drills, worth, shop, RTP, orders, coin flips, auction house and homes
 commands:
   emerald:
     description: Emerald SMP foundation command
@@ -98,6 +98,14 @@ commands:
     description: Gives a crate key to all online players
     usage: /keyall <type> [amount]
     permission: emerald.admin
+  roles:
+    description: OP-only Emerald SMP role management
+    usage: /roles [set <player> <role>]
+    permission: emerald.roles
+  kits:
+    description: Opens the Emerald SMP kit menu
+    usage: /kits
+    permission: emerald.command
 permissions:
   emerald.command:
     description: Allows use of Emerald SMP commands
@@ -107,18 +115,21 @@ permissions:
     default: op
     children:
       emerald.command: true
+  emerald.roles:
+    description: Role management; OP-only in command and GUI
+    default: op
   emerald.rtp.bypass:
     description: Bypasses the /rtp cooldown
     default: op
   emerald.owner:
-    description: Visual OWNER role only; grants no permissions
+    description: Legacy visual permission; roles now use Emerald role data
     default: false
   emerald.dev:
-    description: Visual DEV role only; grants no permissions
+    description: Legacy visual permission; roles now use Emerald role data
     default: false
   emerald.mod:
-    description: Visual MOD role only; grants no permissions
+    description: Legacy visual permission; roles now use Emerald role data
     default: false
   emerald.media:
-    description: Visual MEDIA role only; grants no permissions
+    description: Legacy visual permission; roles now use Emerald role data
     default: false

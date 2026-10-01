@@ -1,17 +1,17 @@
 package net.emeraldsmp.roles;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
+import net.emeraldsmp.EmeraldSMP;
 import net.kyori.adventure.text.Component;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
+import org.bukkit.event.*;
 
 public final class RoleChatListener implements Listener {
-    @EventHandler(priority = EventPriority.HIGHEST)
+    private final EmeraldSMP plugin;
+    public RoleChatListener(EmeraldSMP plugin){this.plugin=plugin;}
+    @EventHandler(priority=EventPriority.HIGHEST)
     public void onChat(AsyncChatEvent event) {
-        Component prefix = Component.text(strip(RoleUtil.roleLabel(event.getPlayer())) + " ");
+        String prefix=RoleUtil.roleLabel(event.getPlayer(),plugin.getRoleManager());
         event.renderer((source, displayName, message, viewer) ->
-            prefix.append(displayName).append(Component.text(" §8» §f")).append(message));
+            Component.text(prefix+" ").append(displayName).append(Component.text(" §8» §f")).append(message));
     }
-    private String strip(String value) { return value.replaceAll("§[0-9A-FK-ORa-fk-or]", ""); }
 }

@@ -44,6 +44,62 @@ lag-cleaner:
   announce: true
 shop:
   buy-multiplier: 2.5
+kits:
+  member:
+    role: MEMBER
+    cooldown: 24h
+    items:
+      - "BREAD:16"
+      - "IRON_INGOT:8"
+  vip:
+    role: VIP
+    cooldown: 24h
+    items:
+      - "BREAD:24"
+      - "IRON_INGOT:16"
+      - "GOLD_INGOT:4"
+  mvp:
+    role: MVP
+    cooldown: 24h
+    items:
+      - "GOLDEN_APPLE:1"
+      - "DIAMOND:4"
+      - "GOLD_INGOT:16"
+  emerald:
+    role: EMERALD
+    cooldown: 24h
+    items:
+      - "DIAMOND:8"
+      - "EMERALD:8"
+      - "GOLDEN_APPLE:2"
+  media:
+    role: MEDIA
+    cooldown: 24h
+    items:
+      - "DIAMOND:10"
+      - "EMERALD:10"
+      - "GOLDEN_APPLE:2"
+  mod:
+    role: MOD
+    cooldown: 24h
+    items:
+      - "DIAMOND:16"
+      - "EMERALD:16"
+      - "GOLDEN_APPLE:3"
+  dev:
+    role: DEV
+    cooldown: 24h
+    items:
+      - "DIAMOND:24"
+      - "EMERALD:24"
+      - "GOLDEN_APPLE:4"
+  owner:
+    role: OWNER
+    cooldown: 24h
+    items:
+      - "DIAMOND:32"
+      - "EMERALD:32"
+      - "GOLDEN_APPLE:5"
 crates:
   animation:
     common: 35
