@@ -27,7 +27,7 @@ public final class RoleManager {
         private final String description;
 
         Role(String label,String icon,String[] colors,String description,int weight){
-            this.label=label;this.icon=icon;this.colors=colors;this.description=description;
+            this.label=label;this.icon=icon;this.colors=colors;this.description=description;this.weight=weight;
         }
         public String label(){return label;}
         public String icon(){return icon;}
