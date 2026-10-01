@@ -21,8 +21,10 @@ public final class RoleUtil {
         StringBuilder out=new StringBuilder();
         String[] colors=r.colors();
         String text="✦ "+r.icon()+" "+r.label()+" ✦";
-        for(int i=0;i<text.length();i++){
-            int colorIndex=Math.min(colors.length-1,(int)Math.floor((double)i/Math.max(1,text.length-1)*(colors.length-1)));
+        int textLength=text.length();
+        int colorCount=Math.max(1,colors.length);
+        for(int i=0;i<textLength;i++){
+            int colorIndex=Math.min(colorCount-1,(int)Math.floor((double)i/Math.max(1,textLength-1)*(colorCount-1)));
             out.append(legacyHex(colors[colorIndex])).append("§l").append(text.charAt(i));
         }
         return out.toString();
@@ -37,8 +39,10 @@ public final class RoleUtil {
         String text="✦ "+r.icon()+" "+r.label()+" ✦";
         net.kyori.adventure.text.Component out=net.kyori.adventure.text.Component.empty();
         String[] colors=r.colors();
-        for(int i=0;i<text.length();i++){
-            int colorIndex=Math.min(colors.length-1,(int)Math.floor((double)i/Math.max(1,text.length()-1)*(colors.length-1)));
+        int textLength=text.length();
+        int colorCount=Math.max(1,colors.length);
+        for(int i=0;i<textLength;i++){
+            int colorIndex=Math.min(colorCount-1,(int)Math.floor((double)i/Math.max(1,textLength-1)*(colorCount-1)));
             net.kyori.adventure.text.format.TextColor c=net.kyori.adventure.text.format.TextColor.fromHexString(colors[colorIndex]);
             out=out.append(net.kyori.adventure.text.Component.text(String.valueOf(text.charAt(i)))
                     .color(c).decorate(net.kyori.adventure.text.format.TextDecoration.BOLD));
