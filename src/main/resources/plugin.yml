@@ -111,6 +111,27 @@ commands:
     description: Opens the Emerald SMP investment system
     usage: /invest [amount|withdraw]
     permission: emerald.command
+  vanish:
+    description: Toggle Emerald SMP staff vanish
+    usage: /vanish
+  fly:
+    description: Toggle Emerald SMP staff flight
+    usage: /fly
+  tp:
+    description: Instant staff teleport
+    usage: /tp <player>
+  tphere:
+    description: Instantly teleport a player to staff
+    usage: /tphere <player>
+  kick:
+    description: Emerald SMP staff kick
+    usage: /kick <player> [reason]
+  ban:
+    description: Emerald SMP staff ban
+    usage: /ban <player> [reason]
+  ipban:
+    description: OWNER-only Emerald SMP IP ban
+    usage: /ipban <player> [reason]
 permissions:
   emerald.command:
     description: Allows use of Emerald SMP commands
@@ -137,4 +158,7 @@ permissions:
     default: false
   emerald.media:
     description: Legacy visual permission; roles now use Emerald role data
+    default: false
+  emerald.staff:
+    description: Legacy staff node; actual access is enforced by Emerald role data
     default: false
