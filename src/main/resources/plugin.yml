@@ -1,5 +1,5 @@
 name: EmeraldSMP
-version: '1.6'
+version: '1.7'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
 description: Emerald SMP economy, teams, tags, roles, kits, custom spawners, drills, worth, shop, RTP, coin flips, auction house, homes and investments
@@ -29,6 +29,13 @@ commands:
     description: Opens the Emerald SMP sell menu
     usage: /sell
     permission: emerald.command
+  spawn:
+    description: Teleports you to the Emerald SMP spawn
+    usage: /spawn
+    permission: emerald.command
+  setspawn:
+    description: Sets the Emerald SMP spawn location
+    usage: /setspawn
   worth:
     description: Opens the Emerald SMP item worth browser
     usage: /worth [search]

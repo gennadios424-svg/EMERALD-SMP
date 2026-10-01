@@ -4,7 +4,9 @@ import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -22,10 +24,13 @@ public final class CleanSellManager {
     private final Map<UUID, Session> sessions = new HashMap<>();
     private final Set<UUID> transactionLocks = new HashSet<>();
 
-    public CleanSellManager(EmeraldSMP plugin) { this.plugin = plugin; }
+    public CleanSellManager(EmeraldSMP plugin) {
+        this.plugin = plugin;
+    }
 
     public void open(Player player) {
         close(player);
+
         Session session = new Session(UUID.randomUUID());
         Inventory inventory = Bukkit.createInventory(session, 54, "§2§l💚 SELL ITEMS");
         session.inventory = inventory;
@@ -33,21 +38,34 @@ public final class CleanSellManager {
         for (int slot = INPUT_SLOTS; slot < 54; slot++) {
             inventory.setItem(slot, button(Material.GRAY_STAINED_GLASS_PANE, " ", List.of()));
         }
-        inventory.setItem(TOTAL_SLOT, button(Material.EMERALD, "§a§l💵 TOTAL VALUE",
-                List.of("§7Current sell value", "§f$0")));
-        inventory.setItem(SELL_SLOT, button(Material.EMERALD_BLOCK, "§a§l💰 SELL",
-                List.of("§7Sell every valid item in the input area", "", "§e▶ Click to sell")));
-        inventory.setItem(CLOSE_SLOT, button(Material.BARRIER, "§c§l✖ CLOSE",
-                List.of("§7Return unsold items")));
+
+        inventory.setItem(TOTAL_SLOT, button(
+                Material.EMERALD,
+                "§a§l💵 TOTAL VALUE",
+                List.of("§7Current sell value", "§f$0")
+        ));
+        inventory.setItem(SELL_SLOT, button(
+                Material.EMERALD_BLOCK,
+                "§a§l💰 SELL",
+                List.of("§7Sell every valid item in the input area", "", "§e▶ Click to sell")
+        ));
+        inventory.setItem(CLOSE_SLOT, button(
+                Material.BARRIER,
+                "§c§l✖ CLOSE",
+                List.of("§7Return unsold items")
+        ));
 
         sessions.put(player.getUniqueId(), session);
         player.openInventory(inventory);
-        refresh(player, session);
+        refresh(session);
     }
 
     public boolean isOpen(Player player, Inventory inventory) {
-        Session s = sessions.get(player.getUniqueId());
-        return s != null && s.inventory == inventory && s.sessionId != null;
+        Session session = sessions.get(player.getUniqueId());
+        return session != null
+                && session.inventory == inventory
+                && session.sessionId != null
+                && !session.processing;
     }
 
     public boolean isControl(int rawSlot) {
@@ -55,79 +73,158 @@ public final class CleanSellManager {
     }
 
     public void handleClick(Player player, InventoryClickEvent event) {
-        Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.inventory != event.getView().getTopInventory()) return;
+        Session session = sessions.get(player.getUniqueId());
+        if (session == null || session.inventory != event.getView().getTopInventory() || session.processing) {
+            return;
+        }
 
         int raw = event.getRawSlot();
+
+        // Only the nine control slots are protected. The 45 input slots and the
+        // player's inventory are deliberately left as normal Bukkit container slots.
         if (raw >= INPUT_SLOTS && raw < 54) {
             event.setCancelled(true);
-            if (raw == SELL_SLOT) sell(player, s);
-            else if (raw == CLOSE_SLOT) player.closeInventory();
+
+            if (raw == SELL_SLOT) {
+                sell(player, session);
+            } else if (raw == CLOSE_SLOT) {
+                player.closeInventory();
+            }
             return;
         }
 
-        // Never cancel normal container interaction in the input area or the player's inventory.
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            Session current = sessions.get(player.getUniqueId());
-            if (current != null && current == s && player.isOnline()) refresh(player, s);
-        });
-    }
-
-    public void handleDrag(Player player, org.bukkit.event.inventory.InventoryDragEvent event) {
-        Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.inventory != event.getView().getTopInventory()) return;
-        if (event.getRawSlots().stream().anyMatch(slot -> slot >= INPUT_SLOTS && slot < 54)) {
+        // Bukkit can handle ordinary clicks directly. Shift-click from the
+        // player's inventory is handled explicitly so only the 45 sell slots
+        // are considered and no protected button can ever receive an item.
+        if (event.isShiftClick()
+                && event.getClickedInventory() != null
+                && event.getClickedInventory().equals(event.getView().getBottomInventory())
+                && raw >= event.getView().getTopInventory().getSize()) {
             event.setCancelled(true);
+            moveShiftClickedItem(player, session, event.getSlot());
             return;
         }
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            Session current = sessions.get(player.getUniqueId());
-            if (current == s && player.isOnline()) refresh(player, s);
-        });
+
+        refreshNextTick(player, session);
     }
 
-    private void refresh(Player player, Session s) {
-        if (sessions.get(player.getUniqueId()) != s || s.inventory == null) return;
-        long total = 0;
-        for (int slot = 0; slot < INPUT_SLOTS; slot++) {
-            ItemStack item = s.inventory.getItem(slot);
-            if (item == null || item.getType().isAir()) continue;
-            long value = plugin.getWorthManager().sellValue(item.getType(), item.getAmount());
-            if (value > 0) {
-                try { total = Math.addExact(total, value); }
-                catch (ArithmeticException ex) { total = Long.MAX_VALUE; break; }
+    private void moveShiftClickedItem(Player player, Session session, int playerSlot) {
+        if (playerSlot < 0 || playerSlot >= player.getInventory().getSize()) return;
+
+        ItemStack source = player.getInventory().getItem(playerSlot);
+        if (source == null || source.getType().isAir()) return;
+
+        // Shift-click only transfers items that can actually be sold.
+        if (!isSellable(source)) return;
+
+        ItemStack moving = source.clone();
+        Map<Integer, ItemStack> leftovers = session.inventory.addItem(moving);
+
+        int remaining = leftovers.values().stream().mapToInt(ItemStack::getAmount).sum();
+        int moved = source.getAmount() - remaining;
+
+        if (moved <= 0) return;
+
+        if (remaining <= 0) {
+            player.getInventory().setItem(playerSlot, null);
+        } else {
+            ItemStack remainder = source.clone();
+            remainder.setAmount(remaining);
+            player.getInventory().setItem(playerSlot, remainder);
+        }
+
+        refresh(session);
+        player.updateInventory();
+    }
+
+    public void handleDrag(Player player, InventoryDragEvent event) {
+        Session session = sessions.get(player.getUniqueId());
+        if (session == null || session.inventory != event.getView().getTopInventory() || session.processing) {
+            return;
+        }
+
+        // A drag is allowed if every affected top slot is a real sell slot.
+        // Any control-slot involvement cancels the whole drag; player-inventory
+        // slots may participate normally.
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot >= INPUT_SLOTS && rawSlot < event.getView().getTopInventory().getSize()) {
+                event.setCancelled(true);
+                return;
             }
         }
-        s.inventory.setItem(TOTAL_SLOT, button(Material.EMERALD, "§a§l💵 TOTAL VALUE",
-                List.of("§7Current sell value", "§f" + plugin.getEconomyManager().format(total))));
+
+        refreshNextTick(player, session);
     }
 
-    private void sell(Player player, Session s) {
+    private void refreshNextTick(Player player, Session session) {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Session current = sessions.get(player.getUniqueId());
+            if (current == session && player.isOnline() && !session.processing) {
+                refresh(session);
+            }
+        });
+    }
+
+    private void refresh(Session session) {
+        if (session.inventory == null) return;
+
+        long total = 0;
+        for (int slot = 0; slot < INPUT_SLOTS; slot++) {
+            ItemStack item = session.inventory.getItem(slot);
+            if (item == null || item.getType().isAir()) continue;
+
+            try {
+                long value = plugin.getWorthManager().sellValue(item.getType(), item.getAmount());
+                total = Math.addExact(total, value);
+            } catch (ArithmeticException ex) {
+                total = Long.MAX_VALUE;
+                break;
+            }
+        }
+
+        session.inventory.setItem(TOTAL_SLOT, button(
+                Material.EMERALD,
+                "§a§l💵 TOTAL VALUE",
+                List.of("§7Current sell value", "§f" + plugin.getEconomyManager().format(total))
+        ));
+    }
+
+    private boolean isSellable(ItemStack item) {
+        if (item == null || item.getType().isAir()) return false;
+        return plugin.getWorthManager().sellValue(item.getType(), 1) > 0;
+    }
+
+    private void sell(Player player, Session session) {
         UUID uuid = player.getUniqueId();
+
         if (!transactionLocks.add(uuid)) {
             player.sendMessage("§e💰 Sell transaction is already processing.");
             return;
         }
 
         try {
-            if (sessions.get(uuid) != s || s.inventory != player.getOpenInventory().getTopInventory()) return;
+            if (sessions.get(uuid) != session
+                    || session.inventory != player.getOpenInventory().getTopInventory()
+                    || session.processing) {
+                return;
+            }
 
             long total = 0;
             long itemCount = 0;
-            List<Integer> sellSlots = new ArrayList<>();
+            List<Integer> soldSlots = new ArrayList<>();
             List<ItemStack> soldItems = new ArrayList<>();
 
-            // Validate the complete transaction before changing any inventory or balance.
+            // Complete validation pass. Nothing is removed until every sellable
+            // stack has a valid value and the total fits in a long.
             for (int slot = 0; slot < INPUT_SLOTS; slot++) {
-                ItemStack item = s.inventory.getItem(slot);
+                ItemStack item = session.inventory.getItem(slot);
                 if (item == null || item.getType().isAir()) continue;
-
-                var worth = plugin.getWorthManager().get(item.getType());
-                if (worth == null || !worth.enabled() || worth.worth() <= 0) continue;
 
                 long value;
                 try {
                     value = plugin.getWorthManager().sellValue(item.getType(), item.getAmount());
+                    if (value <= 0) continue;
+
                     total = Math.addExact(total, value);
                     itemCount = Math.addExact(itemCount, item.getAmount());
                 } catch (ArithmeticException ex) {
@@ -135,41 +232,60 @@ public final class CleanSellManager {
                     return;
                 }
 
-                if (value > 0) {
-                    sellSlots.add(slot);
-                    soldItems.add(item.clone());
-                }
+                soldSlots.add(slot);
+                soldItems.add(item.clone());
             }
 
-            if (sellSlots.isEmpty() || total <= 0) {
+            if (soldSlots.isEmpty() || total <= 0) {
                 player.sendMessage("§c❌ There are no sellable items in the sell area.");
                 return;
             }
 
-            // Lock the session before the commit. All changes below occur on the server thread.
-            s.processing = true;
-            for (int slot : sellSlots) s.inventory.setItem(slot, null);
+            session.processing = true;
 
-            if (!plugin.getEconomyManager().deposit(uuid, total)) {
-                for (int i = 0; i < sellSlots.size(); i++) {
-                    int slot = sellSlots.get(i);
-                    ItemStack existing = s.inventory.getItem(slot);
-                    if (existing == null || existing.getType().isAir()) s.inventory.setItem(slot, soldItems.get(i));
-                    else {
-                        Map<Integer, ItemStack> left = s.inventory.addItem(soldItems.get(i).clone());
-                        for (ItemStack item : left.values()) player.getWorld().dropItemNaturally(player.getLocation(), item);
+            // Remove only after the full transaction has been validated.
+            for (int slot : soldSlots) {
+                session.inventory.setItem(slot, null);
+            }
+
+            boolean deposited;
+            try {
+                deposited = plugin.getEconomyManager().deposit(uuid, total);
+            } catch (RuntimeException ex) {
+                deposited = false;
+                plugin.getLogger().warning("Sell transaction failed for " + player.getName() + ": " + ex.getMessage());
+            }
+
+            if (!deposited) {
+                for (int i = 0; i < soldSlots.size(); i++) {
+                    int slot = soldSlots.get(i);
+                    ItemStack item = soldItems.get(i).clone();
+                    ItemStack existing = session.inventory.getItem(slot);
+
+                    if (existing == null || existing.getType().isAir()) {
+                        session.inventory.setItem(slot, item);
+                    } else {
+                        Map<Integer, ItemStack> left = session.inventory.addItem(item);
+                        for (ItemStack remaining : left.values()) {
+                            player.getWorld().dropItemNaturally(player.getLocation(), remaining);
+                        }
                     }
                 }
+
+                session.processing = false;
+                refresh(session);
                 player.sendMessage("§cThe economy rejected the transaction. Your items were restored.");
-                s.processing = false;
-                refresh(player, s);
                 return;
             }
 
+            // Commit succeeded. The session is consumed exactly once.
             sessions.remove(uuid);
-            s.processing = false;
-            player.sendMessage("§a💰 Sold §f" + String.format(Locale.US, "%,d", itemCount)
-                    + " §aitems for §f" + plugin.getEconomyManager().format(total) + "§a.");
+            session.processing = false;
+
+            player.sendMessage(
+                    "§a💰 Sold §f" + String.format(Locale.US, "%,d", itemCount)
+                            + " §aitems for §f" + plugin.getEconomyManager().format(total) + "§a."
+            );
             player.closeInventory();
         } finally {
             transactionLocks.remove(uuid);
@@ -178,16 +294,23 @@ public final class CleanSellManager {
 
     public void close(Player player) {
         UUID uuid = player.getUniqueId();
+
         if (transactionLocks.contains(uuid)) return;
-        Session s = sessions.remove(uuid);
-        if (s == null || s.processing || s.inventory == null) return;
-        returnItems(player, s.inventory);
+
+        Session session = sessions.remove(uuid);
+        if (session == null || session.processing || session.inventory == null) return;
+
+        returnItems(player, session.inventory);
     }
 
-    public void quit(Player player) { close(player); }
+    public void quit(Player player) {
+        close(player);
+    }
 
     public void disable() {
-        for (Player player : Bukkit.getOnlinePlayers()) close(player);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            close(player);
+        }
         sessions.clear();
     }
 
@@ -195,9 +318,11 @@ public final class CleanSellManager {
         for (int slot = 0; slot < INPUT_SLOTS; slot++) {
             ItemStack item = inventory.getItem(slot);
             if (item == null || item.getType().isAir()) continue;
+
             inventory.setItem(slot, null);
-            Map<Integer, ItemStack> left = player.getInventory().addItem(item.clone());
-            for (ItemStack remaining : left.values()) {
+
+            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(item.clone());
+            for (ItemStack remaining : leftovers.values()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), remaining);
             }
         }
@@ -206,11 +331,13 @@ public final class CleanSellManager {
     private ItemStack button(Material material, String name, List<String> lore) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
+
         if (meta != null) {
             meta.setDisplayName(name);
             meta.setLore(lore);
             item.setItemMeta(meta);
         }
+
         return item;
     }
 
@@ -219,7 +346,13 @@ public final class CleanSellManager {
         private Inventory inventory;
         private boolean processing;
 
-        private Session(UUID sessionId) { this.sessionId = sessionId; }
-        @Override public Inventory getInventory() { return inventory; }
+        private Session(UUID sessionId) {
+            this.sessionId = sessionId;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
     }
 }
