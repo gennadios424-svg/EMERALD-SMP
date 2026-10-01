@@ -114,7 +114,7 @@ public final class SpawnerManager implements Listener {
         Bukkit.getScheduler().runTask(plugin, this::removeAllHolograms);
     }
 
-    public synchronized void save() {
+    public synchronized boolean save() {
         YamlConfiguration y = new YamlConfiguration();
         for (Data d : spawners.values()) {
             String p = "spawners." + d.key();
@@ -132,7 +132,7 @@ public final class SpawnerManager implements Listener {
                 y.set(p + ".drops-enabled." + key, d.enabled.contains(m));
             }
         }
-        try { y.save(file); } catch (IOException e) { plugin.getLogger().warning("Could not save spawners.yml: " + e.getMessage()); }
+        try { y.save(file); return true; } catch (IOException e) { plugin.getLogger().warning("Could not save spawners.yml: " + e.getMessage()); return false; }
     }
 
     public void start() { task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L); }
