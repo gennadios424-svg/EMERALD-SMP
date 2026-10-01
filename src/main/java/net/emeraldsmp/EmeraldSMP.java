@@ -65,7 +65,7 @@ public final class EmeraldSMP extends JavaPlugin {
             susListManager=new SusListManager(this);
             register("vanish",staffCommand,null); register("fly",staffCommand,null); register("tp",staffCommand,null);
             SusListCommand susListCommand=new SusListCommand(this,susListManager); register("suslist",susListCommand,susListCommand);
-            register("tphere",staffCommand,null); register("kick",staffCommand,null); register("ban",staffCommand,null); register("ipban",staffCommand,null);
+            register("tphere",staffCommand,null); register("kick",staffCommand,null); register("ban",staffCommand,null); register("ipban",staffCommand,null); register("unban",staffCommand,null); register("ipunban",staffCommand,null);
 
             getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);getServer().getPluginManager().registerEvents(new ShopListener(this),this);
             worthListener=new WorthListener(this);getServer().getPluginManager().registerEvents(worthListener,this);getServer().getPluginManager().registerEvents(rtpCommand,this);
