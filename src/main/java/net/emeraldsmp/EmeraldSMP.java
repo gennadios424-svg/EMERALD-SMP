@@ -52,7 +52,7 @@ public final class EmeraldSMP extends JavaPlugin {
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
             register("balance",new BalanceCommand(this),null);register("pay",new PayCommand(this),null);
             EcoCommand eco=new EcoCommand(this);register("eco",eco,eco);register("shop",new ShopCommand(this),null);register("sell",new SellCommand(this),null);
-            WorthCommand worth=new WorthCommand(this);register("worth",worth,worth);rtpCommand=new RtpCommand(this);register("rtp",rtpCommand,null);
+            WorthCommand worth=new WorthCommand(this);register("worth",worth,worth);rtpCommand=new RtpCommand(this);register("rtp",rtpCommand,null);SpawnCommand spawnCommand=new SpawnCommand(this);register("spawn",spawnCommand,null);register("setspawn",spawnCommand,null);
             CoinFlipCommand cf=new CoinFlipCommand(this);register("cf",cf,null);
             auctionManager=new AuctionManager(this);AuctionCommand ah=new AuctionCommand(this,auctionManager);register("ah",ah,null);
             homeCommand=new HomeCommand(this);register("sethome",homeCommand,homeCommand);register("home",homeCommand,homeCommand);register("delhome",homeCommand,homeCommand);
