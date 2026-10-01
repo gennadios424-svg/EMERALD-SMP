@@ -25,9 +25,7 @@ public final class PlayerDataManager {
         if (!dataFolder.exists() && !dataFolder.mkdirs()) throw new IllegalStateException("Could not create player-data directory");
     }
 
-    public synchronized PlayerData loadOrCreate(Player player) {
-        return loadOrCreate(player.getUniqueId(), player.getName());
-    }
+    public synchronized PlayerData loadOrCreate(Player player) { return loadOrCreate(player.getUniqueId(), player.getName()); }
 
     public synchronized PlayerData loadOrCreate(UUID uuid, String username) {
         PlayerData data = loaded.get(uuid);
@@ -44,11 +42,13 @@ public final class PlayerDataManager {
             long firstJoin = yaml.getLong("first-join", System.currentTimeMillis());
             long balance = Math.max(0L, yaml.getLong("balance", plugin.getConfigManager().getConfig().getLong("economy.starting-balance", 0L)));
             long shards = Math.max(0L, yaml.getLong("emerald-shards", 0L));
-            data = new PlayerData(uuid, username == null ? yaml.getString("username", "Unknown") : username, firstJoin, System.currentTimeMillis(), balance, shards);
+            long investment = Math.max(0L, yaml.getLong("investment.amount", 0L));
+            long investmentEarnings = Math.max(0L, yaml.getLong("investment.earnings", 0L));
+            data = new PlayerData(uuid, username == null ? yaml.getString("username", "Unknown") : username, firstJoin, System.currentTimeMillis(), balance, shards, investment, investmentEarnings);
         } else {
             long now = System.currentTimeMillis();
             long starting = Math.max(0L, plugin.getConfigManager().getConfig().getLong("economy.starting-balance", 0L));
-            data = new PlayerData(uuid, username == null ? "Unknown" : username, now, now, starting, 0L);
+            data = new PlayerData(uuid, username == null ? "Unknown" : username, now, now, starting, 0L, 0L, 0L);
         }
 
         loaded.put(uuid, data);
@@ -115,24 +115,15 @@ public final class PlayerDataManager {
     }
 
     private void moveAtomic(File source, File target) throws IOException {
-        try {
-            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException atomicFailure) {
-            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
+        try { Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
+        catch (IOException atomicFailure) { Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING); }
     }
 
     private boolean write(PlayerData data) {
         File target = fileFor(data.getUuid());
         File temp = new File(dataFolder, data.getUuid() + ".tmp");
-        try {
-            writeYaml(data, temp);
-            moveAtomic(temp, target);
-            return true;
-        } catch (IOException failure) {
-            plugin.getLogger().log(Level.SEVERE, "ERROR: Could not save player data for " + data.getUuid() + ".", failure);
-            return false;
-        }
+        try { writeYaml(data, temp); moveAtomic(temp, target); return true; }
+        catch (IOException failure) { plugin.getLogger().log(Level.SEVERE, "ERROR: Could not save player data for " + data.getUuid() + ".", failure); return false; }
     }
 
     private void writeYaml(PlayerData data, File target) throws IOException {
@@ -143,13 +134,12 @@ public final class PlayerDataManager {
         yaml.set("last-seen", data.getLastSeen());
         yaml.set("balance", data.getBalance());
         yaml.set("emerald-shards", data.getEmeraldShards());
+        yaml.set("investment.amount", data.getInvestment());
+        yaml.set("investment.earnings", data.getInvestmentEarnings());
         yaml.save(target);
     }
 
-    public synchronized void shutdown() {
-        for (PlayerData data : loaded.values()) save(data);
-        loaded.clear();
-    }
+    public synchronized void shutdown() { for (PlayerData data : loaded.values()) save(data); loaded.clear(); }
 
     private File fileFor(UUID uuid) { return new File(dataFolder, uuid + ".yml"); }
 }
