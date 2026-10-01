@@ -2,12 +2,8 @@ package net.emeraldsmp.spawner;
 
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.*;
-import org.bukkit.block.Block;
-import org.bukkit.block.BlockState;
-import org.bukkit.block.BlockFace;
-import org.bukkit.block.CreatureSpawner;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
+import org.bukkit.block.*;
+import org.bukkit.entity.*;
 import org.bukkit.event.*;
 import org.bukkit.event.block.*;
 import org.bukkit.event.inventory.*;
@@ -28,13 +24,13 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class SpawnerManager implements Listener {
     public static final String TYPE_SKELETON="skeleton";
     private static final String MAIN="§2§l🧟 SKELETON SPAWNER";
-    private static final String SETTINGS="§2§l⚙ SPAWNER SETTINGS";
-
+    private static final String SETTINGS="§2§l⚙ SKELETON SETTINGS";
     private final EmeraldSMP plugin;
     private final File file;
     private final Map<String,Data> spawners=new ConcurrentHashMap<>();
     private final Map<UUID,String> open=new HashMap<>();
-    private final NamespacedKey typeKey,stackKey;
+    private final Set<String> collecting=ConcurrentHashMap.newKeySet();
+    private final NamespacedKey typeKey,stackKey,hologramKey;
     private BukkitTask task;
 
     public static final class Data {
@@ -45,14 +41,14 @@ public final class SpawnerManager implements Listener {
             this.world=world;this.x=x;this.y=y;this.z=z;this.owner=owner;this.lastCycle=System.currentTimeMillis();
         }
         String key(){return world+":"+x+":"+y+":"+z;}
-        Location loc(){World w=Bukkit.getWorld(world);return w==null?null:new Location(w,x,y,z);}
+        Location loc(){World w=Bukkit.getWorld(world);return w==null?null:new Location(w,x+0.5,y+1.65,z+0.5);}
     }
 
     public SpawnerManager(EmeraldSMP plugin){
-        this.plugin=plugin;
-        this.file=new File(plugin.getDataFolder(),"spawners.yml");
+        this.plugin=plugin;this.file=new File(plugin.getDataFolder(),"spawners.yml");
         this.typeKey=new NamespacedKey(plugin,"emerald-spawner");
         this.stackKey=new NamespacedKey(plugin,"emerald-spawner-stack");
+        this.hologramKey=new NamespacedKey(plugin,"emerald-spawner-hologram");
     }
 
     public void load(){
@@ -66,24 +62,19 @@ public final class SpawnerManager implements Listener {
                 String p="spawners."+k;
                 String owner=y.getString(p+".owner");
                 if(owner==null)continue;
-                Data d=new Data(
-                    y.getString(p+".world","world"),
-                    y.getInt(p+".x"),y.getInt(p+".y"),y.getInt(p+".z"),
-                    UUID.fromString(owner)
-                );
-                d.amount=Math.max(1,Math.min(64,y.getInt(p+".amount",1)));
-                d.bones=Math.max(0,y.getLong(p+".drops.bones",0));
-                d.arrows=Math.max(0,y.getLong(p+".drops.arrows",0));
-                d.bows=Math.max(0,y.getLong(p+".drops.bows",0));
-                d.lastCycle=y.getLong(p+".last-cycle",System.currentTimeMillis());
+                Data d=new Data(y.getString(p+".world","world"),y.getInt(p+".x"),y.getInt(p+".y"),y.getInt(p+".z"),UUID.fromString(owner));
+                d.amount=clamp(y.getInt(p+".amount",1),1,64);
+                d.bones=nonNegative(y.getLong(p+".drops.bones",0));
+                d.arrows=nonNegative(y.getLong(p+".drops.arrows",0));
+                d.bows=nonNegative(y.getLong(p+".drops.bows",0));
+                d.lastCycle=Math.max(0,y.getLong(p+".last-cycle",System.currentTimeMillis()));
                 d.bonesEnabled=y.getBoolean(p+".drops-enabled.bones",true);
                 d.arrowsEnabled=y.getBoolean(p+".drops-enabled.arrows",true);
                 d.bowsEnabled=y.getBoolean(p+".drops-enabled.bows",true);
                 spawners.put(d.key(),d);
-            }catch(Exception ex){
-                plugin.getLogger().warning("Skipped invalid spawner entry: "+k);
-            }
+            }catch(Exception ex){plugin.getLogger().warning("Skipped invalid spawner entry: "+k);}
         }
+        Bukkit.getScheduler().runTask(plugin,this::refreshLoadedHolograms);
     }
 
     public synchronized void save(){
@@ -94,102 +85,89 @@ public final class SpawnerManager implements Listener {
             y.set(p+".owner",d.owner.toString());y.set(p+".amount",d.amount);
             y.set(p+".drops.bones",d.bones);y.set(p+".drops.arrows",d.arrows);y.set(p+".drops.bows",d.bows);
             y.set(p+".last-cycle",d.lastCycle);
-            y.set(p+".drops-enabled.bones",d.bonesEnabled);
-            y.set(p+".drops-enabled.arrows",d.arrowsEnabled);
-            y.set(p+".drops-enabled.bows",d.bowsEnabled);
+            y.set(p+".drops-enabled.bones",d.bonesEnabled);y.set(p+".drops-enabled.arrows",d.arrowsEnabled);y.set(p+".drops-enabled.bows",d.bowsEnabled);
         }
         try{y.save(file);}catch(IOException e){plugin.getLogger().warning("Could not save spawners.yml: "+e.getMessage());}
     }
 
-    public void start(){
-        task=Bukkit.getScheduler().runTaskTimer(plugin,this::tick,20L,20L);
-    }
-
-    public void stop(){
-        if(task!=null)task.cancel();
-        save();
-    }
+    public void start(){task=Bukkit.getScheduler().runTaskTimer(plugin,this::tick,20L,20L);}
+    public void stop(){if(task!=null)task.cancel();save();}
 
     private void tick(){
         long now=System.currentTimeMillis();
         long interval=Math.max(1000L,plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12L)*1000L);
-        int base=Math.max(1,plugin.getConfig().getInt("spawners.skeleton.amount",8));
+        long base=Math.max(1,plugin.getConfig().getLong("spawners.skeleton.amount",8L));
         boolean changed=false;
         for(Data d:new ArrayList<>(spawners.values())){
+            World w=Bukkit.getWorld(d.world);
+            if(w==null||!w.isChunkLoaded(d.x>>4,d.z>>4))continue;
             long elapsed=Math.max(0,now-d.lastCycle);
-            long cycles=Math.min(100,elapsed/interval);
+            long cycles=elapsed/interval;
             if(cycles<=0)continue;
+            cycles=Math.min(cycles,1000);
             d.lastCycle+=cycles*interval;
-            produce(d,(long)base*Math.max(1,d.amount),cycles);
+            produce(d,safeMultiply(base,d.amount),cycles);
             changed=true;
+            updateHologram(d);
         }
         if(changed)save();
     }
 
     private void produce(Data d,long mobs,long cycles){
-        long total;
-        try{total=Math.multiplyExact(mobs,cycles);}catch(ArithmeticException ex){total=Long.MAX_VALUE;}
+        long total=safeMultiply(mobs,cycles);
         if(total<=0)return;
-        Random random=ThreadLocalRandom.current();
+        Random r=ThreadLocalRandom.current();
         long bones=0,arrows=0,bows=0;
         for(long i=0;i<total;i++){
-            bones+=1+random.nextInt(3);
-            arrows+=1+random.nextInt(3);
-            if(random.nextDouble()<0.085D)bows++;
-            if(bones>Long.MAX_VALUE-3||arrows>Long.MAX_VALUE-3||bows>Long.MAX_VALUE-3)break;
+            bones=safeAdd(bones,1+r.nextInt(3));
+            arrows=safeAdd(arrows,1+r.nextInt(3));
+            if(r.nextDouble()<0.085D)bows=safeAdd(bows,1);
+            if(bones==Long.MAX_VALUE&&arrows==Long.MAX_VALUE&&bows==Long.MAX_VALUE)break;
         }
         if(d.bonesEnabled)d.bones=safeAdd(d.bones,bones);
         if(d.arrowsEnabled)d.arrows=safeAdd(d.arrows,arrows);
         if(d.bowsEnabled)d.bows=safeAdd(d.bows,bows);
     }
 
-    private long safeAdd(long a,long b){
-        if(b<=0)return a;
-        return Long.MAX_VALUE-a<b?Long.MAX_VALUE:a+b;
-    }
+    private long safeAdd(long a,long b){if(b<=0)return Math.max(0,a);return a>Long.MAX_VALUE-b?Long.MAX_VALUE:a+b;}
+    private long safeMultiply(long a,long b){if(a<=0||b<=0)return 0;return a>Long.MAX_VALUE/b?Long.MAX_VALUE:a*b;}
+    private long nonNegative(long n){return Math.max(0,n);}
+    private int clamp(int n,int min,int max){return Math.max(min,Math.min(max,n));}
 
     public ItemStack createItem(int stack){
-        stack=Math.max(1,Math.min(64,stack));
+        stack=clamp(stack,1,64);
         ItemStack item=new ItemStack(Material.SPAWNER);
         ItemMeta m=item.getItemMeta();
-        int rate=plugin.getConfig().getInt("spawners.skeleton.amount",8);
-        long sec=plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12);
-        m.setDisplayName("§a§l🧟 EMERALD SKELETON SPAWNER");
-        m.setLore(List.of(
-            "§7Physical Emerald SMP spawner",
-            "§e⚡ "+rate*stack+" Skeletons §7/ §f"+sec+"s",
-            "§7Stack: §a"+stack+"x",
-            "§8Right-click to manage"
-        ));
+        long rate=safeMultiply(plugin.getConfig().getLong("spawners.skeleton.amount",8L),stack);
+        long sec=Math.max(1,plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12L));
+        m.setDisplayName("§a§l💚 EMERALD SKELETON SPAWNER");
+        m.setLore(List.of("§7Physical Emerald SMP spawner","§e⚡ "+rate+" Skeletons §7/ §f"+sec+"s","§7Stack: §a"+stack+"x","§8Right-click to manage"));
         m.getPersistentDataContainer().set(typeKey,PersistentDataType.STRING,TYPE_SKELETON);
         m.getPersistentDataContainer().set(stackKey,PersistentDataType.INTEGER,stack);
-        item.setItemMeta(m);
-        item.setAmount(1);
-        return item;
+        item.setItemMeta(m);item.setAmount(1);return item;
     }
 
     private boolean isItem(ItemStack i){
         return i!=null&&i.getType()==Material.SPAWNER&&i.hasItemMeta()
-            &&i.getItemMeta().getPersistentDataContainer().has(typeKey,PersistentDataType.STRING);
+                &&TYPE_SKELETON.equals(i.getItemMeta().getPersistentDataContainer().get(typeKey,PersistentDataType.STRING));
     }
-
     private int itemStack(ItemStack i){
         if(!isItem(i))return 1;
         Integer n=i.getItemMeta().getPersistentDataContainer().get(stackKey,PersistentDataType.INTEGER);
-        return Math.max(1,n==null?1:n);
+        return clamp(n==null?1:n,1,64);
     }
-
     private String key(Block b){return b.getWorld().getName()+":"+b.getX()+":"+b.getY()+":"+b.getZ();}
 
-    private void markVanillaSpawner(Data d){
+    private void configurePhysicalSpawner(Data d){
         Location l=d.loc();
         if(l==null||l.getBlock().getType()!=Material.SPAWNER)return;
         BlockState state=l.getBlock().getState();
         if(state instanceof CreatureSpawner cs){
             cs.setSpawnedType(EntityType.SKELETON);
-            cs.setMinSpawnDelay(Integer.MAX_VALUE);
-            cs.setMaxSpawnDelay(Integer.MAX_VALUE);
-            cs.setDelay(Integer.MAX_VALUE);
+            cs.setMinSpawnDelay(2000000000);
+            cs.setMaxSpawnDelay(2000000000);
+            cs.setDelay(2000000000);
+            cs.setMaxNearbyEntities(0);
             cs.update(true,false);
         }
     }
@@ -197,23 +175,31 @@ public final class SpawnerManager implements Listener {
     @EventHandler(priority=EventPriority.HIGHEST)
     public void place(BlockPlaceEvent e){
         if(!isItem(e.getItemInHand())||e.getBlockPlaced().getType()!=Material.SPAWNER)return;
-        Player p=e.getPlayer();Block b=e.getBlockPlaced();int incoming=itemStack(e.getItemInHand());
-        Data existing=null;
-        for(BlockFace face:BlockFace.values()){
-            if(face==BlockFace.SELF)continue;
-            Data candidate=spawners.get(key(b.getRelative(face)));
-            if(candidate!=null&&candidate.owner.equals(p.getUniqueId())){existing=candidate;break;}
-        }
+        Player p=e.getPlayer();Block b=e.getBlockPlaced();
+        int incoming=itemStack(e.getItemInHand());
+        Data existing=findAdjacentOwned(b,p.getUniqueId());
         if(existing!=null){
+            int old=existing.amount;
+            existing.amount=clamp(safeIntAdd(existing.amount,incoming),1,64);
             b.setType(Material.AIR,false);
-            existing.amount=Math.min(64,existing.amount+incoming);
-            markVanillaSpawner(existing);save();open(p,existing);
-            p.sendMessage("§a🧟 Spawner stack: §f"+existing.amount+"x");
+            if(existing.amount==old){p.sendMessage("§cSpawner stack is already at the 64x limit.");return;}
+            configurePhysicalSpawner(existing);save();updateHologram(existing);
+            p.sendMessage("§a🧟 Spawner stacked: §f"+existing.amount+"x");
             return;
         }
         Data d=new Data(b.getWorld().getName(),b.getX(),b.getY(),b.getZ(),p.getUniqueId());
-        d.amount=incoming;spawners.put(d.key(),d);markVanillaSpawner(d);save();open(p,d);
+        d.amount=incoming;spawners.put(d.key(),d);
+        configurePhysicalSpawner(d);save();spawnHologram(d);open(p,d);
         p.sendMessage("§a🧟 Emerald Skeleton Spawner placed.");
+    }
+
+    private Data findAdjacentOwned(Block b,UUID owner){
+        for(BlockFace face:BlockFace.values()){
+            if(face==BlockFace.SELF||face==BlockFace.DOWN||face==BlockFace.UP)continue;
+            Data d=spawners.get(key(b.getRelative(face)));
+            if(d!=null&&d.owner.equals(owner))return d;
+        }
+        return null;
     }
 
     @EventHandler(priority=EventPriority.HIGHEST)
@@ -225,72 +211,76 @@ public final class SpawnerManager implements Listener {
         e.setCancelled(true);
         Player p=e.getPlayer();
         if(isItem(e.getItem())){
-            if(!d.owner.equals(p.getUniqueId())&&!p.isOp()){p.sendMessage("§cOnly the owner can add to this spawner.");return;}
-            int n=itemStack(e.getItem());
-            d.amount=Math.min(64,d.amount+n);
+            if(!canManage(p,d)){p.sendMessage("§cOnly the spawner owner can add to it.");return;}
+            int incoming=itemStack(e.getItem());
+            int newAmount=clamp(safeIntAdd(d.amount,incoming),1,64);
+            int added=newAmount-d.amount;
+            if(added<=0){p.sendMessage("§cSpawner stack is already at 64x.");return;}
+            d.amount=newAmount;
             e.getItem().setAmount(Math.max(0,e.getItem().getAmount()-1));
-            markVanillaSpawner(d);save();open(p,d);return;
+            configurePhysicalSpawner(d);save();updateHologram(d);open(p,d);
+            return;
         }
-        if(!d.owner.equals(p.getUniqueId())&&!p.isOp()){p.sendMessage("§cOnly the owner can manage this spawner.");return;}
+        if(!canManage(p,d)){p.sendMessage("§cOnly the spawner owner can manage this spawner.");return;}
         open(p,d);
     }
+
+    private boolean canManage(Player p,Data d){return d.owner.equals(p.getUniqueId())||p.isOp();}
 
     @EventHandler(priority=EventPriority.HIGHEST)
     public void breakBlock(BlockBreakEvent e){
         Data d=spawners.get(key(e.getBlock()));if(d==null)return;
         Player p=e.getPlayer();
-        if(!d.owner.equals(p.getUniqueId())&&!p.isOp()){e.setCancelled(true);p.sendMessage("§cOnly the owner can break this spawner.");return;}
-        Material tool=p.getInventory().getItemInMainHand().getType();
-        if(!isPickaxe(tool)){e.setCancelled(true);p.sendMessage("§cUse a pickaxe to break an Emerald Spawner.");return;}
+        if(!canManage(p,d)){e.setCancelled(true);p.sendMessage("§cOnly the spawner owner can break this spawner.");return;}
+        if(!isPickaxe(p.getInventory().getItemInMainHand().getType())){e.setCancelled(true);p.sendMessage("§cUse a pickaxe to break an Emerald Spawner.");return;}
         e.setDropItems(false);
-        spawners.remove(d.key());save();
+        spawners.remove(d.key());removeHolograms(d);
+        save();
         giveOrDrop(p,createItem(d.amount));
-        giveOrDrop(p,new ItemStack(Material.BONE,(int)Math.min(64,d.bones)));d.bones=Math.max(0,d.bones-64);
-        giveStored(p,Material.BONE,d.bones);
-        giveStored(p,Material.ARROW,d.arrows);
-        giveStored(p,Material.BOW,d.bows);
+        giveOrDrop(p,new ItemStack(Material.BONE,0)); // no-op: stored drops are returned below
+        giveStoredOrDrop(p,Material.BONE,d.bones);
+        giveStoredOrDrop(p,Material.ARROW,d.arrows);
+        giveStoredOrDrop(p,Material.BOW,d.bows);
         p.sendMessage("§a🧟 Spawner broken. Stored drops returned.");
     }
 
     private boolean isPickaxe(Material m){
-        return m==Material.WOODEN_PICKAXE||m==Material.STONE_PICKAXE||m==Material.IRON_PICKAXE
-            ||m==Material.DIAMOND_PICKAXE||m==Material.NETHERITE_PICKAXE;
+        return m==Material.WOODEN_PICKAXE||m==Material.STONE_PICKAXE||m==Material.IRON_PICKAXE||m==Material.DIAMOND_PICKAXE||m==Material.NETHERITE_PICKAXE;
     }
 
-    private void giveStored(Player p,Material mat,long amount){
+    private void giveStoredOrDrop(Player p,Material mat,long amount){
         long left=amount;
         while(left>0){
             int n=(int)Math.min(mat.getMaxStackSize(),left);
             ItemStack stack=new ItemStack(mat,n);
-            HashMap<Integer,ItemStack> rem=p.getInventory().addItem(stack);
-            if(rem.isEmpty()){left-=n;continue;}
-            int remaining=0;for(ItemStack x:rem.values())remaining+=x.getAmount();
-            left-=n-remaining;
-            for(ItemStack x:rem.values())p.getWorld().dropItemNaturally(p.getLocation(),x);
-            break;
+            Map<Integer,ItemStack> rem=p.getInventory().addItem(stack);
+            long returned=0;for(ItemStack x:rem.values())returned+=x.getAmount();
+            long accepted=n-returned;
+            left-=accepted;
+            if(returned>0){
+                for(ItemStack x:rem.values())p.getWorld().dropItemNaturally(p.getLocation(),x);
+                break;
+            }
         }
     }
 
     private void giveOrDrop(Player p,ItemStack item){
+        if(item==null||item.getAmount()<=0)return;
         for(ItemStack x:p.getInventory().addItem(item).values())p.getWorld().dropItemNaturally(p.getLocation(),x);
     }
+
+    private int safeIntAdd(int a,int b){return a>Integer.MAX_VALUE-b?Integer.MAX_VALUE:a+b;}
 
     private void open(Player p,Data d){
         open.put(p.getUniqueId(),d.key());
         Inventory inv=Bukkit.createInventory(null,36,MAIN);
         fill(inv);
-        long rate=(long)plugin.getConfig().getInt("spawners.skeleton.amount",8)*d.amount;
-        long sec=plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12);
-        inv.setItem(10,item(Material.SPAWNER,"§a§l🧟 SKELETON SPAWNER",List.of(
-            "§7Stack: §f"+d.amount+"x","§e⚡ Rate: §f"+rate+" Skeletons / "+sec+"s"
-        )));
-        inv.setItem(12,item(Material.CHEST,"§a§l📦 STORED DROPS",List.of(
-            "§f🦴 Bones: §a"+fmt(d.bones),
-            "§f🏹 Arrows: §a"+fmt(d.arrows),
-            "§f🏹 Bows: §a"+fmt(d.bows)
-        )));
-        inv.setItem(20,item(Material.CHEST,"§a§l📦 COLLECT DROPS",List.of("§7Move stored physical drops to inventory","§7Overflow stays as ground items")));
-        inv.setItem(24,item(Material.COMPARATOR,"§b§l⚙ SETTINGS",List.of("§7Choose which physical drops are stored")));
+        long rate=safeMultiply(plugin.getConfig().getLong("spawners.skeleton.amount",8L),d.amount);
+        long sec=Math.max(1,plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12L));
+        inv.setItem(10,item(Material.SPAWNER,"§a§l🧟 SKELETON SPAWNER",List.of("§7Stack: §f"+d.amount+"x","§e⚡ Rate: §f"+rate+" Skeletons / "+sec+"s")));
+        inv.setItem(12,item(Material.CHEST,"§a§l📦 STORED DROPS",List.of("§f🦴 Bones: §a"+fmt(d.bones),"§f🏹 Arrows: §a"+fmt(d.arrows),"§f🏹 Bows: §a"+fmt(d.bows))));
+        inv.setItem(20,item(Material.CHEST,"§a§l📦 DROP STORED DROPS",List.of("§7Transfer as much as your inventory can hold","§7Any remainder stays safely stored","§8No auto-sell • No automatic money")));
+        inv.setItem(24,item(Material.COMPARATOR,"§b§l⚙ SETTINGS",List.of("§7Choose which physical drops are generated")));
         inv.setItem(31,item(Material.BARRIER,"§c✕ CLOSE",List.of()));
         p.openInventory(inv);
     }
@@ -301,42 +291,81 @@ public final class SpawnerManager implements Listener {
         inv.setItem(11,item(Material.BONE,"§f🦴 Bones: "+on(d.bonesEnabled),List.of("§7Click to toggle")));
         inv.setItem(13,item(Material.ARROW,"§f🏹 Arrows: "+on(d.arrowsEnabled),List.of("§7Click to toggle")));
         inv.setItem(15,item(Material.BOW,"§f🏹 Bows: "+on(d.bowsEnabled),List.of("§7Click to toggle")));
-        inv.setItem(22,item(Material.ARROW,"§a← BACK",List.of()));
+        inv.setItem(22,item(Material.ARROW,"§a§l← BACK",List.of()));
         p.openInventory(inv);
     }
 
     private String on(boolean b){return b?"§aON":"§cOFF";}
-
-    private ItemStack item(Material mat,String name,List<String> lore){
-        ItemStack i=new ItemStack(mat);ItemMeta m=i.getItemMeta();m.setDisplayName(name);m.setLore(lore);i.setItemMeta(m);return i;
-    }
-
-    private void fill(Inventory inv){
-        ItemStack pane=item(Material.GRAY_STAINED_GLASS_PANE,"§r",List.of());
-        for(int i=0;i<inv.getSize();i++)if(inv.getItem(i)==null)inv.setItem(i,pane.clone());
-    }
-
+    private ItemStack item(Material mat,String name,List<String> lore){ItemStack i=new ItemStack(mat);ItemMeta m=i.getItemMeta();m.setDisplayName(name);m.setLore(lore);i.setItemMeta(m);return i;}
+    private void fill(Inventory inv){ItemStack pane=item(Material.GRAY_STAINED_GLASS_PANE,"§r",List.of());for(int i=0;i<inv.getSize();i++)if(inv.getItem(i)==null)inv.setItem(i,pane.clone());}
     private String fmt(long n){return String.format(Locale.US,"%,d",n);}
 
     private void collect(Player p,Data d){
-        d.bones=transfer(p,Material.BONE,d.bones);
-        d.arrows=transfer(p,Material.ARROW,d.arrows);
-        d.bows=transfer(p,Material.BOW,d.bows);
-        save();p.sendMessage("§a📦 Stored drops collected.");
+        String k=d.key();
+        if(!collecting.add(k)){p.sendMessage("§e📦 Collection already processing.");return;}
+        try{
+            long beforeBones=d.bones,beforeArrows=d.arrows,beforeBows=d.bows;
+            d.bones=transfer(p,Material.BONE,beforeBones);
+            d.arrows=transfer(p,Material.ARROW,beforeArrows);
+            d.bows=transfer(p,Material.BOW,beforeBows);
+            save();updateHologram(d);open(p,d);
+            long moved=(beforeBones-d.bones)+(beforeArrows-d.arrows)+(beforeBows-d.bows);
+            if(moved>0)p.sendMessage("§a📦 Collected §f"+fmt(moved)+" §aitem(s).");
+            else p.sendMessage("§e📦 Inventory is full; stored drops remain untouched.");
+        }finally{collecting.remove(k);}
     }
 
     private long transfer(Player p,Material mat,long amount){
-        long left=amount;
+        long left=Math.max(0,amount);
         while(left>0){
             int n=(int)Math.min(mat.getMaxStackSize(),left);
-            ItemStack stack=new ItemStack(mat,n);
-            HashMap<Integer,ItemStack> rem=p.getInventory().addItem(stack);
-            if(rem.isEmpty()){left-=n;continue;}
-            int remaining=0;for(ItemStack x:rem.values())remaining+=x.getAmount();
-            left-=n-remaining;
-            break;
+            Map<Integer,ItemStack> rem=p.getInventory().addItem(new ItemStack(mat,n));
+            long returned=0;for(ItemStack x:rem.values())returned+=x.getAmount();
+            long accepted=n-returned;
+            if(accepted<=0)break;
+            left-=accepted;
+            if(returned>0)break;
         }
         return left;
+    }
+
+    private void spawnHologram(Data d){
+        Location base=d.loc();if(base==null||base.getWorld()==null||!base.getWorld().isChunkLoaded(d.x>>4,d.z>>4))return;
+        removeHolograms(d);
+        String[] lines=holoLines(d);
+        for(int i=0;i<lines.length;i++){
+            ArmorStand as=base.getWorld().spawn(base.clone().add(0,-i*0.27,0),ArmorStand.class,stand->{
+                stand.setInvisible(true);stand.setMarker(true);stand.setGravity(false);stand.setInvulnerable(true);stand.setSilent(true);stand.setCustomNameVisible(true);
+                stand.customName(net.kyori.adventure.text.Component.text(lines[i]));
+                stand.getPersistentDataContainer().set(hologramKey,PersistentDataType.STRING,d.key());
+            });
+        }
+    }
+
+    private String[] holoLines(Data d){
+        long rate=safeMultiply(plugin.getConfig().getLong("spawners.skeleton.amount",8L),d.amount);
+        long sec=Math.max(1,plugin.getConfig().getLong("spawners.skeleton.interval-seconds",12L));
+        return new String[]{"§a§l🧟 SKELETON SPAWNER","§e⚡ "+rate+" Skeletons / "+sec+"s","§7📦 Stored Drops §8• §fRight-Click"};
+    }
+
+    private void updateHologram(Data d){spawnHologram(d);}
+    private void removeHolograms(Data d){
+        World w=Bukkit.getWorld(d.world);if(w==null)return;
+        for(Entity e:new ArrayList<>(w.getEntities())){
+            if(e instanceof ArmorStand as&&d.key().equals(as.getPersistentDataContainer().get(hologramKey,PersistentDataType.STRING)))as.remove();
+        }
+    }
+
+    private void refreshLoadedHolograms(){
+        for(World w:Bukkit.getWorlds())for(Entity e:new ArrayList<>(w.getEntities())){
+            if(e instanceof ArmorStand as&&as.getPersistentDataContainer().has(hologramKey,PersistentDataType.STRING))as.remove();
+        }
+        for(Data d:spawners.values())spawnHologram(d);
+    }
+
+    @EventHandler(priority=EventPriority.MONITOR)
+    public void chunkLoad(ChunkLoadEvent e){
+        for(Data d:spawners.values())if(d.world.equals(e.getWorld().getName())&&(d.x>>4)==e.getChunk().getX()&&(d.z>>4)==e.getChunk().getZ())spawnHologram(d);
     }
 
     @EventHandler(priority=EventPriority.HIGHEST)
@@ -345,21 +374,23 @@ public final class SpawnerManager implements Listener {
         String title=e.getView().getTitle();
         if(!MAIN.equals(title)&&!SETTINGS.equals(title))return;
         e.setCancelled(true);
+        if(e.getClick().isKeyboardClick()||e.isShiftClick()||e.getClick()==ClickType.DOUBLE_CLICK)return;
         if(e.getClickedInventory()!=e.getView().getTopInventory())return;
-        Data d=null;String k=open.get(p.getUniqueId());if(k!=null)d=spawners.get(k);
+        String k=open.get(p.getUniqueId());Data d=k==null?null:spawners.get(k);
         if(d==null){p.closeInventory();return;}
+        if(!canManage(p,d)){p.closeInventory();p.sendMessage("§cYou no longer have access to this spawner.");return;}
         if(MAIN.equals(title)){
             switch(e.getRawSlot()){
-                case 20 -> {collect(p,d);open(p,d);}
-                case 24 -> settings(p,d);
-                case 31 -> p.closeInventory();
+                case 20->collect(p,d);
+                case 24->settings(p,d);
+                case 31->p.closeInventory();
             }
         }else{
             switch(e.getRawSlot()){
-                case 11 -> d.bonesEnabled=!d.bonesEnabled;
-                case 13 -> d.arrowsEnabled=!d.arrowsEnabled;
-                case 15 -> d.bowsEnabled=!d.bowsEnabled;
-                case 22 -> {open(p,d);return;}
+                case 11->d.bonesEnabled=!d.bonesEnabled;
+                case 13->d.arrowsEnabled=!d.arrowsEnabled;
+                case 15->d.bowsEnabled=!d.bowsEnabled;
+                case 22->{open(p,d);return;}
             }
             save();settings(p,d);
         }
