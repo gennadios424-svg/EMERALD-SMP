@@ -56,9 +56,11 @@ public final class CleanSellManager {
 
     public void handleClick(Player player, InventoryClickEvent event) {
         Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.inventory != event.getView().getTopInventory()) return;
+        if (s == null || s.inventory != event.getView().getTopInventory() || s.processing) return;
 
         int raw = event.getRawSlot();
+
+        // Protected controls are the only top-inventory slots that are cancelled.
         if (raw >= INPUT_SLOTS && raw < 54) {
             event.setCancelled(true);
             if (raw == SELL_SLOT) sell(player, s);
@@ -66,28 +68,82 @@ public final class CleanSellManager {
             return;
         }
 
-        // Never cancel normal container interaction in the input area or the player's inventory.
+        // Explicitly implement shift-click from the player's inventory. This avoids
+        // Bukkit's generic MOVE_TO_OTHER_INVENTORY routing around the protected rows.
+        if (event.isShiftClick() && raw >= event.getView().getTopInventory().getSize()) {
+            event.setCancelled(true);
+            movePlayerStackToSellArea(player, s, event.getSlot());
+            refresh(player, s);
+            return;
+        }
+
+        // Ordinary clicks in the real input container are intentionally not cancelled.
+        // Bukkit/Paper owns the normal place/pickup/merge/split/number-key behavior.
         Bukkit.getScheduler().runTask(plugin, () -> {
             Session current = sessions.get(player.getUniqueId());
-            if (current != null && current == s && player.isOnline()) refresh(player, s);
+            if (current == s && player.isOnline() && !s.processing) refresh(player, s);
         });
+    }
+
+    private void movePlayerStackToSellArea(Player player, Session s, int playerSlot) {
+        ItemStack source = player.getInventory().getItem(playerSlot);
+        if (source == null || source.getType().isAir()) return;
+
+        ItemStack remaining = source.clone();
+
+        // First merge into compatible existing stacks.
+        for (int slot = 0; slot < INPUT_SLOTS && !remaining.getType().isAir(); slot++) {
+            ItemStack target = s.inventory.getItem(slot);
+            if (target == null || target.getType().isAir()) continue;
+            if (!target.isSimilar(remaining)) continue;
+
+            int room = Math.min(remaining.getMaxStackSize(), target.getMaxStackSize()) - target.getAmount();
+            if (room <= 0) continue;
+
+            int moved = Math.min(room, remaining.getAmount());
+            target.setAmount(target.getAmount() + moved);
+            remaining.setAmount(remaining.getAmount() - moved);
+            s.inventory.setItem(slot, target);
+        }
+
+        // Then fill empty input slots.
+        for (int slot = 0; slot < INPUT_SLOTS && !remaining.getType().isAir(); slot++) {
+            ItemStack target = s.inventory.getItem(slot);
+            if (target != null && !target.getType().isAir()) continue;
+
+            int moved = Math.min(remaining.getAmount(), remaining.getMaxStackSize());
+            ItemStack placed = remaining.clone();
+            placed.setAmount(moved);
+            s.inventory.setItem(slot, placed);
+            remaining.setAmount(remaining.getAmount() - moved);
+        }
+
+        if (remaining.getType().isAir()) {
+            player.getInventory().setItem(playerSlot, null);
+        } else {
+            player.getInventory().setItem(playerSlot, remaining);
+        }
     }
 
     public void handleDrag(Player player, org.bukkit.event.inventory.InventoryDragEvent event) {
         Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.inventory != event.getView().getTopInventory()) return;
+        if (s == null || s.inventory != event.getView().getTopInventory() || s.processing) return;
+
+        // Only protected controls cancel a drag. Drags touching input slots remain real
+        // container operations; player-inventory-only drags are also left untouched.
         if (event.getRawSlots().stream().anyMatch(slot -> slot >= INPUT_SLOTS && slot < 54)) {
             event.setCancelled(true);
             return;
         }
+
         Bukkit.getScheduler().runTask(plugin, () -> {
             Session current = sessions.get(player.getUniqueId());
-            if (current == s && player.isOnline()) refresh(player, s);
+            if (current == s && player.isOnline() && !s.processing) refresh(player, s);
         });
     }
 
     private void refresh(Player player, Session s) {
-        if (sessions.get(player.getUniqueId()) != s || s.inventory == null) return;
+        if (sessions.get(player.getUniqueId()) != s || s.inventory == null || s.processing) return;
         long total = 0;
         for (int slot = 0; slot < INPUT_SLOTS; slot++) {
             ItemStack item = s.inventory.getItem(slot);
@@ -110,14 +166,13 @@ public final class CleanSellManager {
         }
 
         try {
-            if (sessions.get(uuid) != s || s.inventory != player.getOpenInventory().getTopInventory()) return;
+            if (sessions.get(uuid) != s || s.inventory != player.getOpenInventory().getTopInventory() || s.processing) return;
 
             long total = 0;
             long itemCount = 0;
             List<Integer> sellSlots = new ArrayList<>();
             List<ItemStack> soldItems = new ArrayList<>();
 
-            // Validate the complete transaction before changing any inventory or balance.
             for (int slot = 0; slot < INPUT_SLOTS; slot++) {
                 ItemStack item = s.inventory.getItem(slot);
                 if (item == null || item.getType().isAir()) continue;
@@ -125,19 +180,17 @@ public final class CleanSellManager {
                 var worth = plugin.getWorthManager().get(item.getType());
                 if (worth == null || !worth.enabled() || worth.worth() <= 0) continue;
 
-                long value;
                 try {
-                    value = plugin.getWorthManager().sellValue(item.getType(), item.getAmount());
+                    long value = plugin.getWorthManager().sellValue(item.getType(), item.getAmount());
                     total = Math.addExact(total, value);
                     itemCount = Math.addExact(itemCount, item.getAmount());
+                    if (value > 0) {
+                        sellSlots.add(slot);
+                        soldItems.add(item.clone());
+                    }
                 } catch (ArithmeticException ex) {
                     player.sendMessage("§cThe sale is too large to process safely. Nothing was sold.");
                     return;
-                }
-
-                if (value > 0) {
-                    sellSlots.add(slot);
-                    soldItems.add(item.clone());
                 }
             }
 
@@ -146,7 +199,6 @@ public final class CleanSellManager {
                 return;
             }
 
-            // Lock the session before the commit. All changes below occur on the server thread.
             s.processing = true;
             for (int slot : sellSlots) s.inventory.setItem(slot, null);
 
@@ -160,8 +212,8 @@ public final class CleanSellManager {
                         for (ItemStack item : left.values()) player.getWorld().dropItemNaturally(player.getLocation(), item);
                     }
                 }
-                player.sendMessage("§cThe economy rejected the transaction. Your items were restored.");
                 s.processing = false;
+                player.sendMessage("§cThe economy rejected the transaction. Your items were restored.");
                 refresh(player, s);
                 return;
             }
@@ -179,6 +231,7 @@ public final class CleanSellManager {
     public void close(Player player) {
         UUID uuid = player.getUniqueId();
         if (transactionLocks.contains(uuid)) return;
+
         Session s = sessions.remove(uuid);
         if (s == null || s.processing || s.inventory == null) return;
         returnItems(player, s.inventory);
@@ -218,7 +271,6 @@ public final class CleanSellManager {
         private final UUID sessionId;
         private Inventory inventory;
         private boolean processing;
-
         private Session(UUID sessionId) { this.sessionId = sessionId; }
         @Override public Inventory getInventory() { return inventory; }
     }
