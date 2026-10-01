@@ -132,10 +132,10 @@ public final class SpawnCommand implements CommandExecutor {
         // platforms and does not require surrounding terrain.
         return feetBlock.isPassable()
                 && headBlock.isPassable()
-                && !feet.isLiquid()
-                && !head.isLiquid()
+                && !feetBlock.isLiquid()
+                && !headBlock.isLiquid()
                 && below.isSolid()
-                && !below.isLiquid()
+                && !belowBlock.isLiquid()
                 && !isDangerousFloor(below);
     }
 
