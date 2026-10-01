@@ -42,6 +42,7 @@ public final class EmeraldSMP extends JavaPlugin {
     private SpawnerManager spawnerManager;
     private DrillManager drillManager;
     private CrateManager crateManager;
+    private LagCleaner lagCleaner;
 
     @Override public void onEnable() {
         try {
@@ -57,6 +58,7 @@ public final class EmeraldSMP extends JavaPlugin {
             spawnerManager=new SpawnerManager(this);spawnerManager.load();
             drillManager=new DrillManager(this);drillManager.load();
             crateManager=new CrateManager(this);crateManager.load();
+            lagCleaner=new LagCleaner(this);lagCleaner.start();
 
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
             register("balance",new BalanceCommand(this),null);
