@@ -108,34 +108,8 @@ crates:
     crimson: 65
     emerald: 75
   rewards:
-    common:
-      - "25|COAL:16"
-      - "20|IRON_INGOT:8"
-      - "15|GOLD_INGOT:6"
-      - "10|DIAMOND:2"
-      - "15|shards:2"
-      - "15|$5000"
-    spawner:
-      - "25|BONE:64"
-      - "20|ARROW:64"
-      - "20|shards:5"
-      - "20|$10000"
-      - "15|DIAMOND:4"
-    gold:
-      - "20|GOLD_INGOT:32"
-      - "20|DIAMOND:8"
-      - "20|EMERALD:16"
-      - "20|shards:10"
-      - "20|$25000"
-    crimson:
-      - "20|DIAMOND:16"
-      - "20|EMERALD:32"
-      - "20|NETHERITE_SCRAP:4"
-      - "20|shards:20"
-      - "20|$50000"
-    emerald:
-      - "20|DIAMOND:32"
-      - "20|EMERALD:64"
-      - "20|NETHERITE_INGOT:2"
-      - "20|shards:40"
-      - "20|$100000"
+    common: []
+    spawner: []
+    gold: []
+    crimson: []
+    emerald: []
