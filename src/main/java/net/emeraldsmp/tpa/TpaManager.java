@@ -28,7 +28,7 @@ public final class TpaManager implements Listener {
     }
 
     public void request(Player sender, Player target, boolean here) {
-        if (plugin.getCombatManager().isInCombat(sender) || plugin.getCombatManager().isInCombat(target)) {
+        if (!isStaff(sender) && (plugin.getCombatManager().isInCombat(sender) || plugin.getCombatManager().isInCombat(target))) {
             sender.sendMessage("§c⚔ You cannot use that command while in combat!");
             return;
         }
@@ -79,7 +79,7 @@ public final class TpaManager implements Listener {
     }
 
     public void accept(Player target) {
-        if (plugin.getCombatManager().isInCombat(target)) {
+        if (!isStaff(target) && plugin.getCombatManager().isInCombat(target)) {
             target.sendMessage("§c⚔ You cannot use that command while in combat!");
             return;
         }
@@ -126,6 +126,10 @@ public final class TpaManager implements Listener {
             sender.sendMessage("§c❌ Your teleport request was denied.");
         }
         target.sendMessage("§cTeleport request denied.");
+    }
+
+    private boolean isStaff(Player player) {
+        return player.isOp() || player.hasPermission("emerald.admin") || plugin.getRoleManager().isStaff(player);
     }
 
     private void startCountdown(Player teleporting, Player destination, Request request) {
