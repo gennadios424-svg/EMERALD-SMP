@@ -105,15 +105,18 @@ public final class WorthManager {
     public long sellValue(Material material, int amount) {
         WorthEntry entry = entries.get(material);
         if (entry == null || !entry.enabled() || amount < 0) return 0;
-        double multiplier = plugin.getConfig().getDouble("economy.sell-multiplier", 0.50D);
-        multiplier = Math.max(0D, multiplier);
         return Math.multiplyExact(entry.worth(), (long) amount);
     }
 
     public long buyValue(Material material, int amount) {
         WorthEntry entry = entries.get(material);
         if (entry == null || !entry.enabled() || amount < 0) return 0;
-        return Math.multiplyExact(entry.worth(), (long) amount);
+        double multiplier=plugin.getConfig().getDouble("shop.buy-multiplier",2.5D);
+        multiplier=Math.max(1.01D,multiplier);
+        long total=Math.multiplyExact(entry.worth(),(long)amount);
+        if(total<=0)return 0;
+        long rounded=Math.round(total*multiplier);
+        return Math.max(total+1,rounded);
     }
 
     public void clear(Player p){views.remove(p.getUniqueId());}
