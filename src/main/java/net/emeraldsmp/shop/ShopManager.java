@@ -316,6 +316,7 @@ public final class ShopManager {
         if (section == null && categoryKey.equals("combat")) section=plugin.getConfig().getConfigurationSection("shop.categories.cpvp.items");
         if (section == null) return generatedWorthItems(categoryKey);
 
+        List<ShopItem> result = new ArrayList<>();
         for (String key : section.getKeys(false)) {
             ConfigurationSection s = section.getConfigurationSection(key);
             if (s == null || !s.getBoolean("enabled", true)) continue;
