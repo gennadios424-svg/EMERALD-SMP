@@ -23,6 +23,7 @@ import net.emeraldsmp.kits.*;
 import net.emeraldsmp.invest.*;
 import net.emeraldsmp.staff.StaffCommand;
 import net.emeraldsmp.anticheat.FlightAntiCheat;
+import net.emeraldsmp.anticheat.MacroAntiCheat;
 import net.emeraldsmp.anticheat.SusListCommand;
 import net.emeraldsmp.anticheat.SusListManager;
 import org.bukkit.command.PluginCommand;
