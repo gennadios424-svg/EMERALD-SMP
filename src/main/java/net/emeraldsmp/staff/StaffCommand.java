@@ -112,18 +112,26 @@ public final class StaffCommand implements CommandExecutor, TabCompleter, Listen
 
     private void unban(Player staff, String[] args, boolean ipunban) {
         if (args.length != 1) {
-            staff.sendMessage("§cUsage: /" + (ipunban ? "ipunban" : "unban") + " <player|IP>");
+            staff.sendMessage("§cUsage: /" + (ipunban ? "ipunban" : "unban") + " <player>");
             return;
         }
 
         String target = args[0];
+
         if (ipunban) {
-            boolean removed = Bukkit.getBanList(BanList.Type.IP).isBanned(target);
-            if (!removed) {
+            Player targetPlayer = Bukkit.getPlayerExact(target);
+            String ip = targetPlayer != null && targetPlayer.getAddress() != null && targetPlayer.getAddress().getAddress() != null
+                    ? targetPlayer.getAddress().getAddress().getHostAddress() : null;
+
+            if (ip == null) {
+                staff.sendMessage("§cThat player must be online so their IP can be safely resolved.");
+                return;
+            }
+            if (!Bukkit.getBanList(BanList.Type.IP).isBanned(ip)) {
                 staff.sendMessage("§cNo IP ban was found for §f" + target + "§c.");
                 return;
             }
-            Bukkit.getBanList(BanList.Type.IP).pardon(target);
+            Bukkit.getBanList(BanList.Type.IP).pardon(ip);
             staff.sendMessage("§a🔓 IP ban removed for §f" + target + "§a.");
             return;
         }
