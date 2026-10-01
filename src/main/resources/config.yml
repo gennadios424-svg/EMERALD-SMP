@@ -12,11 +12,6 @@ economy:
   # /sell always pays the central /worth value.
   sell-multiplier: 1.0
 
-shop:
-  # /shop buy price = /worth value × this multiplier.
-  # Must stay above 1.0 so buying and immediately selling loses money.
-  buy-multiplier: 2.5
-
 visual:
   primary-color: "GREEN"
   secondary-color: "DARK_GREEN"
@@ -35,8 +30,9 @@ messages:
 
 # Curated player shop.
 # buy: -1 means the existing Worth buy value is used automatically.
-# This shop list is intentionally separate from the full /worth database.
+# This shop uses the central /worth database. Configured items with buy: -1 use the central buy formula.
 shop:
+  buy-multiplier: 2.5
   categories:
     blocks:
       enabled: true
