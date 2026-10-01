@@ -15,7 +15,7 @@ public final class SellCommand implements CommandExecutor {
             sender.sendMessage("Only players can use /sell.");
             return true;
         }
-        plugin.getShopManager().openSell(player);
+        plugin.getManualSellManager().open(player);
         return true;
     }
 }
