@@ -12,33 +12,19 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class RoleManager {
     public enum Role {
-        OWNER("OWNER","👑", new String[]{"#064e3b","#10b981","#facc15","#ffffff"}, "Server owner / leadership rank"),
-        DEV("DEV","⚡", new String[]{"#064e3b","#14b8a6","#67e8f9","#ffffff"}, "Development and technical rank"),
-        MOD("MOD","🛡", new String[]{"#064e3b","#0f766e","#2dd4bf","#ffffff"}, "Moderation and community rank"),
-        MEDIA("MEDIA","🎥", new String[]{"#047857","#a855f7","#ec4899","#ffffff"}, "Media and creator rank"),
-        EMERALD("EMERALD","💚", new String[]{"#064e3b","#059669","#22c55e","#ffffff"}, "Premium Emerald SMP supporter rank"),
-        MVP("MVP","💎", new String[]{"#064e3b","#06b6d4","#67e8f9","#ffffff","#facc15"}, "High-tier premium rank"),
-        VIP("VIP","⭐", new String[]{"#047857","#d4af37","#fde047","#ffffff"}, "Premium supporter rank"),
-        MEMBER("MEMBER","👤", new String[]{"#064e3b","#6b7280","#d1d5db","#ffffff"}, "Default Emerald SMP rank");
-
-        private final String label, icon;
-        private final int weight;
-        private final String[] colors;
-        private final String description;
-
-        Role(String label,String icon,String[] colors,String description,int weight){
-            this.label=label;this.icon=icon;this.colors=colors;this.description=description;this.weight=weight;
-        }
-        public String label(){return label;}
-        public String icon(){return icon;}
-        public String[] colors(){return colors.clone();}
-        public String description(){return description;}
-        public String color(){return RoleUtil.legacyHex(colors[1]);}
-        public String darkColor(){return RoleUtil.legacyHex(colors[0]);}
-        public String badge(){return RoleUtil.legacyBadge(this);}
-        public static Role parse(String s){
-            try{return valueOf(s.toUpperCase(Locale.ROOT));}catch(Exception e){return null;}
-        }
+        OWNER("OWNER","👑",new String[]{"#064e3b","#10b981","#facc15","#ffffff"},"Server owner / leadership rank",7),
+        DEV("DEV","⚡",new String[]{"#064e3b","#14b8a6","#67e8f9","#ffffff"},"Development and technical rank",6),
+        MOD("MOD","🛡",new String[]{"#064e3b","#0f766e","#2dd4bf","#ffffff"},"Moderation and community rank",5),
+        MEDIA("MEDIA","🎥",new String[]{"#047857","#a855f7","#ec4899","#ffffff"},"Media and creator rank",4),
+        EMERALD("EMERALD","💚",new String[]{"#064e3b","#059669","#22c55e","#ffffff"},"Premium Emerald SMP supporter rank",3),
+        MVP("MVP","💎",new String[]{"#064e3b","#06b6d4","#67e8f9","#ffffff","#facc15"},"High-tier premium rank",2),
+        VIP("VIP","⭐",new String[]{"#047857","#d4af37","#fde047","#ffffff"},"Premium supporter rank",1),
+        MEMBER("MEMBER","✦",new String[]{"#064e3b","#6b7280","#d1d5db","#ffffff"},"Default Emerald SMP rank",0);
+        private final String label,icon,description; private final String[] colors; private final int weight;
+        Role(String label,String icon,String[] colors,String description,int weight){this.label=label;this.icon=icon;this.colors=colors;this.description=description;this.weight=weight;}
+        public String label(){return label;} public String icon(){return icon;} public String[] colors(){return colors.clone();} public String description(){return description;} public int weight(){return weight;}
+        public String color(){return RoleUtil.legacyHex(colors[1]);} public String darkColor(){return RoleUtil.legacyHex(colors[0]);} public String badge(){return RoleUtil.legacyBadge(this);}
+        public static Role parse(String s){try{return valueOf(s.toUpperCase(Locale.ROOT));}catch(Exception e){return null;}}
     }
 
     private final EmeraldSMP plugin;
@@ -71,6 +57,8 @@ public final class RoleManager {
 
     public Role get(UUID uuid){return roles.getOrDefault(uuid,Role.MEMBER);}
     public Role get(Player p){return get(p.getUniqueId());}
+    public boolean isStaff(Player p){Role r=get(p);return r==Role.OWNER||r==Role.DEV||r==Role.MOD;}
+    public boolean canPunish(Player executor,Player target){return get(executor).weight()>get(target).weight();}
 
     public synchronized boolean ensureMember(Player p){
         if(roles.containsKey(p.getUniqueId()))return false;
