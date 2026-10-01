@@ -22,6 +22,7 @@ public final class RoleManager {
         MEMBER("MEMBER","👤", new String[]{"#064e3b","#6b7280","#d1d5db","#ffffff"}, "Default Emerald SMP rank");
 
         private final String label, icon;
+        private final int weight;
         private final String[] colors;
         private final String description;
 
