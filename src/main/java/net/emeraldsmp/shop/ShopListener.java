@@ -121,9 +121,9 @@ public final class ShopListener implements Listener {
     }
 
     private String categoryAt(int slot) {
-        int[] slots = {10, 11, 12, 13, 14, 15};
-        String[] keys = {"blocks", "cpvp", "redstone", "food", "farm", "end"};
-        for (int i = 0; i < slots.length; i++) if (slots[i] == slot) return keys[i];
+        int[] slots={10,11,12,13,14,15,16,19,20,21,22,23};
+        String[] keys={"blocks","resources","farm","food","combat","tools","redstone","mob_drops","nether","end","building","spawners"};
+        for(int i=0;i<slots.length;i++)if(slots[i]==slot)return keys[i];
         return null;
     }
 }
