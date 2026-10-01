@@ -2,6 +2,9 @@ package net.emeraldsmp.shop;
 
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.Material;
 import org.bukkit.block.ShulkerBox;
 import org.bukkit.entity.Player;
@@ -19,7 +22,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.text.NumberFormat;
 import java.util.*;
 
-public final class CleanSellManager implements Listener {
+public final class CleanSellManager implements Listener, CommandExecutor {
     private static final String TITLE = "§2§l💚 SELL ITEMS";
     private static final int INPUT_SLOTS = 45;
     private static final int TOTAL_SLOT = 47;
@@ -32,6 +35,16 @@ public final class CleanSellManager implements Listener {
 
     public CleanSellManager(EmeraldSMP plugin) {
         this.plugin = plugin;
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("§cOnly players can use /sell.");
+            return true;
+        }
+        open(player);
+        return true;
     }
 
     public void open(Player player) {
