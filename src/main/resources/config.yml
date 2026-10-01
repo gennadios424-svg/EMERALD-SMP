@@ -214,3 +214,45 @@ emerald-miner:
     max-blocks: 128
     min-shards: 1
     max-shards: 5
+
+
+# 🎁 Physical Emerald SMP crates. Rewards are server-side and configurable.
+crates:
+  animation:
+    common: 35
+    spawner: 45
+    gold: 55
+    crimson: 65
+    emerald: 75
+  rewards:
+    common:
+      - "COAL:16"
+      - "IRON_INGOT:8"
+      - "GOLD_INGOT:6"
+      - "DIAMOND:2"
+      - "shards:2"
+      - "$5000"
+    spawner:
+      - "BONE:64"
+      - "ARROW:64"
+      - "shards:5"
+      - "$10000"
+      - "DIAMOND:4"
+    gold:
+      - "GOLD_INGOT:32"
+      - "DIAMOND:8"
+      - "EMERALD:16"
+      - "shards:10"
+      - "$25000"
+    crimson:
+      - "DIAMOND:16"
+      - "EMERALD:32"
+      - "NETHERITE_SCRAP:4"
+      - "shards:20"
+      - "$50000"
+    emerald:
+      - "DIAMOND:32"
+      - "EMERALD:64"
+      - "NETHERITE_INGOT:2"
+      - "shards:40"
+      - "$100000"
