@@ -18,7 +18,6 @@ public final class RolesCommand implements CommandExecutor,TabCompleter,Listener
     private static final String PICKER_PREFIX="§2§l💚 ROLE §8• §f";
     private final EmeraldSMP plugin;
     private final RoleManager roles;
-    private final Map<UUID,UUID> selected=new HashMap<>();
 
     public RolesCommand(EmeraldSMP plugin,RoleManager roles){this.plugin=plugin;this.roles=roles;}
 
@@ -80,23 +79,7 @@ public final class RolesCommand implements CommandExecutor,TabCompleter,Listener
         inv.setItem(49,icon(Material.ARROW,"§e§l⬅ BACK",List.of("§7Return to rank collection")));
         inv.setItem(53,icon(Material.BARRIER,"§c§l✕ CLOSE",List.of()));
         p.openInventory(inv);
-        selected.put(admin.getUniqueId(),role.ordinal());
     }
-
-    private void openTargetRoles(Player admin,Player target){
-        Inventory inv=Bukkit.createInventory(null,27,PICKER_PREFIX+target.getName());
-        inv.setItem(4,icon(Material.PLAYER_HEAD,"§f§l"+target.getName(),List.of("§7Current: "+roles.get(target).badge())));
-        RoleManager.Role[] all=RoleManager.Role.values();
-        for(int i=0;i<all.length;i++){
-            RoleManager.Role r=all[i];
-            inv.setItem(10+i,icon(material(r),r.badge(),List.of("§7"+r.description(),"§eClick to apply")));
-        }
-        inv.setItem(22,icon(Material.ARROW,"§e§l⬅ BACK",List.of()));
-        selected.put(admin.getUniqueId(),target.getUniqueId());
-        pSafeOpen(admin,inv);
-    }
-
-    private void pSafeOpen(Player p,Inventory inv){p.openInventory(inv);}
 
     private int count(RoleManager.Role r){
         int n=0;for(Player p:Bukkit.getOnlinePlayers())if(roles.get(p)==r)n++;return n;
@@ -136,24 +119,18 @@ public final class RolesCommand implements CommandExecutor,TabCompleter,Listener
         }else if(title.startsWith(PICKER_PREFIX)){
             if(slot==53){p.closeInventory();return;}
             if(slot==49){openCollection(p);return;}
-            if(title.startsWith(PICKER_PREFIX)){
-                String suffix=ChatColor.stripColor(title.substring(PICKER_PREFIX.length())).trim();
-                RoleManager.Role role=RoleManager.Role.parse(suffix);
-                if(role!=null){
-                    if(e.getCurrentItem()!=null&&e.getCurrentItem().getType()==Material.PLAYER_HEAD){
-                        String name=ChatColor.stripColor(Objects.requireNonNull(e.getCurrentItem().getItemMeta()).getDisplayName());
-                        Player target=Bukkit.getPlayerExact(name);
-                        if(target!=null){roles.set(target,role);p.sendMessage("§a💚 Assigned "+role.badge()+" §ato §f"+target.getName());openCollection(p);}
-                    }
-                }else{
-                    UUID targetId=(UUID)selected.get(p.getUniqueId());
-                    if(targetId!=null){
-                        Player target=Bukkit.getPlayer(targetId);
-                        RoleManager.Role[] all=RoleManager.Role.values();
-                        int idx=slot-10;
-                        if(target!=null&&idx>=0&&idx<all.length){roles.set(target,all[idx]);p.sendMessage("§a💚 Assigned "+all[idx].badge()+" §ato §f"+target.getName());openCollection(p);}
-                    }
-                }
+            String suffix=ChatColor.stripColor(title.substring(PICKER_PREFIX.length())).trim();
+            RoleManager.Role role=RoleManager.Role.parse(suffix);
+            if(role==null)return;
+            if(e.getCurrentItem()==null||e.getCurrentItem().getType()!=Material.PLAYER_HEAD)return;
+            ItemMeta meta=e.getCurrentItem().getItemMeta();
+            if(meta==null)return;
+            String name=ChatColor.stripColor(meta.getDisplayName());
+            Player target=Bukkit.getPlayerExact(name);
+            if(target!=null){
+                roles.set(target,role);
+                p.sendMessage("§a💚 Assigned "+role.badge()+" §ato §f"+target.getName());
+                openCollection(p);
             }
         }
     }
@@ -162,7 +139,6 @@ public final class RolesCommand implements CommandExecutor,TabCompleter,Listener
         if(e.getView().getTitle().startsWith("§2§l💚")||e.getView().getTitle().startsWith(PICKER_PREFIX))e.setCancelled(true);
     }
 
-    @EventHandler public void close(InventoryCloseEvent e){selected.remove(e.getPlayer().getUniqueId());}
 
     @Override public List<String> onTabComplete(CommandSender sender,Command command,String alias,String[] args){
         if(args.length==1)return List.of("set");
