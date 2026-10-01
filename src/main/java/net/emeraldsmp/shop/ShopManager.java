@@ -153,6 +153,11 @@ public final class ShopManager {
         }
     }
 
+    public void refreshSellDisplay(Player p) {
+        Inventory inv = sellInventories.get(p.getUniqueId());
+        if (inv != null) updateSellDisplay(p, inv);
+    }
+
     private void updateSellDisplay(Player p, Inventory inv) {
         long total = 0;
         for (int slot = 0; slot < SELL_INPUT_SLOTS; slot++) {
