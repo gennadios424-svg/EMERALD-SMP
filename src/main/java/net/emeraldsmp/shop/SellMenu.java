@@ -86,8 +86,12 @@ public final class SellMenu implements Listener {
     }
 
     @EventHandler public void click(InventoryClickEvent event){
-        if(!(event.getWhoClicked() instanceof Player player))return;Session session=sessions.get(player.getUniqueId());
-        if(session==null||session.inventory!=event.getView().getTopInventory())return;int raw=event.getRawSlot();
+        if(!(event.getWhoClicked() instanceof Player player))return;
+        Inventory active=event.getView().getTopInventory();
+        if(!isSellInventory(active))return;
+        Session session=(Session)active.getHolder();
+        if(session.processing){event.setCancelled(true);return;}
+        int raw=event.getRawSlot();
         if(raw>=SIZE||raw<0){Bukkit.getScheduler().runTask(plugin,()->refresh(player,session));return;}
         if(raw==SELL_SLOT){event.setCancelled(true);sell(player,active,session);return;}
         if(raw==CLOSE_SLOT){event.setCancelled(true);player.closeInventory();return;}
@@ -96,8 +100,11 @@ public final class SellMenu implements Listener {
     }
 
     @EventHandler public void drag(InventoryDragEvent event){
-        if(!(event.getWhoClicked() instanceof Player player))return;Session session=sessions.get(player.getUniqueId());
-        if(session==null||session.inventory!=event.getView().getTopInventory())return;
+        if(!(event.getWhoClicked() instanceof Player player))return;
+        Inventory active=event.getView().getTopInventory();
+        if(!isSellInventory(active))return;
+        Session session=(Session)active.getHolder();
+        if(session.processing){event.setCancelled(true);return;}
         for(int raw:event.getRawSlots())if(raw<SIZE&&!isInputSlot(raw)){event.setCancelled(true);return;}
         Bukkit.getScheduler().runTask(plugin,()->refresh(player,session));
     }
@@ -150,9 +157,6 @@ public final class SellMenu implements Listener {
             }
             sessions.remove(uuid);session.processing=false;player.sendMessage(ChatColor.GREEN+"💚 Sold "+ChatColor.WHITE+String.format(Locale.US,"%,d",itemCount)+ChatColor.GREEN+" items for "+ChatColor.WHITE+plugin.getEconomyManager().format(total)+ChatColor.GREEN+"!");player.playSound(player.getLocation(),org.bukkit.Sound.ENTITY_PLAYER_LEVELUP,1f,1.25f);player.closeInventory();
         }finally{transactionLocks.remove(uuid);}
-    }
-    private void returnItems(Player player,Inventory inventory){
-        if(inventory==null)return;for(int slot:INPUT_SLOTS){ItemStack item=inventory.getItem(slot);if(item==null||item.getType().isAir())continue;inventory.setItem(slot,null);Map<Integer,ItemStack> leftovers=player.getInventory().addItem(item.clone());for(ItemStack remaining:leftovers.values())player.getWorld().dropItemNaturally(player.getLocation(),remaining);}
     }
     public void disable(){for(Player player:Bukkit.getOnlinePlayers()){Session session=sessions.get(player.getUniqueId());if(session!=null&&!session.processing)player.closeInventory();}sessions.clear();}
     private static final class Session implements InventoryHolder{private final UUID sessionId;private final UUID owner;private Inventory inventory;private boolean processing;private Session(UUID sessionId,UUID owner){this.sessionId=sessionId;this.owner=owner;}@Override public Inventory getInventory(){return inventory;}}
