@@ -76,15 +76,31 @@ public final class EmeraldToolsManager implements Listener {
                 lore.add("§7Works with /sell and the Emerald Sell Axe");
             }
         }
-        long expiresAt = System.currentTimeMillis() + (type == ToolType.MONEY_HELMET ? HELMET_MS : SIX_DAYS_MS);
-        lore.add("§e⏳ Expires in: §f" + formatRemaining(expiresAt));
+        // Expiry is intentionally NOT started here. Emerald tool expiry starts only when the item is delivered as a crate reward.
         lore.add("");
         lore.add("§2§lEMERALD SMP");
         meta.setDisplayName(name);
         meta.setLore(lore);
         meta.getPersistentDataContainer().set(typeKey, PersistentDataType.STRING, type.name());
-        meta.getPersistentDataContainer().set(expiryKey, PersistentDataType.LONG, expiresAt);
         meta.setCustomModelData(type == ToolType.MONEY_HELMET ? 7001 : (type == ToolType.SELL_AXE ? 7002 : 7003));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    /** Starts the expiry timer when an Emerald tool is actually received from a crate. */
+    public ItemStack activateCrateReward(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return item;
+        ItemMeta meta = item.getItemMeta();
+        String raw = meta.getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
+        if (raw == null) return item;
+        ToolType type;
+        try { type = ToolType.valueOf(raw); } catch (IllegalArgumentException ex) { return item; }
+        if (meta.getPersistentDataContainer().has(expiryKey, PersistentDataType.LONG)) return item;
+        long expiresAt = System.currentTimeMillis() + (type == ToolType.MONEY_HELMET ? HELMET_MS : SIX_DAYS_MS);
+        meta.getPersistentDataContainer().set(expiryKey, PersistentDataType.LONG, expiresAt);
+        List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
+        lore.add(0, "§e⏳ Expires in: §f" + formatRemaining(expiresAt));
+        meta.setLore(lore);
         item.setItemMeta(meta);
         return item;
     }
