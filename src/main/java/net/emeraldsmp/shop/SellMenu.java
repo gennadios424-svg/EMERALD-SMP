@@ -204,8 +204,9 @@ public final class SellMenu implements Listener {
             event.setCancelled(true);
             ItemStack clicked = event.getCurrentItem();
             if (clicked != null && !clicked.getType().isAir()) {
-                moveToSellSlots(active, clicked);
-                event.getWhoClicked().getInventory().setItem(event.getSlot(), null);
+                ItemStack remaining = moveToSellSlots(active, clicked);
+                event.getWhoClicked().getInventory().setItem(event.getSlot(),
+                        remaining == null || remaining.getType().isAir() ? null : remaining);
             }
             Bukkit.getScheduler().runTask(plugin, () -> refresh(player, session));
             return;
@@ -237,7 +238,7 @@ public final class SellMenu implements Listener {
         Bukkit.getScheduler().runTask(plugin, () -> refresh(player, session));
     }
 
-    private void moveToSellSlots(Inventory active, ItemStack source) {
+    private ItemStack moveToSellSlots(Inventory active, ItemStack source) {
         ItemStack remaining = source.clone();
 
         // First merge with existing compatible stacks.
@@ -268,14 +269,8 @@ public final class SellMenu implements Listener {
             remaining.setAmount(remaining.getAmount() - moved);
         }
 
-        // Return anything that did not fit. The source slot is restored by the caller
-        // with exactly the remaining amount, preserving complete ItemStack metadata.
-        // This method stores the remainder temporarily in a dedicated field instead of
-        // silently deleting it.
-        lastMoveRemainder.set(remaining);
+        return remaining.getAmount() <= 0 ? null : remaining;
     }
-
-    private final ThreadLocal<ItemStack> lastMoveRemainder = new ThreadLocal<>();
 
     @EventHandler
     public void drag(InventoryDragEvent event) {
