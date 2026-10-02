@@ -30,62 +30,133 @@ public final class WorthManager {
             ConfigurationSection worth=next.getConfigurationSection("worth");if(worth==null)throw new IllegalArgumentException("Missing 'worth' section.");Map<Material,WorthEntry> parsed=new EnumMap<>(Material.class);for(String key:worth.getKeys(false)){Material m=Material.matchMaterial(key);if(m==null||!isSupported(m))continue;long value;try{value=new BigDecimal(String.valueOf(worth.get(key))).longValueExact();}catch(Exception ex){continue;}if(value<0)continue;String cn=next.getString("categories."+key,defaultCategory(m).name());WorthCategory cat;try{cat=WorthCategory.valueOf(cn.toUpperCase(Locale.ROOT));}catch(Exception ex){cat=defaultCategory(m);}parsed.put(m,new WorthEntry(m,value,cat,next.getBoolean("enabled."+key,true)));}if(parsed.isEmpty())throw new IllegalArgumentException("No valid worth entries found.");entries.clear();entries.putAll(parsed);return true;}catch(Exception ex){plugin.getLogger().log(java.util.logging.Level.SEVERE,"[Worth] Reload failed; previous valid data was kept.",ex);return false;}}
     public synchronized Collection<WorthEntry> all(){List<WorthEntry> r=new ArrayList<>();for(Material m:Material.values())if(isSupported(m)){WorthEntry e=entries.get(m);if(e!=null&&e.enabled())r.add(e);}return r;}
     public synchronized WorthEntry get(Material m){return entries.get(m);} public synchronized long value(Material m,int amount){WorthEntry e=entries.get(m);if(e==null||!e.enabled()||amount<0)return 0;return Math.multiplyExact(e.worth(),(long)amount);}
-    public void openBrowser(Player p,String query,int page,WorthCategoryFilter filter,WorthSort sort){String q=query==null?"":query.trim().toLowerCase(Locale.ROOT);WorthCategoryFilter f=filter==null?WorthCategoryFilter.ALL:filter;WorthSort s=sort==null?WorthSort.NAME_ASC:sort;List<WorthEntry> list=all().stream().filter(e->f==WorthCategoryFilter.ALL||e.category()==f.category()).filter(e->q.isEmpty()||e.material().name().toLowerCase(Locale.ROOT).contains(q)||pretty(e.material()).toLowerCase(Locale.ROOT).contains(q)).sorted(comparator(s)).toList();if(list.isEmpty()){plugin.getMessageService().send(p,"&cNo items found for &f\""+(query==null?"":query)+"&c\".");return;}int pages=Math.max(1,(list.size()+44)/45);int safe=Math.max(0,Math.min(page,pages-1));views.put(p.getUniqueId(),new ViewState(q,safe,f,s,list));Inventory inv=plugin.getServer().createInventory(null,54,"§2§l💚 WORTH §8• §fPage "+(safe+1)+"/"+pages);int from=safe*45,to=Math.min(from+45,list.size());for(int i=from;i<to;i++)inv.setItem(i,display(list.get(i),false));inv.setItem(PREVIOUS, safe==0 ? button("BARRIER","§8⬅ Previous",List.of("§7Already on the first page")) : button("ARROW","§a⬅ Previous",List.of("§7Go to the previous page")));inv.setItem(ALL,button("COMPASS","§b🏠 All Items",List.of("§7Clear search and category filter")));inv.setItem(SEARCH,button("NAME_TAG","§e🔎 Search",List.of("§7Click, then type a search in chat")));inv.setItem(CLEAR,button("BARRIER","§c✖ Clear Search",List.of("§7Remove the current search")));inv.setItem(CATEGORY,button("BOOK","§f📂 Category: §a"+f.displayName(),List.of("§7Click to cycle categories")));inv.setItem(SORT,button("HOPPER","§f🔄 Sort: §a"+s.displayName(),List.of("§7Click to cycle sorting")));inv.setItem(INFO,button("PAPER","§f"+list.size()+" items",List.of("§7Matching items")));inv.setItem(NEXT, safe>=pages-1 ? button("BARRIER","§8Next ➡",List.of("§7Already on the last page")) : button("ARROW","§aNext ➡",List.of("§7Go to the next page")));p.openInventory(inv);}
+    public void openBrowser(Player p, String query, int page, WorthCategoryFilter filter, WorthSort sort) {
+        String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        WorthCategoryFilter f = filter == null ? WorthCategoryFilter.ALL : filter;
+        WorthSort s = sort == null ? WorthSort.NAME_ASC : sort;
+
+        List<WorthEntry> results = all().stream()
+                .filter(e -> f == WorthCategoryFilter.ALL || e.category() == f.category())
+                .filter(e -> q.isEmpty()
+                        || e.material().name().toLowerCase(Locale.ROOT).contains(q)
+                        || pretty(e.material()).toLowerCase(Locale.ROOT).contains(q))
+                .sorted(comparator(s))
+                .collect(java.util.stream.Collectors.toList());
+
+        if (results.isEmpty()) {
+            views.remove(p.getUniqueId());
+            plugin.getMessageService().send(p, "&cNo items found for &f"" + (query == null ? "" : query) + "&c".");
+            return;
+        }
+
+        final int pageSize = 45;
+        final int totalPages = Math.max(1, (results.size() + pageSize - 1) / pageSize);
+        final int safePage = Math.max(0, Math.min(page, totalPages - 1));
+        final int from = safePage * pageSize;
+        final int to = Math.min(from + pageSize, results.size());
+
+        ViewState state = new ViewState(q, safePage, f, s, results);
+        views.put(p.getUniqueId(), state);
+
+        Inventory inv = plugin.getServer().createInventory(
+                null, 54, "§2§l💚 WORTH §8• §fPage " + (safePage + 1) + "/" + totalPages
+        );
+
+        for (int i = from; i < to; i++) {
+            inv.setItem(i - from, display(results.get(i), false));
+        }
+
+        inv.setItem(PREVIOUS,
+                safePage == 0
+                        ? button("BARRIER", "§8⬅ PREVIOUS", List.of("§7Already on page 1"))
+                        : button("ARROW", "§a⬅ PREVIOUS", List.of("§7Go to page " + safePage)));
+
+        inv.setItem(ALL, button("COMPASS", "§b🏠 ALL ITEMS",
+                List.of("§7Clear search and category filter")));
+
+        inv.setItem(SEARCH, button("NAME_TAG", "§e🔎 SEARCH",
+                List.of("§7Click, then type an item name in chat")));
+
+        inv.setItem(CLEAR, button("BARRIER", "§c✖ CLEAR SEARCH",
+                List.of("§7Remove the current search")));
+
+        inv.setItem(CATEGORY, button("BOOK", "§f📂 CATEGORY: §a" + f.displayName(),
+                List.of("§7Click to cycle categories")));
+
+        inv.setItem(SORT, button("HOPPER", "§f🔄 SORT: §a" + s.displayName(),
+                List.of("§7Click to cycle sorting")));
+
+        inv.setItem(INFO, button("PAPER", "§f📖 PAGE " + (safePage + 1) + "/" + totalPages,
+                List.of("§7Showing items " + (from + 1) + "–" + to + " of " + results.size())));
+
+        inv.setItem(NEXT,
+                safePage >= totalPages - 1
+                        ? button("BARRIER", "§8NEXT ➡", List.of("§7Already on the last page"))
+                        : button("ARROW", "§aNEXT ➡", List.of("§7Go to page " + (safePage + 2))));
+
+        p.openInventory(inv);
+    }
+
     public void openInfo(Player p,WorthEntry e,ViewState state){Inventory inv=plugin.getServer().createInventory(null,27,"§2§l💚 WORTH INFO §8• §f"+pretty(e.material()));inv.setItem(4,display(e,true));inv.setItem(11,button("EMERALD","§aWorth: §f$"+e.worth()+" / item",List.of("§7Category: §f"+e.category().displayName())));inv.setItem(13,button("CHEST","§bStack Worth: §f$"+e.stackWorth(),List.of("§7Stack size: §f"+e.material().getMaxStackSize())));inv.setItem(15,button("BOOK","§fMaterial: §7"+e.material().name(),List.of("§7Java Edition material")));inv.setItem(22,button("ARROW","§a⬅ Back",List.of("§7Return to the worth browser")));views.put(p.getUniqueId(),state);p.openInventory(inv);}
-    public void click(Player p,int slot){
-        ViewState s=views.get(p.getUniqueId());
-        if(s==null)return;
-        String openTitle=org.bukkit.ChatColor.stripColor(p.getOpenInventory().getTitle());
-        if(openTitle.startsWith("💚 WORTH INFO") && slot==22){
-            openBrowser(p,s.query,s.page,s.filter,s.sort);
+    public void click(Player p, int slot) {
+        ViewState s = views.get(p.getUniqueId());
+        if (s == null) return;
+
+        String openTitle = org.bukkit.ChatColor.stripColor(p.getOpenInventory().getTitle());
+        if (openTitle.startsWith("💚 WORTH INFO")) {
+            if (slot == 22) openBrowser(p, s.query, s.page, s.filter, s.sort);
             return;
         }
-        if(openTitle.startsWith("💚 WORTH INFO")) return;
-        if(slot>=0&&slot<45){
-            int idx=s.page*45+slot;
-            if(idx>=0&&idx<s.results.size()){
-                WorthEntry entry=s.results.get(idx);
-                openInfo(p,entry,s);
+
+        final int pageSize = 45;
+
+        if (slot >= 0 && slot < pageSize) {
+            int index = s.page * pageSize + slot;
+            if (index >= 0 && index < s.results.size()) {
+                openInfo(p, s.results.get(index), s);
             }
             return;
         }
-        switch(slot){
-            case PREVIOUS->{
-                if(s.page<=0){plugin.getMessageService().send(p,"&7Already on the first page.");return;}
-                String q=s.query; int page=s.page-1; WorthCategoryFilter f=s.filter; WorthSort sort=s.sort;
-                openBrowser(p,q,page,f,sort);
+
+        int lastPage = Math.max(0, (s.results.size() - 1) / pageSize);
+
+        switch (slot) {
+            case PREVIOUS -> {
+                int target = Math.max(0, s.page - 1);
+                if (target == s.page) {
+                    plugin.getMessageService().send(p, "&7Already on the first page.");
+                    return;
+                }
+                openBrowser(p, s.query, target, s.filter, s.sort);
             }
-            case NEXT->{
-                int last=(s.results.size()-1)/45;
-                if(s.page>=last){plugin.getMessageService().send(p,"&7Already on the last page.");return;}
-                String q=s.query; int page=s.page+1; WorthCategoryFilter f=s.filter; WorthSort sort=s.sort;
-                openBrowser(p,q,page,f,sort);
+            case NEXT -> {
+                int target = Math.min(lastPage, s.page + 1);
+                if (target == s.page) {
+                    plugin.getMessageService().send(p, "&7Already on the last page.");
+                    return;
+                }
+                openBrowser(p, s.query, target, s.filter, s.sort);
             }
-            case ALL->{
-                WorthSort sort=s.sort;
-                openBrowser(p,"",0,WorthCategoryFilter.ALL,sort);
+            case ALL -> openBrowser(p, "", 0, WorthCategoryFilter.ALL, s.sort);
+            case SEARCH -> {
+                p.closeInventory();
+                plugin.beginWorthSearch(p);
             }
-            case SEARCH->{p.closeInventory();plugin.beginWorthSearch(p);}
-            case CLEAR->{
-                WorthCategoryFilter f=s.filter; WorthSort sort=s.sort;
-                openBrowser(p,"",0,f,sort);
+            case CLEAR -> openBrowser(p, "", 0, s.filter, s.sort);
+            case CATEGORY -> {
+                WorthCategoryFilter[] values = WorthCategoryFilter.values();
+                WorthCategoryFilter nextFilter =
+                        values[(s.filter.ordinal() + 1) % values.length];
+                openBrowser(p, s.query, 0, nextFilter, s.sort);
             }
-            case CATEGORY->{
-                WorthCategoryFilter[] v=WorthCategoryFilter.values();
-                String q=s.query; WorthCategoryFilter f=v[(s.filter.ordinal()+1)%v.length]; WorthSort sort=s.sort;
-                openBrowser(p,q,0,f,sort);
+            case SORT -> {
+                WorthSort nextSort = s.sort.next();
+                openBrowser(p, s.query, 0, s.filter, nextSort);
             }
-            case SORT->{
-                String q=s.query; WorthCategoryFilter f=s.filter; WorthSort sort=s.sort.next();
-                plugin.getServer().getScheduler().runTask(plugin,()->openBrowser(p,q,0,f,sort));
-            }
-            case 22->{
-                String q=s.query; int page=s.page; WorthCategoryFilter f=s.filter; WorthSort sort=s.sort;
-                plugin.getServer().getScheduler().runTask(plugin,()->openBrowser(p,q,page,f,sort));
-            }
-            default->{}
+            default -> { }
         }
     }
+
     public void searchCurrent(Player p, String query){
         ViewState s = views.get(p.getUniqueId());
         WorthCategoryFilter filter = s == null ? WorthCategoryFilter.ALL : s.filter;
