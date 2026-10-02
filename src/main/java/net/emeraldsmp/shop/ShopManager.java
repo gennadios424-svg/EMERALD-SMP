@@ -63,7 +63,7 @@ public final class ShopManager {
         }finally{buyProcessing.remove(uuid);}
     }
     private List<ShopItem> configuredItems(String key){
-        if(key.equals("spawners")){List<ShopItem> out=new ArrayList<>();for(String type:List.of("skeleton","zombie","spider","creeper"))out.add(new ShopItem(type+"-spawner",Material.SPAWNER,"§a§l💚 "+Character.toUpperCase(type.charAt(0))+type.substring(1)+" Spawner",1500L,List.of("§7Price: §a1,500 Emerald Shards","§7Uses the existing Emerald SMP spawner system","§8Click for purchase amounts"),true,type));return out;}
+        if(key.equals("spawners")){List<ShopItem> out=new ArrayList<>();for(String type:List.of("skeleton","zombie","spider","creeper"))out.add(new ShopItem(type+"-spawner",Material.SPAWNER,"§a§l💚 "+Character.toUpperCase(type.charAt(0))+type.substring(1)+" Spawner",1500L,List.of("§7Price: §a"+plugin.getEconomyManager().formatCompact(1500L)+" Emerald Shards","§7Currency: §aEmerald Shards","§8Click for purchase amounts"),true,type));return out;}
         List<Material> mats=CURATED.getOrDefault(key,List.of());List<ShopItem> out=new ArrayList<>();
         for(Material m:mats){WorthEntry w=plugin.getWorthManager().get(m);if(m!=Material.END_CRYSTAL&&(w==null||!w.enabled()))continue;long sellWorth=w==null?0L:w.worth();long buy=m==Material.END_CRYSTAL?500L:plugin.getWorthManager().buyValue(m,1);if(buy<=sellWorth)continue;out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT),m,roleStyledName(m),buy,List.of("§7Buy: §a"+plugin.getEconomyManager().format(buy)+" §7/ item","§7Sell: §a"+plugin.getEconomyManager().format(sellWorth)+" §7/ item","§8Click for purchase amounts"),false,null));}
         return out;
@@ -71,7 +71,7 @@ public final class ShopManager {
     private static final Map<String,Integer> CATEGORY_INDEX=Map.of("resources",0,"blocks",1,"redstone",2,"cpvp",3,"nether",4,"spawners",5);
     private String categoryDisplay(String key){for(int i=0;i<CATEGORY_KEYS.length;i++)if(CATEGORY_KEYS[i].equals(key))return ChatColor.stripColor(CATEGORY_NAMES[i]);return key;}
     private ItemStack shopDisplay(ShopItem item){return icon(item.material(),item.displayName(),item.lore());}
-    private ItemStack buyButton(ShopItem item,int qty){long total;try{total=Math.multiplyExact(item.buyPrice(),qty);}catch(ArithmeticException ex){total=Long.MAX_VALUE;}return icon(Material.EMERALD,"§a§lBUY ×"+qty,List.of("§7Price: §f"+(item.shards()?String.format(Locale.US,"%,d Emerald Shards",total):plugin.getEconomyManager().format(total)),"§8Click to purchase"));}
+    private ItemStack buyButton(ShopItem item,int qty){long total;try{total=Math.multiplyExact(item.buyPrice(),qty);}catch(ArithmeticException ex){total=Long.MAX_VALUE;}return icon(Material.EMERALD,"§a§lBUY ×"+qty,List.of("§7Price: §f"+(item.shards()?plugin.getEconomyManager().formatCompact(total)+" Emerald Shards":plugin.getEconomyManager().format(total)),"§8Click to purchase"));}
     private ItemStack icon(Material m,String n,List<String> l){ItemStack i=new ItemStack(m);ItemMeta meta=i.getItemMeta();if(meta!=null){meta.setDisplayName(n);meta.setLore(l);i.setItemMeta(meta);}return i;}
     private boolean hasSpace(Player p,Material m,int qty){int remaining=qty;for(ItemStack s:p.getInventory().getStorageContents()){if(remaining<=0)return true;if(s==null||s.getType().isAir())remaining-=m.getMaxStackSize();else if(s.getType()==m)remaining-=Math.max(0,m.getMaxStackSize()-s.getAmount());}return remaining<=0;}
     private String roleStyledName(Material m){return "§a§l"+pretty(m);}
