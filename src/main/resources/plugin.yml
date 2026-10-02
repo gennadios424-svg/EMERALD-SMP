@@ -37,6 +37,18 @@ commands:
     description: Opens the Emerald SMP sell menu
     usage: /sell
     permission: emerald.command
+  sellaxe:
+    description: Gives the Emerald Sell Axe (OP only)
+    usage: /sellaxe [player]
+    permission: emerald.admin
+  treechopper:
+    description: Gives the Emerald Tree Chopper (OP only)
+    usage: /treechopper [player]
+    permission: emerald.admin
+  emeraldhelmet:
+    description: Gives the Emerald Money Helmet (OP only)
+    usage: /emeraldhelmet [player]
+    permission: emerald.admin
   spawn:
     description: Teleports you to the Emerald SMP spawn
     usage: /spawn
