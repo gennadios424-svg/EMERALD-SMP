@@ -48,7 +48,7 @@ public final class LeaderboardManager implements CommandExecutor, Listener {
                 case SHARDS -> d.getEmeraldShards();
                 case KILLS -> stat(op,Statistic.PLAYER_KILLS);
                 case DEATHS -> stat(op,Statistic.DEATHS);
-                case BLOCKS -> stat(op,Statistic.MINE_BLOCKS);
+                case BLOCKS -> blocksMined(op);
                 case PLAYTIME -> stat(op,Statistic.PLAY_ONE_MINUTE);
             };
             entries.add(new Entry(d.getUsername()==null?u.toString():d.getUsername(),value));
@@ -68,6 +68,14 @@ public final class LeaderboardManager implements CommandExecutor, Listener {
     }
 
     private long stat(OfflinePlayer p,Statistic s){try{return p.getStatistic(s);}catch(Exception e){return 0L;}}
+    private long blocksMined(OfflinePlayer p){
+        long total=0L;
+        for(Material m:Material.values()){
+            if(!m.isBlock())continue;
+            try{long n=p.getStatistic(Statistic.MINE_BLOCK,m);if(Long.MAX_VALUE-total<n)return Long.MAX_VALUE;total+=n;}catch(Exception ignored){}
+        }
+        return total;
+    }
     private String display(Category c){return switch(c){
         case MONEY->"💰 MONEY"; case KILLS->"⚔ KILLS"; case SHARDS->"💎 EMERALD SHARDS";
         case DEATHS->"💀 DEATHS"; case BLOCKS->"⛏ BLOCKS BROKEN"; case PLAYTIME->"🕒 PLAYTIME";
