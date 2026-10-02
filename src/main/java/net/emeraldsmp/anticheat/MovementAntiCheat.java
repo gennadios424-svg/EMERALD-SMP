@@ -18,7 +18,7 @@ public final class MovementAntiCheat implements Listener {
     private final Map<UUID,Integer> airTicks=new ConcurrentHashMap<>();
     private final Map<UUID,Long> lastFlag=new ConcurrentHashMap<>();
     public MovementAntiCheat(EmeraldSMP plugin){this.plugin=plugin;}
-    private boolean bypass(Player p){return p.getGameMode()==GameMode.SPECTATOR||p.getGameMode()==GameMode.CREATIVE||plugin.getRoleManager().isStaff(p)||p.hasPermission("emerald.anticheat.bypass");}
+    private boolean bypass(Player p){return !plugin.getAuthManager().isAntiCheatReady(p)||p.getGameMode()==GameMode.SPECTATOR||p.getGameMode()==GameMode.CREATIVE||plugin.getRoleManager().isStaff(p)||p.hasPermission("emerald.anticheat.bypass");}
     private void flag(Player p,String reason,int suspicion){if(bypass(p))return;long now=System.currentTimeMillis(),last=lastFlag.getOrDefault(p.getUniqueId(),0L);if(now-last<350L)return;lastFlag.put(p.getUniqueId(),now);int n=flags.merge(p.getUniqueId(),1,Integer::sum);plugin.getSusListManager().record(p,p.getLocation(),reason,n,Math.min(100,suspicion));}
     @EventHandler(ignoreCancelled=true) public void move(PlayerMoveEvent e){
         Player p=e.getPlayer();if(bypass(p)||e.getTo()==null)return;Location a=e.getFrom(),b=e.getTo();double horizontal=Math.hypot(b.getX()-a.getX(),b.getZ()-a.getZ());
