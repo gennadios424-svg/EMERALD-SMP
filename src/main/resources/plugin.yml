@@ -122,6 +122,11 @@ commands:
     description: Opens the Emerald SMP investment system
     usage: /invest [amount|withdraw]
     permission: emerald.command
+  leaderboard:
+    description: Opens persistent Emerald SMP leaderboards
+    usage: /leaderboard [money|kills|shards|deaths|blocks|playtime]
+    aliases: [leaderboards, lb]
+    permission: emerald.command
   vanish:
     description: Toggle Emerald SMP staff vanish
     usage: /vanish
