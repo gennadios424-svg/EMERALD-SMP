@@ -181,7 +181,7 @@ public final class SellMenu implements Listener {
                         Material.EMERALD,
                         ChatColor.GREEN + "§l💵 TOTAL VALUE",
                         List.of("", ChatColor.GRAY + "Current sell value",
-                                ChatColor.WHITE + "$" + money(applySellMultiplier(player, total(session.inventory)))
+                                ChatColor.WHITE + "$" + money(applySellMultiplier(player, total(session.inventory))))
                 )
         );
     }
