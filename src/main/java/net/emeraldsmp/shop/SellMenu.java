@@ -129,6 +129,10 @@ public final class SellMenu implements Listener {
         return NumberFormat.getNumberInstance(Locale.US).format(amount);
     }
 
+    private long applySellMultiplier(Player player, long base) {
+        return plugin.getEmeraldToolsManager() == null ? base : plugin.getEmeraldToolsManager().multiplier(player, base);
+    }
+
     /**
      * Reads ONLY the real active sell slots. No cached item list is used.
      */
@@ -177,7 +181,7 @@ public final class SellMenu implements Listener {
                         Material.EMERALD,
                         ChatColor.GREEN + "§l💵 TOTAL VALUE",
                         List.of("", ChatColor.GRAY + "Current sell value",
-                                ChatColor.WHITE + "$" + money(total(session.inventory)))
+                                ChatColor.WHITE + "$" + money(applySellMultiplier(player, total(session.inventory)))
                 )
         );
     }
@@ -391,6 +395,8 @@ public final class SellMenu implements Listener {
                     return;
                 }
             }
+
+            total = applySellMultiplier(player, total);
 
             if (sellSlots.isEmpty() || total <= 0L) {
                 boolean hasUnsupported = false;
