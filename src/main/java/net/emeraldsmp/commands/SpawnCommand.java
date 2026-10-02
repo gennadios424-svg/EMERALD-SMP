@@ -2,10 +2,10 @@ package net.emeraldsmp.commands;
 
 import net.emeraldsmp.EmeraldSMP;
 import org.bukkit.*;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
+import org.bukkit.block.Block;
+import org.bukkit.command.*;
 import org.bukkit.entity.Player;
+import org.bukkit.util.BoundingBox;
 
 import java.util.Locale;
 
@@ -27,6 +27,11 @@ public final class SpawnCommand implements CommandExecutor {
             return setSpawn(player, args);
         }
 
+        if (args.length != 0) {
+            player.sendMessage("§cUsage: /spawn");
+            return true;
+        }
+
         return teleportToSpawn(player);
     }
 
@@ -40,21 +45,20 @@ public final class SpawnCommand implements CommandExecutor {
             return true;
         }
 
-        if (args.length > 1 || (args.length == 1 && !args[0].equalsIgnoreCase("safe"))) {
-            player.sendMessage("§cUsage: /setspawn [safe]");
+        if (args.length != 0) {
+            player.sendMessage("§cUsage: /setspawn");
             return true;
         }
 
         Location location = player.getLocation();
         World world = location.getWorld();
 
-        if (world == null || !isFinite(location) || !isSafe(location)) {
-            player.sendMessage("§c✘ Stand on a valid spawn platform with two clear blocks above it.");
-            player.sendMessage("§7Air around the platform is allowed; natural terrain is not required.");
+        // Save exactly where the authorized player is standing.
+        // No safe-location search and no coordinate adjustment are performed.
+        if (world == null || !isFinite(location) || !isValidStandingSpace(player)) {
+            player.sendMessage("§c✘ You cannot set spawn while your body or head is inside a solid block.");
             return true;
         }
-
-        boolean safeMode = args.length == 1 && args[0].equalsIgnoreCase("safe");
 
         plugin.getConfig().set("spawn.world", world.getName());
         plugin.getConfig().set("spawn.x", location.getX());
@@ -62,13 +66,12 @@ public final class SpawnCommand implements CommandExecutor {
         plugin.getConfig().set("spawn.z", location.getZ());
         plugin.getConfig().set("spawn.yaw", location.getYaw());
         plugin.getConfig().set("spawn.pitch", location.getPitch());
-        plugin.getConfig().set("spawn.safe", safeMode);
         plugin.saveConfig();
 
         player.sendMessage("§a💚 Emerald SMP spawn has been set at your exact location.");
-        if (safeMode) {
-            player.sendMessage("§7Safe custom-spawn mode enabled. Floating/custom platforms are allowed.");
-        }
+        player.sendMessage("§7World: §f" + world.getName()
+                + " §8| §7XYZ: §f"
+                + String.format(Locale.US, "%.3f %.3f %.3f", location.getX(), location.getY(), location.getZ()));
         return true;
     }
 
@@ -76,12 +79,11 @@ public final class SpawnCommand implements CommandExecutor {
         Location configured = readConfiguredSpawn();
 
         if (configured == null || configured.getWorld() == null) {
-            player.sendMessage("§c✘ Spawn is not configured.");
+            player.sendMessage("§c✘ Spawn is not configured. An authorized player must run /setspawn first.");
             return true;
         }
 
-        // Do not search for terrain or move the player to another block.
-        // The configured world, coordinates, yaw and pitch are authoritative.
+        // The saved Location is authoritative: world, XYZ, yaw and pitch are all preserved.
         if (!player.teleport(configured)) {
             player.sendMessage("§c✘ Spawn teleport failed.");
             return true;
@@ -111,43 +113,30 @@ public final class SpawnCommand implements CommandExecutor {
         return new Location(world, x, y, z, yaw, pitch);
     }
 
-    private boolean isSafe(Location location) {
-        if (location.getWorld() == null || !isFinite(location)) return false;
+    private boolean isValidStandingSpace(Player player) {
+        World world = player.getWorld();
+        BoundingBox box = player.getBoundingBox();
 
-        World world = location.getWorld();
-        int blockY = location.getBlockY();
+        // Check only the blocks actually intersecting the player's current body.
+        // A block directly below the player is not considered a body collision.
+        int minX = (int) Math.floor(box.getMinX());
+        int maxX = (int) Math.floor(Math.nextDown(box.getMaxX()));
+        int minY = (int) Math.floor(box.getMinY());
+        int maxY = (int) Math.floor(Math.nextDown(box.getMaxY()));
+        int minZ = (int) Math.floor(box.getMinZ());
+        int maxZ = (int) Math.floor(Math.nextDown(box.getMaxZ()));
 
-        if (blockY <= world.getMinHeight() || blockY + 1 >= world.getMaxHeight()) return false;
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    Block block = world.getBlockAt(x, y, z);
+                    if (block.getType().isAir() || block.isPassable()) continue;
+                    if (block.getCollisionShape().overlaps(box)) return false;
+                }
+            }
+        }
 
-        var feetBlock = world.getBlockAt(location.getBlockX(), blockY, location.getBlockZ());
-        var headBlock = world.getBlockAt(location.getBlockX(), blockY + 1, location.getBlockZ());
-        var belowBlock = world.getBlockAt(location.getBlockX(), blockY - 1, location.getBlockZ());
-
-        Material feet = feetBlock.getType();
-        Material head = headBlock.getType();
-        Material below = belowBlock.getType();
-
-        // Player space must be clear, while exactly one solid platform block
-        // must exist underneath. This intentionally allows floating/custom
-        // platforms and does not require surrounding terrain.
-        return feetBlock.isPassable()
-                && headBlock.isPassable()
-                && !feetBlock.isLiquid()
-                && !headBlock.isLiquid()
-                && below.isSolid()
-                && !belowBlock.isLiquid()
-                && !isDangerousFloor(below);
-    }
-
-    private boolean isDangerousFloor(Material material) {
-        String name = material.name();
-        return name.contains("LAVA")
-                || name.contains("MAGMA")
-                || name.contains("CAMPFIRE")
-                || name.contains("SOUL_FIRE")
-                || name.contains("FIRE")
-                || name.contains("CACTUS")
-                || name.contains("SWEET_BERRY_BUSH");
+        return true;
     }
 
     private boolean isFinite(Location location) {
