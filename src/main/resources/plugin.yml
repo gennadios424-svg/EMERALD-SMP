@@ -1,232 +1,69 @@
 name: EmeraldSMP
-version: '1.7'
+version: '1.8'
 main: net.emeraldsmp.EmeraldSMP
 api-version: '1.21'
 description: Emerald SMP economy, teams, tags, roles, kits, custom spawners, drills, worth, shop, RTP, coin flips, auction house, homes and investments
 commands:
-  register:
-    description: Register your Emerald SMP account
-    usage: /register <password>
-    permission: emerald.auth
-  login:
-    description: Login to your Emerald SMP account
-    usage: /login <password>
-    permission: emerald.auth
-  emerald:
-    description: Emerald SMP foundation command
-    usage: /emerald [reload]
-    permission: emerald.command
-  balance:
-    description: Shows your Money balance
-    usage: /balance [player]
-    aliases: [bal, money]
-    permission: emerald.command
-  pay:
-    description: Pay another online player
-    usage: /pay <player> <amount>
-    permission: emerald.command
-  eco:
-    description: Emerald economy administration
-    usage: /eco <give|take|set|reset> <player> [amount]
-    permission: emerald.admin
-  shop:
-    description: Opens the Emerald SMP shop
-    usage: /shop
-    permission: emerald.command
-  sell:
-    description: Opens the Emerald SMP sell menu
-    usage: /sell
-    permission: emerald.command
-  sellaxe:
-    description: Gives the Emerald Sell Axe (OP only)
-    usage: /sellaxe [player]
-    permission: emerald.admin
-  treechopper:
-    description: Gives the Emerald Tree Chopper (OP only)
-    usage: /treechopper [player]
-    permission: emerald.admin
-  emeraldhelmet:
-    description: Gives the Emerald Money Helmet (OP only)
-    usage: /emeraldhelmet [player]
-    permission: emerald.admin
-  spawn:
-    description: Teleports you to the Emerald SMP spawn
-    usage: /spawn
-    permission: emerald.command
-  setspawn:
-    description: Sets the Emerald SMP spawn location
-    usage: /setspawn [safe]
-  worth:
-    description: Opens the Emerald SMP item worth browser
-    usage: /worth [search]
-    permission: emerald.command
-  rtp:
-    description: Teleports you to a random safe location
-    usage: /rtp
-    permission: emerald.command
-  cf:
-    description: Opens coin flip
-    usage: /cf
-    permission: emerald.command
-  ah:
-    description: Opens the Auction House
-    usage: /ah [sell]
-    permission: emerald.command
-  sethome:
-    description: Save your current location as a home
-    usage: /sethome [name]
-    permission: emerald.command
-  home:
-    description: Open your homes or teleport to a named home
-    usage: /home [name]
-    permission: emerald.command
-  delhome:
-    description: Delete a saved home
-    usage: /delhome <name>
-    permission: emerald.command
-  afk:
-    description: Toggle AFK status
-    usage: /afk
-    permission: emerald.command
-  teams:
-    description: Opens the Emerald SMP team GUI
-    usage: /teams
-    aliases: [team]
-    permission: emerald.command
-  tags:
-    description: Opens cosmetic tags
-    usage: /tags
-    permission: emerald.command
-  spawner:
-    description: Emerald SMP custom spawner administration
-    usage: /spawner give <player> <skeleton|zombie|spider|creeper> [stack]
-    aliases: [spawners]
-    permission: emerald.admin
-  drill:
-    description: Gives the Original Drill (admin only)
-    usage: /drill [player]
-    permission: emerald.admin
-  shardgainer:
-    description: Gives an Emerald Gainer (admin only)
-    usage: /shardgainer [player]
-    permission: emerald.admin
-  crates:
-    description: Opens Emerald SMP crate information or manages crates
-    usage: /crates [give|place|remove|edit]
-    permission: emerald.command
-  crate:
-    description: Crate management alias
-    usage: /crate edit <type>
-    permission: emerald.admin
-  keyall:
-    description: Gives digital crate keys to all online players
-    usage: /keyall <type> [amount]
-    permission: emerald.admin
-  roles:
-    description: OP-only Emerald SMP role management
-    usage: /roles [set <player> <role>]
-    permission: emerald.roles
-  kits:
-    description: Opens the Emerald SMP kit menu
-    usage: /kits
-    permission: emerald.command
-  invest:
-    description: Opens the Emerald SMP investment system
-    usage: /invest [amount|withdraw]
-    permission: emerald.command
-  leaderboard:
-    description: Opens persistent Emerald SMP leaderboards
-    usage: /leaderboard [money|kills|shards|deaths|blocks|playtime]
-    aliases: [leaderboards, lb]
-    permission: emerald.command
-  vanish:
-    description: Toggle Emerald SMP staff vanish
-    usage: /vanish
-  fly:
-    description: Toggle Emerald SMP staff flight
-    usage: /fly
-  tp:
-    description: Instant staff teleport
-    usage: /tp <player>
-  tpa:
-    description: Request to teleport to another player
-    usage: /tpa <player>
-    permission: emerald.command
-  live:
-    description: Toggle Emerald SMP live status (MEDIA role only)
-    usage: /live
-    permission: emerald.command
-  tpahere:
-    description: Request another player to teleport to you
-    usage: /tpahere <player>
-    permission: emerald.command
-  tpaccept:
-    description: Accept a pending teleport request
-    usage: /tpaccept
-    permission: emerald.command
-  tpdeny:
-    description: Deny a pending teleport request
-    usage: /tpdeny
-    permission: emerald.command
-  tphere:
-    description: Instantly teleport a player to staff
-    usage: /tphere <player>
-  kick:
-    description: Emerald SMP staff kick
-    usage: /kick <player> [reason]
-  ban:
-    description: Emerald SMP staff ban
-    usage: /ban <player> [reason]
-  ipban:
-    description: OWNER-only Emerald SMP IP ban
-    usage: /ipban <player> [reason]
-  unban:
-    description: Emerald SMP staff player unban
-    usage: /unban <player>
-  ipunban:
-    description: OWNER-only Emerald SMP IP unban
-    usage: /ipunban <player>
-  suslist:
-    description: Opens the Emerald SMP anti-cheat suspect list
-    usage: /suslist [tp|remove|clear] [player]
-    permission: emerald.anticheat
-  suswatch:
-    description: Vanish and watch an anti-cheat suspect
-    usage: /suswatch <player>|leave
-    permission: emerald.anticheat
+  register: {description: Register your Emerald SMP account, usage: /register <password>, permission: emerald.auth}
+  login: {description: Login to your Emerald SMP account, usage: /login <password>, permission: emerald.auth}
+  emerald: {description: Emerald SMP foundation command, usage: /emerald [reload], permission: emerald.command}
+  balance: {description: Shows your Money balance, usage: /balance [player], aliases: [bal, money], permission: emerald.command}
+  pay: {description: Pay another online player, usage: /pay <player> <amount>, permission: emerald.command}
+  eco: {description: Emerald economy administration, usage: /eco <give|take|set|reset> <player> [amount], permission: emerald.admin}
+  shop: {description: Opens the Emerald SMP shop, usage: /shop, permission: emerald.command}
+  sell: {description: Opens the Emerald SMP sell menu, usage: /sell, permission: emerald.command}
+  sellaxe: {description: Gives the Emerald Sell Axe (OP only), usage: /sellaxe [player], permission: emerald.admin}
+  treechopper: {description: Gives the Emerald Tree Chopper (OP only), usage: /treechopper [player], permission: emerald.admin}
+  emeraldhelmet: {description: Gives the Emerald Money Helmet (OP only), usage: /emeraldhelmet [player], permission: emerald.admin}
+  spawn: {description: Teleports you to the Emerald SMP spawn, usage: /spawn, permission: emerald.command}
+  setspawn: {description: Sets the Emerald SMP spawn location, usage: /setspawn [safe]}
+  worth: {description: Opens the Emerald SMP item worth browser, usage: /worth [search], permission: emerald.command}
+  rtp: {description: Teleports you to a random safe location, usage: /rtp, permission: emerald.command}
+  cf: {description: Opens coin flip, usage: /cf, permission: emerald.command}
+  ah: {description: Opens the Auction House, usage: /ah [sell], permission: emerald.command}
+  sethome: {description: Save your current location as a home, usage: /sethome [name], permission: emerald.command}
+  home: {description: Open your homes or teleport to a named home, usage: /home [name], permission: emerald.command}
+  delhome: {description: Delete a saved home, usage: /delhome <name>, permission: emerald.command}
+  afk: {description: Toggle AFK status and teleport to the configured AFK location, usage: /afk, permission: emerald.command}
+  setafk: {description: Sets the exact server AFK location and hologram, usage: /setafk, permission: emerald.admin}
+  settings: {description: Opens personal Emerald SMP settings, usage: /settings, permission: emerald.command}
+  teams: {description: Opens the Emerald SMP team GUI, usage: /teams, aliases: [team], permission: emerald.command}
+  tags: {description: Opens cosmetic tags, usage: /tags, permission: emerald.command}
+  spawner: {description: Emerald SMP custom spawner administration, usage: /spawner give <player> <type> [stack], permission: emerald.admin}
+  drill: {description: Gives the Original Drill (admin only), usage: /drill [player], permission: emerald.admin}
+  shardgainer: {description: Gives an Emerald Gainer (admin only), usage: /shardgainer [player], permission: emerald.admin}
+  crates: {description: Opens Emerald SMP crate information or manages crates, usage: /crates [give|place|remove|edit], permission: emerald.command}
+  crate: {description: Crate management alias, usage: /crate edit <type>, permission: emerald.admin}
+  keyall: {description: Gives digital crate keys to all online players, usage: /keyall <type> [amount], permission: emerald.admin}
+  roles: {description: OP-only Emerald SMP role management, usage: /roles [set <player> <role>], permission: emerald.roles}
+  kits: {description: Opens the Emerald SMP kit menu, usage: /kits, permission: emerald.command}
+  invest: {description: Opens the Emerald SMP investment system, usage: /invest [amount|withdraw], permission: emerald.command}
+  leaderboard: {description: Opens persistent Emerald SMP leaderboards, usage: /leaderboard [money|kills|shards|deaths|blocks|playtime], aliases: [leaderboards, lb], permission: emerald.command}
+  vanish: {description: Toggle Emerald SMP staff vanish, usage: /vanish}
+  fly: {description: Toggle Emerald SMP staff flight, usage: /fly}
+  tp: {description: Instant staff teleport, usage: /tp <player>}
+  tpa: {description: Request to teleport to another player, usage: /tpa <player>, permission: emerald.command}
+  live: {description: Toggle Emerald SMP live status (MEDIA role only), usage: /live, permission: emerald.command}
+  tpahere: {description: Request another player to teleport to you, usage: /tpahere <player>, permission: emerald.command}
+  tpaccept: {description: Accept a pending teleport request, usage: /tpaccept, permission: emerald.command}
+  tpdeny: {description: Deny a pending teleport request, usage: /tpdeny, permission: emerald.command}
+  tphere: {description: Instantly teleport a player to staff, usage: /tphere <player>}
+  kick: {description: Emerald SMP staff kick, usage: /kick <player> [reason]}
+  ban: {description: Emerald SMP staff ban, usage: /ban <player> [reason]}
+  ipban: {description: OWNER-only Emerald SMP IP ban, usage: /ipban <player> [reason]}
+  unban: {description: Emerald SMP staff player unban, usage: /unban <player>}
+  ipunban: {description: OWNER-only Emerald SMP IP unban, usage: /ipunban <player>}
+  suslist: {description: Opens the Emerald SMP anti-cheat suspect list, usage: /suslist [tp|remove|clear] [player], permission: emerald.anticheat}
+  suswatch: {description: Vanish and watch an anti-cheat suspect, usage: /suswatch <player>|leave, permission: emerald.anticheat}
 permissions:
-  emerald.auth:
-    description: Allows account registration and login
-    default: true
-  emerald.command:
-    description: Allows use of Emerald SMP commands
-    default: true
-  emerald.admin:
-    description: Allows administrative commands
-    default: op
-    children:
-      emerald.command: true
-  emerald.roles:
-    description: Role management; OP-only in command and GUI
-    default: op
-  emerald.rtp.bypass:
-    description: Bypasses the /rtp cooldown
-    default: op
-  emerald.owner:
-    description: Legacy visual permission; roles now use Emerald role data
-    default: false
-  emerald.dev:
-    description: Legacy visual permission; roles now use Emerald role data
-    default: false
-  emerald.mod:
-    description: Legacy visual permission; roles now use Emerald role data
-    default: false
-  emerald.media:
-    description: Legacy visual permission; roles now use Emerald role data
-    default: false
-  emerald.staff:
-    description: Legacy staff node; actual access is enforced by Emerald role data
-    default: false
-  emerald.anticheat:
-    description: Allows access to the Emerald SMP anti-cheat suspect list
-    default: op
+  emerald.auth: {description: Allows account registration and login, default: true}
+  emerald.command: {description: Allows use of Emerald SMP commands, default: true}
+  emerald.admin: {description: Allows administrative commands, default: op, children: {emerald.command: true}}
+  emerald.roles: {description: Role management; OP-only in command and GUI, default: op}
+  emerald.rtp.bypass: {description: Bypasses the /rtp cooldown, default: op}
+  emerald.owner: {description: Legacy visual permission, default: false}
+  emerald.dev: {description: Legacy visual permission, default: false}
+  emerald.mod: {description: Legacy visual permission, default: false}
+  emerald.media: {description: Legacy visual permission, default: false}
+  emerald.staff: {description: Legacy staff node, default: false}
+  emerald.anticheat: {description: Allows access to the Emerald SMP anti-cheat suspect list, default: op}
