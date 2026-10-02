@@ -178,6 +178,10 @@ commands:
     description: Opens the Emerald SMP anti-cheat suspect list
     usage: /suslist [tp|remove|clear] [player]
     permission: emerald.anticheat
+  suswatch:
+    description: Vanish and watch an anti-cheat suspect
+    usage: /suswatch <player>|leave
+    permission: emerald.anticheat
 permissions:
   emerald.auth:
     description: Allows account registration and login
