@@ -10,12 +10,17 @@ import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.scheduler.BukkitTask;
 import java.util.*;
 
 public final class EmeraldToolsManager implements Listener {
     public enum ToolType { SELL_AXE, TREE_CHOPPER, MONEY_HELMET }
+    private static final long SIX_DAYS_MS = 6L * 24L * 60L * 60L * 1000L;
+    private static final long HELMET_MS = 24L * 60L * 60L * 1000L;
     private final EmeraldSMP plugin;
     private final NamespacedKey typeKey;
+    private final NamespacedKey expiryKey;
+    private final BukkitTask expiryTask;
 
     private static final Set<Material> LOGS = EnumSet.of(
         Material.OAK_LOG, Material.SPRUCE_LOG, Material.BIRCH_LOG, Material.JUNGLE_LOG,
@@ -37,7 +42,11 @@ public final class EmeraldToolsManager implements Listener {
     public EmeraldToolsManager(EmeraldSMP plugin) {
         this.plugin = plugin;
         this.typeKey = new NamespacedKey(plugin, "emerald-custom-tool");
+        this.expiryKey = new NamespacedKey(plugin, "emerald-item-expires");
+        this.expiryTask = Bukkit.getScheduler().runTaskTimer(plugin, this::refreshAllExpiryLore, 20L, 20L);
     }
+
+    public void stop() { if (expiryTask != null) expiryTask.cancel(); }
 
     public ItemStack createItem(ToolType type) {
         Material material = type == ToolType.MONEY_HELMET ? Material.NETHERITE_HELMET : Material.NETHERITE_AXE;
@@ -67,11 +76,14 @@ public final class EmeraldToolsManager implements Listener {
                 lore.add("§7Works with /sell and the Emerald Sell Axe");
             }
         }
+        long expiresAt = System.currentTimeMillis() + (type == ToolType.MONEY_HELMET ? HELMET_MS : SIX_DAYS_MS);
+        lore.add("§e⏳ Expires in: §f" + formatRemaining(expiresAt));
         lore.add("");
         lore.add("§2§lEMERALD SMP");
         meta.setDisplayName(name);
         meta.setLore(lore);
         meta.getPersistentDataContainer().set(typeKey, PersistentDataType.STRING, type.name());
+        meta.getPersistentDataContainer().set(expiryKey, PersistentDataType.LONG, expiresAt);
         meta.setCustomModelData(type == ToolType.MONEY_HELMET ? 7001 : (type == ToolType.SELL_AXE ? 7002 : 7003));
         item.setItemMeta(meta);
         return item;
@@ -79,8 +91,58 @@ public final class EmeraldToolsManager implements Listener {
 
     public boolean is(ItemStack item, ToolType type) {
         if (item == null || !item.hasItemMeta()) return false;
-        String value = item.getItemMeta().getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
-        return type.name().equals(value);
+        ItemMeta meta = item.getItemMeta();
+        String value = meta.getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
+        if (!type.name().equals(value)) return false;
+        Long expiresAt = meta.getPersistentDataContainer().get(expiryKey, PersistentDataType.LONG);
+        return expiresAt == null || System.currentTimeMillis() < expiresAt;
+    }
+
+    public String getExpiryDisplay(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+        Long expiresAt = item.getItemMeta().getPersistentDataContainer().get(expiryKey, PersistentDataType.LONG);
+        if (expiresAt == null) return null;
+        if (System.currentTimeMillis() >= expiresAt) return "Expired";
+        return formatRemaining(expiresAt);
+    }
+
+    public void refreshExpiryLore(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return;
+        ItemMeta meta = item.getItemMeta();
+        Long expiresAt = meta.getPersistentDataContainer().get(expiryKey, PersistentDataType.LONG);
+        if (expiresAt == null) return;
+        List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
+        lore.removeIf(line -> line != null && (line.startsWith("§e⏳ Expires in:") || line.startsWith("§c⏳ Expired")));
+        int insert = lore.size();
+        for (int i = 0; i < lore.size(); i++) if (lore.get(i).isEmpty()) { insert = i; break; }
+        String line = System.currentTimeMillis() >= expiresAt ? "§c⏳ Expired" : "§e⏳ Expires in: §f" + formatRemaining(expiresAt);
+        lore.add(insert, line);
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+    }
+
+    private void refreshAllExpiryLore() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            for (ItemStack item : player.getInventory().getStorageContents()) refreshExpiryLore(item);
+            refreshExpiryLore(player.getInventory().getItemInMainHand());
+            refreshExpiryLore(player.getInventory().getItemInOffHand());
+            refreshExpiryLore(player.getInventory().getHelmet());
+            refreshExpiryLore(player.getInventory().getChestplate());
+            refreshExpiryLore(player.getInventory().getLeggings());
+            refreshExpiryLore(player.getInventory().getBoots());
+        }
+    }
+
+    private String formatRemaining(long expiresAt) {
+        long ms = Math.max(0L, expiresAt - System.currentTimeMillis());
+        long minutes = ms / 60_000L;
+        long days = minutes / (24L * 60L);
+        minutes %= 24L * 60L;
+        long hours = minutes / 60L;
+        minutes %= 60L;
+        if (days > 0) return days + "d " + hours + "h";
+        if (hours > 0) return hours + "h " + minutes + "m";
+        return Math.max(1L, minutes) + "m";
     }
 
     public boolean hasMoneyHelmet(Player player) {
@@ -120,8 +182,7 @@ public final class EmeraldToolsManager implements Listener {
         }
         block.setType(Material.AIR, false);
         damageTool(player, tool, 1);
-        player.sendMessage("§a💚 Sold §f1× " + pretty(material) + " §afor §f" +
-                plugin.getEconomyManager().format(amount) + "§a.");
+        player.sendMessage("§a💚 Sold §f1× " + pretty(material) + " §afor §f" + plugin.getEconomyManager().format(amount) + "§a.");
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, .55f, 1.35f);
     }
 
@@ -157,7 +218,7 @@ public final class EmeraldToolsManager implements Listener {
         if (broken > 0) {
             damageTool(player, tool, broken);
             player.sendMessage("§a🌳 Emerald Tree Chopper cut §f" + broken + " §alog blocks.");
-            player.playSound(player.getLocation(), Sound.BLOCK_WOOD_BREAK, .7f, 1.15f);
+            player.playSound(player.getLocation(),Sound.BLOCK_WOOD_BREAK,.7f,1.15f);
         }
     }
 
