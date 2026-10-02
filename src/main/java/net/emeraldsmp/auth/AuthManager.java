@@ -9,22 +9,23 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.AsyncPlayerChatEvent;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class AuthManager implements Listener {
     private static final int ITERATIONS=210_000, KEY_BITS=256, SALT_BYTES=16;
+    private static final long ANTICHEAT_GRACE_MS=500L;
     private final org.bukkit.plugin.java.JavaPlugin plugin;
     private final File file;
     private final Map<String,Record> records=new HashMap<>();
     private final Set<UUID> authenticated=ConcurrentHashMap.newKeySet();
+    private final Map<UUID,Long> antiCheatReadyAt=new ConcurrentHashMap<>();
 
     public AuthManager(org.bukkit.plugin.java.JavaPlugin plugin){this.plugin=plugin;this.file=new File(plugin.getDataFolder(),"auth.yml");load();}
 
@@ -48,17 +49,25 @@ public final class AuthManager implements Listener {
     private String key(Player p){return p.getName().toLowerCase(Locale.ROOT);}
     public boolean isRegistered(Player p){return records.containsKey(key(p));}
     public boolean isAuthenticated(Player p){return authenticated.contains(p.getUniqueId());}
+    public boolean isAntiCheatReady(Player p){
+        UUID u=p.getUniqueId();
+        return isAuthenticated(p) && p.isOnline() && antiCheatReadyAt.getOrDefault(u,Long.MAX_VALUE)<=System.currentTimeMillis();
+    }
+    private void markAuthenticated(Player p){
+        authenticated.add(p.getUniqueId());
+        antiCheatReadyAt.put(p.getUniqueId(),System.currentTimeMillis()+ANTICHEAT_GRACE_MS);
+    }
     public void register(Player p,String password){
         if(isRegistered(p)){p.sendMessage(ChatColor.RED+"You are already registered. Use /login <password>.");return;}
         if(!validPassword(password)){p.sendMessage(ChatColor.RED+"Password must be 6-64 characters.");return;}
-        Record r=hash(password);records.put(key(p),r);save();authenticated.add(p.getUniqueId());
+        Record r=hash(password);records.put(key(p),r);save();markAuthenticated(p);
         p.sendMessage(ChatColor.GREEN+"💚 Account registered and logged in!");
     }
     public void login(Player p,String password){
         if(!isRegistered(p)){p.sendMessage(ChatColor.RED+"You are not registered. Use /register <password>.");return;}
         Record r=records.get(key(p));
         if(!verify(password,r)){p.sendMessage(ChatColor.RED+"❌ Incorrect password.");return;}
-        authenticated.add(p.getUniqueId());p.sendMessage(ChatColor.GREEN+"💚 Login successful!");
+        markAuthenticated(p);p.sendMessage(ChatColor.GREEN+"💚 Login successful!");
     }
     private boolean validPassword(String p){return p!=null&&p.length()>=6&&p.length()<=64;}
     private Record hash(String password){
@@ -76,7 +85,7 @@ public final class AuthManager implements Listener {
     private String b64(byte[] b){return Base64.getEncoder().encodeToString(b);}
 
     @EventHandler public void join(PlayerJoinEvent e){
-        Player p=e.getPlayer();authenticated.remove(p.getUniqueId());
+        Player p=e.getPlayer();authenticated.remove(p.getUniqueId());antiCheatReadyAt.remove(p.getUniqueId());
         plugin.getServer().getScheduler().runTaskLater(plugin,()->{
             if(!p.isOnline()||isAuthenticated(p))return;
             p.sendMessage(ChatColor.GREEN+"━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -86,7 +95,7 @@ public final class AuthManager implements Listener {
             p.sendMessage(ChatColor.GREEN+"━━━━━━━━━━━━━━━━━━━━━━━━");
         },5L);
     }
-    @EventHandler public void quit(PlayerQuitEvent e){authenticated.remove(e.getPlayer().getUniqueId());}
+    @EventHandler public void quit(PlayerQuitEvent e){UUID u=e.getPlayer().getUniqueId();authenticated.remove(u);antiCheatReadyAt.remove(u);}
     private boolean locked(Player p){return !isAuthenticated(p);}
     @EventHandler public void command(PlayerCommandPreprocessEvent e){
         if(!locked(e.getPlayer()))return;
@@ -100,7 +109,6 @@ public final class AuthManager implements Listener {
     @EventHandler public void placeBlock(BlockPlaceEvent e){if(locked(e.getPlayer()))e.setCancelled(true);}
     @EventHandler public void inventory(InventoryClickEvent e){if(e.getWhoClicked() instanceof Player p&&locked(p))e.setCancelled(true);}
     @EventHandler public void chat(AsyncPlayerChatEvent e){if(locked(e.getPlayer())){e.setCancelled(true);e.getPlayer().sendMessage(ChatColor.RED+"🔒 Authenticate first with /login or /register.");}}
-    @EventHandler public void commandLogin(PlayerCommandPreprocessEvent e){}
-    public void shutdown(){authenticated.clear();}
+    public void shutdown(){authenticated.clear();antiCheatReadyAt.clear();}
     private record Record(String salt,String hash,int iterations){}
 }
