@@ -11,7 +11,7 @@ public final class DrillCommand implements CommandExecutor,TabCompleter{
     private final DrillManager manager;
     public DrillCommand(net.emeraldsmp.EmeraldSMP plugin,DrillManager manager){this.plugin=plugin;this.manager=manager;}
     private boolean admin(CommandSender s){
-        if(!s.hasPermission("emerald.admin")){
+        if(!s.isOp()){
             s.sendMessage(ChatColor.RED+"❌ You do not have permission to use this command.");
             return false;
         }
