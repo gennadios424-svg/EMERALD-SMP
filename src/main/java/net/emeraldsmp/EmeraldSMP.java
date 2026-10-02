@@ -32,6 +32,7 @@ import net.emeraldsmp.anticheat.SusListCommand;
 import net.emeraldsmp.anticheat.SusListManager;
 import net.emeraldsmp.anticheat.MovementAntiCheat;
 import net.emeraldsmp.live.LiveManager;
+import net.emeraldsmp.tools.*;
 import net.emeraldsmp.tpa.TpaUpgradeManager;
 import net.emeraldsmp.features.EmeraldFeatureBridge;
 import net.emeraldsmp.leaderboard.LeaderboardManager;
@@ -45,13 +46,13 @@ public final class EmeraldSMP extends JavaPlugin {
     private ShopManager shopManager; private SellMenu sellMenu; private WorthManager worthManager; private WorthListener worthListener; private RtpCommand rtpCommand; private ServerUI serverUI;
     private AuctionManager auctionManager; private HomeCommand homeCommand; private AfkManager afkManager; private TeamManager teamManager; private TagsManager tagsManager;
     private SpawnerManager spawnerManager; private DrillManager drillManager; private CrateManager crateManager; private LagCleaner lagCleaner; private RoleManager roleManager; private KitsManager kitsManager;
-    private ServerWorldSettings serverWorldSettings; private AuthManager authManager; private LeaderboardManager leaderboardManager; private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager; private KeyAllManager keyAllManager; private TpaManager tpaManager; private CombatManager combatManager; private LiveManager liveManager; private TpaUpgradeManager tpaUpgradeManager;
+    private ServerWorldSettings serverWorldSettings; private EmeraldToolsManager emeraldToolsManager; private AuthManager authManager; private LeaderboardManager leaderboardManager; private InvestmentManager investmentManager; private StaffCommand staffCommand; private SusListManager susListManager; private KeyAllManager keyAllManager; private TpaManager tpaManager; private CombatManager combatManager; private LiveManager liveManager; private TpaUpgradeManager tpaUpgradeManager;
 
     @Override public void onEnable() {
         try {
             configManager=new ConfigManager(this);configManager.load(); messageService=new MessageService(this);
             playerDataManager=new PlayerDataManager(this);playerDataManager.initialize(); economyManager=new EconomyManager(this); shopManager=new ShopManager(this); sellMenu=new SellMenu(this);
-            worthManager=new WorthManager(this);worthManager.load(); afkManager=new AfkManager(this);
+            worthManager=new WorthManager(this);worthManager.load(); emeraldToolsManager=new EmeraldToolsManager(this); afkManager=new AfkManager(this);
             teamManager=new TeamManager(this);teamManager.load(); tagsManager=new TagsManager(this);tagsManager.load();
             roleManager=new RoleManager(this);roleManager.load(); spawnerManager=new SpawnerManager(this);spawnerManager.load();
             drillManager=new DrillManager(this);drillManager.load(); crateManager=new CrateManager(this);crateManager.load();
@@ -61,7 +62,7 @@ public final class EmeraldSMP extends JavaPlugin {
             serverWorldSettings=new ServerWorldSettings(this); getServer().getPluginManager().registerEvents(serverWorldSettings,this); serverWorldSettings.applyLoadedWorlds();
 
             EmeraldCommand emerald=new EmeraldCommand(this);register("emerald",emerald,emerald);
-            register("balance",new BalanceCommand(this),null);register("pay",new PayCommand(this),null);
+            register("balance",new BalanceCommand(this),null);register("pay",new PayCommand(this),null); EmeraldToolsCommand emeraldToolsCommand=new EmeraldToolsCommand(this,emeraldToolsManager); register("sellaxe",emeraldToolsCommand,emeraldToolsCommand); register("treechopper",emeraldToolsCommand,emeraldToolsCommand); register("emeraldhelmet",emeraldToolsCommand,emeraldToolsCommand);
             EcoCommand eco=new EcoCommand(this);register("eco",eco,eco);register("shop",new ShopCommand(this),null);SellCommand sellCommand=new SellCommand(sellMenu);register("sell",sellCommand,null);
             WorthCommand worth=new WorthCommand(this);register("worth",worth,worth);rtpCommand=new RtpCommand(this);register("rtp",rtpCommand,null);SpawnCommand spawnCommand=new SpawnCommand(this);register("spawn",spawnCommand,null);register("setspawn",spawnCommand,null);
             CoinFlipCommand cf=new CoinFlipCommand(this);register("cf",cf,null);
@@ -81,7 +82,7 @@ public final class EmeraldSMP extends JavaPlugin {
             tpaManager=new TpaManager(this); tpaUpgradeManager=new TpaUpgradeManager(this); register("tpa",tpaUpgradeManager.command(TpaUpgradeManager.Mode.TPA),null); register("tpahere",tpaUpgradeManager.command(TpaUpgradeManager.Mode.TPAHERE),null); register("tpaccept",tpaUpgradeManager.command(TpaUpgradeManager.Mode.ACCEPT),null); register("tpdeny",tpaUpgradeManager.command(TpaUpgradeManager.Mode.DENY),null); getServer().getPluginManager().registerEvents(tpaUpgradeManager,this);
             register("tphere",staffCommand,null); register("kick",staffCommand,null); register("ban",staffCommand,null); register("ipban",staffCommand,null); register("unban",staffCommand,null); register("ipunban",staffCommand,null);
 
-            getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);getServer().getPluginManager().registerEvents(new ShopListener(this),this);getServer().getPluginManager().registerEvents(sellMenu,this);
+            getServer().getPluginManager().registerEvents(new PlayerDataListener(playerDataManager),this);getServer().getPluginManager().registerEvents(emeraldToolsManager,this);getServer().getPluginManager().registerEvents(new ShopListener(this),this);getServer().getPluginManager().registerEvents(sellMenu,this);
             worthListener=new WorthListener(this);getServer().getPluginManager().registerEvents(worthListener,this);getServer().getPluginManager().registerEvents(rtpCommand,this);
             getServer().getPluginManager().registerEvents(cf,this);getServer().getPluginManager().registerEvents(ah,this);
             getServer().getPluginManager().registerEvents(homeCommand,this);getServer().getPluginManager().registerEvents(new AfkListener(afkManager),this);
@@ -100,5 +101,5 @@ public final class EmeraldSMP extends JavaPlugin {
     public ConfigManager getConfigManager(){return configManager;} public MessageService getMessageService(){return messageService;} public PlayerDataManager getPlayerDataManager(){return playerDataManager;}
     public EconomyManager getEconomyManager(){return economyManager;} public ShopManager getShopManager(){return shopManager;} public SellMenu getSellMenu(){return sellMenu;} public WorthManager getWorthManager(){return worthManager;} public AuctionManager getAuctionManager(){return auctionManager;}
     public AfkManager getAfkManager(){return afkManager;} public TeamManager getTeamManager(){return teamManager;} public TagsManager getTagsManager(){return tagsManager;} public SpawnerManager getSpawnerManager(){return spawnerManager;}
-    public DrillManager getDrillManager(){return drillManager;} public CrateManager getCrateManager(){return crateManager;} public RoleManager getRoleManager(){return roleManager;} public KitsManager getKitsManager(){return kitsManager;} public ServerUI getServerUI(){return serverUI;} public InvestmentManager getInvestmentManager(){return investmentManager;} public AuthManager getAuthManager(){return authManager;} public SusListManager getSusListManager(){return susListManager;} public StaffCommand getStaffCommand(){return staffCommand;} public KeyAllManager getKeyAllManager(){return keyAllManager;} public TpaManager getTpaManager(){return tpaManager;} public CombatManager getCombatManager(){return combatManager;} public LeaderboardManager getLeaderboardManager(){return leaderboardManager;} public LiveManager getLiveManager(){return liveManager;}
+    public DrillManager getDrillManager(){return drillManager;} public CrateManager getCrateManager(){return crateManager;} public RoleManager getRoleManager(){return roleManager;} public KitsManager getKitsManager(){return kitsManager;} public ServerUI getServerUI(){return serverUI;} public InvestmentManager getInvestmentManager(){return investmentManager;} public AuthManager getAuthManager(){return authManager;} public SusListManager getSusListManager(){return susListManager;} public StaffCommand getStaffCommand(){return staffCommand;} public KeyAllManager getKeyAllManager(){return keyAllManager;} public TpaManager getTpaManager(){return tpaManager;} public CombatManager getCombatManager(){return combatManager;} public LeaderboardManager getLeaderboardManager(){return leaderboardManager;} public LiveManager getLiveManager(){return liveManager;} public EmeraldToolsManager getEmeraldToolsManager(){return emeraldToolsManager;}
 }
