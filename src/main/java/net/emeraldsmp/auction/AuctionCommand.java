@@ -50,7 +50,7 @@ public final class AuctionCommand implements org.bukkit.command.CommandExecutor,
         p.sendMessage("§7Item: §f" + pretty(secured.getType()));
         p.sendMessage("§7Amount: §f" + secured.getAmount());
         p.sendMessage("§7Price: §f" + plugin.getEconomyManager().format(price));
-        p.sendMessage("§7Per Item: §f" + formatPerItem(price, secured.getAmount()));
+        p.sendMessage("§7Listing expires in: §f14d");
         open(p, 0);
     }
 
@@ -65,16 +65,16 @@ public final class AuctionCommand implements org.bukkit.command.CommandExecutor,
         for (int i = from; i < Math.min(from + 45, ls.size()); i++) {
             AuctionManager.Listing x = ls.get(i);
             ItemStack display = x.item().clone();
+            plugin.getEmeraldToolsManager().refreshExpiryLore(display);
             ItemMeta m = display.getItemMeta();
             if (m != null) {
                 List<String> lore = new ArrayList<>();
                 lore.add("");
-                lore.add("§8§m────────────────");
-                lore.add("§a📦 Amount: §f" + x.amount());
-                lore.add("§6💰 Total Price: §f" + plugin.getEconomyManager().format(x.price()));
-                lore.add("§e💵 Per Item: §f" + formatPerItem(x.price(), x.amount()));
+                lore.add("§6💰 Price: §f" + plugin.getEconomyManager().format(x.price()));
                 lore.add("§b👤 Seller: §f" + x.sellerName());
-                lore.add("§8§m────────────────");
+                lore.add("§e⏳ Listing expires: §f" + formatRemaining(x.expiresAt()));
+                String itemExpiry = plugin.getEmeraldToolsManager().getExpiryDisplay(display);
+                if (itemExpiry != null) lore.add("§a💚 Item expires: §f" + itemExpiry);
                 lore.add("");
                 lore.add(x.seller().equals(p.getUniqueId())
                     ? "§c§l✖ Your own listing"
@@ -129,7 +129,7 @@ public final class AuctionCommand implements org.bukkit.command.CommandExecutor,
         if (!buying.add(id)) { buyer.sendMessage("§cThat listing is already being purchased."); return; }
         try {
             AuctionManager.Listing l = manager.get(id);
-            if (l == null) { buyer.sendMessage("§cThat listing is no longer available."); open(buyer, 0); return; }
+            if (l == null || l.expired()) { buyer.sendMessage("§cThat listing is no longer available."); open(buyer, 0); return; }
             if (l.seller().equals(buyer.getUniqueId())) { buyer.sendMessage("§cYou cannot buy your own listing."); return; }
             EconomyManager eco = plugin.getEconomyManager();
             if (eco.getBalance(buyer.getUniqueId()) < l.price()) { buyer.sendMessage("§cYou need " + eco.format(l.price()) + "§c."); return; }
@@ -160,9 +160,20 @@ public final class AuctionCommand implements org.bukkit.command.CommandExecutor,
         return false;
     }
 
+    private String formatRemaining(long expiresAt) {
+        long ms = Math.max(0L, expiresAt - System.currentTimeMillis());
+        long minutes = ms / 60_000L;
+        long days = minutes / (24L * 60L);
+        minutes %= 24L * 60L;
+        long hours = minutes / 60L;
+        minutes %= 60L;
+        if (days > 0) return days + "d " + hours + "h";
+        if (hours > 0) return hours + "h " + minutes + "m";
+        return Math.max(1L, minutes) + "m";
+    }
+
     private AuctionView current(Player p) { return views.getOrDefault(p.getUniqueId(), new AuctionView("", AuctionManager.Category.ALL, AuctionManager.SortMode.NEWEST, 0)); }
     private ItemStack button(Material m, String n, List<String> lore) { ItemStack i = new ItemStack(m); ItemMeta meta = i.getItemMeta(); meta.setDisplayName(n); meta.setLore(lore); i.setItemMeta(meta); return i; }
-    private String formatPerItem(long total, int amount) { return String.format(Locale.US, "%.2f", total / (double) Math.max(1, amount)); }
     private String pretty(Material m) { String s = m.name().toLowerCase(Locale.ROOT).replace('_', ' '); StringBuilder b = new StringBuilder(); for (String w : s.split(" ")) if (!w.isEmpty()) b.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(' '); return b.toString().trim(); }
 
     private record AuctionView(String query, AuctionManager.Category category, AuctionManager.SortMode sort, int page) {}
