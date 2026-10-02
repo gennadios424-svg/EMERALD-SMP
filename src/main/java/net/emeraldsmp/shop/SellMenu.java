@@ -98,7 +98,17 @@ public final class SellMenu implements Listener {
         Bukkit.getScheduler().runTask(plugin,()->refresh(player,session));
     }
 
-    @EventHandler public void close(InventoryCloseEvent event){
+    public void close(Player player){
+        if(player==null)return;
+        Session session=sessions.get(player.getUniqueId());
+        if(session==null||session.inventory==null)return;
+        if(session.processing)return;
+        sessions.remove(player.getUniqueId());
+        if(player.getOpenInventory().getTopInventory()==session.inventory) player.closeInventory();
+        returnItems(player,session.inventory);
+    }
+
+    @EventHandler public void onInventoryClose(InventoryCloseEvent event){
         if(!(event.getPlayer() instanceof Player player))return;Session session=sessions.get(player.getUniqueId());
         if(session==null||session.inventory!=event.getInventory())return;if(session.processing)return;
         sessions.remove(player.getUniqueId());returnItems(player,session.inventory);
