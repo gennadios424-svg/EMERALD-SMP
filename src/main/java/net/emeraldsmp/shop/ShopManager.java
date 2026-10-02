@@ -12,10 +12,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.*;
 
 public final class ShopManager {
-    private static final int[] CATEGORY_SLOTS = {11, 13, 15, 21, 23};
-    private static final String[] CATEGORY_KEYS = {"resources", "blocks", "redstone", "cpvp", "nether"};
-    private static final String[] CATEGORY_NAMES = {"§a§l🌾 RESOURCES", "§2§l🧱 BLOCKS", "§c§l🔴 REDSTONE", "§5§l⚔ CPvP", "§4§l🔥 NETHER"};
-    private static final Material[] CATEGORY_ICONS = {Material.WHEAT, Material.BRICKS, Material.REDSTONE, Material.END_CRYSTAL, Material.NETHER_BRICKS};
+    private static final int[] CATEGORY_SLOTS = {10, 12, 14, 16, 21, 23};
+    private static final String[] CATEGORY_KEYS = {"resources", "blocks", "redstone", "cpvp", "nether", "spawners"};
+    private static final String[] CATEGORY_NAMES = {"§a§l🌾 RESOURCES", "§2§l🧱 BLOCKS", "§c§l🔴 REDSTONE", "§5§l⚔ CPvP", "§4§l🔥 NETHER", "§a§l🧟 SPAWNERS"};
+    private static final Material[] CATEGORY_ICONS = {Material.WHEAT, Material.BRICKS, Material.REDSTONE, Material.END_CRYSTAL, Material.NETHER_BRICKS, Material.SPAWNER};
 
     private static final Map<String, List<Material>> CURATED = Map.ofEntries(
             Map.entry("resources", List.of(Material.KELP, Material.WHEAT, Material.CARROT, Material.POTATO, Material.BAMBOO, Material.CACTUS, Material.COCOA_BEANS, Material.SUGAR_CANE, Material.NETHER_WART)),
@@ -83,15 +83,18 @@ public final class ShopManager {
             if (item == null || qty <= 0 || qty > 64) return false;
             long total;
             try { total = Math.multiplyExact(item.buyPrice(), qty); } catch (ArithmeticException ex) { return false; }
-            if (total <= 0 || plugin.getEconomyManager().getBalance(uuid) < total || !hasSpace(p, item.material(), qty)) return false;
-            if (!plugin.getEconomyManager().withdraw(uuid, total)) return false;
-            Map<Integer, ItemStack> left = p.getInventory().addItem(new ItemStack(item.material(), qty));
-            if (!left.isEmpty()) {
-                for (ItemStack leftover : left.values()) {
-                    p.getInventory().removeItem(leftover);
-                }
-                plugin.getEconomyManager().deposit(uuid, total);
-                return false;
+            if (total <= 0 || !hasSpace(p, item.material(), qty)) return false;
+            boolean shards=item.shards();
+            if(shards){
+                if(plugin.getPlayerDataManager().getEmeraldShards(uuid)<total || !plugin.getPlayerDataManager().withdrawEmeraldShards(uuid,total)) return false;
+            }else{
+                if(plugin.getEconomyManager().getBalance(uuid)<total || !plugin.getEconomyManager().withdraw(uuid,total)) return false;
+            }
+            ItemStack product=item.specialSpawnerType()==null?new ItemStack(item.material(),qty):plugin.getSpawnerManager().createItem(item.specialSpawnerType(),1);
+            if(item.specialSpawnerType()!=null) product.setAmount(Math.min(qty,64));
+            Map<Integer, ItemStack> left=p.getInventory().addItem(product);
+            if(!left.isEmpty()){
+                for(ItemStack leftover:left.values())p.getWorld().dropItemNaturally(p.getLocation(),leftover);
             }
             return true;
         } finally {
@@ -100,6 +103,13 @@ public final class ShopManager {
     }
 
     private List<ShopItem> configuredItems(String key) {
+        if(key.equals("spawners")){
+            List<ShopItem> out=new ArrayList<>();
+            for(String type:List.of("skeleton","zombie","spider","creeper"))
+                out.add(new ShopItem(type+"-spawner",Material.SPAWNER,"§a§l💚 "+Character.toUpperCase(type.charAt(0))+type.substring(1)+" Spawner",1500L,
+                        List.of("§7Price: §a1,500 Emerald Shards","§7Uses the existing Emerald SMP spawner system","§8Click for purchase amounts"),true,type));
+            return out;
+        }
         List<Material> mats = CURATED.getOrDefault(key, List.of());
         List<ShopItem> out = new ArrayList<>();
         for (Material m : mats) {
@@ -108,7 +118,7 @@ public final class ShopManager {
             long sellWorth = w == null ? 0L : w.worth();
             long buy = m == Material.END_CRYSTAL ? 500L : plugin.getWorthManager().buyValue(m, 1);
             if (buy <= sellWorth) continue;
-            out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT), m, roleStyledName(m), buy, List.of("§7Buy: §a" + plugin.getEconomyManager().format(buy) + " §7/ item", "§7Sell: §a" + plugin.getEconomyManager().format(sellWorth) + " §7/ item", "§8Click for purchase amounts")));
+            out.add(new ShopItem(m.name().toLowerCase(Locale.ROOT), m, roleStyledName(m), buy, List.of("§7Buy: §a" + plugin.getEconomyManager().format(buy) + " §7/ item", "§7Sell: §a" + plugin.getEconomyManager().format(sellWorth) + " §7/ item", "§8Click for purchase amounts"),false,null));
         }
         return out;
     }
@@ -121,7 +131,7 @@ public final class ShopManager {
     private ItemStack buyButton(ShopItem item, int qty) {
         long total;
         try { total = Math.multiplyExact(item.buyPrice(), qty); } catch (ArithmeticException ex) { total = Long.MAX_VALUE; }
-        return icon(Material.EMERALD, "§a§lBUY ×" + qty, List.of("§7Price: §f" + plugin.getEconomyManager().format(total), "§8Click to purchase"));
+        return icon(Material.EMERALD, "§a§lBUY ×" + qty, List.of("§7Price: §f" + (item.shards()?String.format(Locale.US,"%,d Emerald Shards",total):plugin.getEconomyManager().format(total)), "§8Click to purchase"));
     }
     private ItemStack filler() { return icon(Material.GRAY_STAINED_GLASS_PANE, " ", List.of()); }
     private ItemStack icon(Material m, String n, List<String> l) {
@@ -145,5 +155,5 @@ public final class ShopManager {
         return b.toString().trim();
     }
     public record ShopView(String category, int page, List<?> items) {}
-    public record ShopItem(String key, Material material, String displayName, long buyPrice, List<String> lore) {}
+    public record ShopItem(String key, Material material, String displayName, long buyPrice, List<String> lore, boolean shards, String specialSpawnerType) {}
 }
