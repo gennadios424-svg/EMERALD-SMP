@@ -1,5 +1,8 @@
 server:
   name: "Emerald SMP"
+  survival-world: "world"
+  survival-border-size: 150000
+  hopper-speed: 48
 afk:
   enabled: true
   auto-afk-minutes: 10
