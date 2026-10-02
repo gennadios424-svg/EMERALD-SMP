@@ -14,6 +14,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public final class AuctionManager {
+    public static final long LISTING_DURATION_MS = 14L * 24L * 60L * 60L * 1000L;
+
     public enum SortMode {
         LOWEST_PRICE("LOWEST PRICE"), HIGHEST_PRICE("HIGHEST PRICE"),
         LOWEST_PER_ITEM("LOWEST PER ITEM"), HIGHEST_PER_ITEM("HIGHEST PER ITEM"),
@@ -29,9 +31,10 @@ public final class AuctionManager {
         Category(String label) { this.label = label; }
     }
 
-    public record Listing(UUID id, UUID seller, String sellerName, ItemStack item, long price, long createdAt) {
+    public record Listing(UUID id, UUID seller, String sellerName, ItemStack item, long price, long createdAt, long expiresAt) {
         public int amount() { return item.getAmount(); }
         public long perItem() { return price / Math.max(1, amount()); }
+        public boolean expired() { return System.currentTimeMillis() >= expiresAt; }
     }
 
     private final EmeraldSMP plugin;
@@ -45,6 +48,7 @@ public final class AuctionManager {
     }
 
     public synchronized List<Listing> find(String query, Category category, SortMode sort) {
+        purgeExpired();
         String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT).replace(' ', '_');
         List<Listing> result = new ArrayList<>();
         for (Listing l : listings.values()) {
@@ -65,47 +69,58 @@ public final class AuctionManager {
         return result;
     }
 
-    public synchronized Listing get(UUID id) { return listings.get(id); }
+    public synchronized Listing get(UUID id) {
+        purgeExpired();
+        return listings.get(id);
+    }
 
     public synchronized boolean add(Player seller, ItemStack item, long price) {
-        return add(seller.getUniqueId(), seller.getName(), item, price, UUID.randomUUID(), System.currentTimeMillis());
+        return add(seller.getUniqueId(), seller.getName(), item, price, UUID.randomUUID(), System.currentTimeMillis(), System.currentTimeMillis() + LISTING_DURATION_MS);
     }
 
     public synchronized boolean add(UUID seller, String sellerName, ItemStack item, long price) {
-        return add(seller, sellerName, item, price, UUID.randomUUID(), System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        return add(seller, sellerName, item, price, UUID.randomUUID(), now, now + LISTING_DURATION_MS);
     }
 
-    private boolean add(UUID seller, String sellerName, ItemStack item, long price, UUID id, long created) {
+    private boolean add(UUID seller, String sellerName, ItemStack item, long price, UUID id, long created, long expires) {
         if (item == null || item.getType().isAir() || item.getAmount() <= 0 || price <= 0) return false;
-        Listing listing = new Listing(id, seller, sellerName, item.clone(), price, created);
+        Listing listing = new Listing(id, seller, sellerName, item.clone(), price, created, expires);
         listings.put(id, listing);
         if (!save()) { listings.remove(id); return false; }
         return true;
     }
 
     public synchronized boolean restore(Listing listing) {
-        if (listing == null || listings.containsKey(listing.id())) return false;
+        if (listing == null || listing.expired() || listings.containsKey(listing.id())) return false;
         listings.put(listing.id(), listing);
         if (!save()) { listings.remove(listing.id()); return false; }
         return true;
     }
 
     public synchronized Listing remove(UUID id) {
+        purgeExpired();
         Listing listing = listings.remove(id);
         if (listing != null && !save()) { listings.put(id, listing); return null; }
         return listing;
     }
 
+    private void purgeExpired() {
+        boolean changed = listings.values().removeIf(Listing::expired);
+        if (changed) save();
+    }
+
     public synchronized boolean save() {
         try {
             YamlConfiguration yaml = new YamlConfiguration();
-            yaml.set("version", 1);
+            yaml.set("version", 2);
             for (Listing l : listings.values()) {
                 String path = "listings." + l.id();
                 yaml.set(path + ".seller", l.seller().toString());
                 yaml.set(path + ".seller-name", l.sellerName());
                 yaml.set(path + ".price", l.price());
                 yaml.set(path + ".created", l.createdAt());
+                yaml.set(path + ".expires", l.expiresAt());
                 yaml.set(path + ".item", l.item());
             }
             File tmp = new File(plugin.getDataFolder(), "auctions.yml.tmp");
@@ -127,6 +142,7 @@ public final class AuctionManager {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         ConfigurationSection section = yaml.getConfigurationSection("listings");
         if (section == null) return;
+        boolean migrated = false;
         for (String key : section.getKeys(false)) {
             try {
                 UUID id = UUID.fromString(key);
@@ -134,13 +150,20 @@ public final class AuctionManager {
                 String sellerName = section.getString(key + ".seller-name", "Unknown");
                 long price = section.getLong(key + ".price");
                 long created = section.getLong(key + ".created");
+                long expires = section.contains(key + ".expires") ? section.getLong(key + ".expires") : created + LISTING_DURATION_MS;
                 ItemStack item = section.getItemStack(key + ".item");
-                if (item == null || item.getType().isAir() || item.getAmount() <= 0 || price <= 0) continue;
-                listings.put(id, new Listing(id, seller, sellerName, item, price, created));
+                if (item == null || item.getType().isAir() || item.getAmount() <= 0 || price <= 0 || System.currentTimeMillis() >= expires) {
+                    migrated = true;
+                    continue;
+                }
+                listings.put(id, new Listing(id, seller, sellerName, item, price, created, expires));
+                if (!section.contains(key + ".expires")) migrated = true;
             } catch (Exception ex) {
                 plugin.getLogger().warning("Skipped invalid auction listing " + key + ".");
+                migrated = true;
             }
         }
+        if (migrated) save();
     }
 
     public static Category categoryOf(Material m) {
