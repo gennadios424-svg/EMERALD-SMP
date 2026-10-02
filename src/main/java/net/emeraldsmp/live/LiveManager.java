@@ -68,8 +68,9 @@ public final class LiveManager implements Listener, CommandExecutor {
 
         Component prefix=Component.text("§c§l🔴 LIVE NOW §f§f");
         Component message=prefix.append(Component.text("§f"+p.getName()+" is now LIVE! §7▶ "))
-                .append(Component.text("§b§nWatch on "+platform, ClickEvent.openUrl(link),
-                        HoverEvent.showText(Component.text("§a§lCLICK TO WATCH §7• "+p.getName()+" is live"))));
+                .append(Component.text("§b§nWatch on "+platform)
+                        .clickEvent(ClickEvent.openUrl(link))
+                        .hoverEvent(HoverEvent.showText(Component.text("§a§lCLICK TO WATCH §7• "+p.getName()+" is live"))));
         Bukkit.broadcast(message);
 
         for(Player viewer:Bukkit.getOnlinePlayers()) viewer.playSound(viewer.getLocation(),Sound.BLOCK_NOTE_BLOCK_PLING,.65f,1.15f);
