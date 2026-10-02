@@ -10,8 +10,13 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,6 +26,51 @@ public final class WorthListener implements Listener {
     private final Map<UUID, Boolean> waitingForSearch = new ConcurrentHashMap<>();
 
     public WorthListener(EmeraldSMP plugin) { this.plugin = plugin; }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void formatMoneyOnOpen(InventoryOpenEvent e) {
+        String title = ChatColor.stripColor(e.getView().getTitle());
+        if (!title.startsWith("💚 WORTH")) return;
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (!(e.getPlayer() instanceof Player p) || !p.isOnline()) return;
+            var inv = p.getOpenInventory().getTopInventory();
+            if (title.startsWith("💚 WORTH INFO")) {
+                ItemStack subject = inv.getItem(4);
+                if (subject != null) {
+                    WorthEntry entry = plugin.getWorthManager().get(subject.getType());
+                    if (entry != null) {
+                        setLore(inv.getItem(11), List.of("§7Worth: §f" + plugin.getEconomyManager().format(entry.worth()) + " §7/ item", "§7Category: §f" + entry.category().displayName()));
+                        setLore(inv.getItem(13), List.of("§7Stack Worth: §f" + plugin.getEconomyManager().format(entry.stackWorth()), "§7Stack size: §f" + entry.material().getMaxStackSize()));
+                    }
+                }
+                return;
+            }
+            for (int slot = 0; slot < Math.min(45, inv.getSize()); slot++) {
+                ItemStack item = inv.getItem(slot);
+                if (item == null) continue;
+                WorthEntry entry = plugin.getWorthManager().get(item.getType());
+                if (entry == null) continue;
+                ItemMeta meta = item.getItemMeta();
+                if (meta == null || !meta.hasLore()) continue;
+                List<String> lore = new ArrayList<>(meta.getLore());
+                for (int i = 0; i < lore.size(); i++) {
+                    String line = ChatColor.stripColor(lore.get(i));
+                    if (line.startsWith("Worth:")) lore.set(i, "§aWorth: §f" + plugin.getEconomyManager().format(entry.worth()) + " §7/ item");
+                    else if (line.startsWith("Stack Worth:")) lore.set(i, "§7Stack Worth: §f" + plugin.getEconomyManager().format(entry.stackWorth()));
+                }
+                meta.setLore(lore);
+                item.setItemMeta(meta);
+            }
+        });
+    }
+
+    private void setLore(ItemStack item, List<String> lore) {
+        if (item == null) return;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return;
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+    }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void click(InventoryClickEvent e) {
@@ -40,8 +90,7 @@ public final class WorthListener implements Listener {
                 || e.getClick() == ClickType.SWAP_OFFHAND || e.getClick() == ClickType.DROP
                 || e.getClick() == ClickType.CONTROL_DROP) return;
 
-        if (info && slot != 22) { plugin.getWorthManager().click(p, slot); }
-        else plugin.getWorthManager().click(p, slot);
+        plugin.getWorthManager().click(p, slot);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
