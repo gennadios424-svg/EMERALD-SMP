@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.player.*;
 import org.bukkit.scoreboard.*;
-
 import java.util.*;
 
 public final class ServerUI implements Listener {
@@ -18,147 +17,15 @@ public final class ServerUI implements Listener {
     private final Map<UUID, Scoreboard> boards = new HashMap<>();
     private final Map<UUID, Set<String>> oldEntries = new HashMap<>();
     private int taskId = -1;
-
     public ServerUI(EmeraldSMP plugin) { this.plugin = plugin; }
-
-    public void start() {
-        taskId = Bukkit.getScheduler().runTaskTimer(plugin, this::updateAll, 20L, 10L).getTaskId();
-        updateAll();
-    }
-
-    public void stop() {
-        if (taskId != -1) Bukkit.getScheduler().cancelTask(taskId);
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            p.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
-            p.sendPlayerListHeaderAndFooter(Component.empty(), Component.empty());
-            p.playerListName(Component.text(p.getName()));
-            p.setCustomName(null);
-            p.setCustomNameVisible(false);
-        }
-        boards.clear();
-        oldEntries.clear();
-    }
-
-    @EventHandler public void join(PlayerJoinEvent e) {
-        Bukkit.getScheduler().runTaskLater(plugin, () -> updateAll(), 2L);
-    }
-
-    @EventHandler public void quit(PlayerQuitEvent e) {
-        boards.remove(e.getPlayer().getUniqueId());
-        oldEntries.remove(e.getPlayer().getUniqueId());
-        Bukkit.getScheduler().runTaskLater(plugin, this::updateAll, 1L);
-    }
-
-    public void refresh(Player p) {
-        if (p != null && p.isOnline()) update(p);
-    }
-
-    public void refreshAll() { updateAll(); }
-
-    private void updateAll() {
-        for (Player p : Bukkit.getOnlinePlayers()) update(p);
-    }
-
-    private void update(Player viewer) {
-        viewer.sendPlayerListHeaderAndFooter(
-                Component.text("\n💚 EMERALD SMP", NamedTextColor.GREEN, TextDecoration.BOLD),
-                Component.text("🌐 s1.seranodes.com:25638", NamedTextColor.GRAY)
-        );
-        updatePlayerList();
-        updateScoreboard(viewer, plugin.getRoleManager().get(viewer));
-    }
-
-    private void updatePlayerList() {
-        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
-        players.sort(Comparator
-                .comparingInt((Player p) -> -plugin.getRoleManager().get(p).weight())
-                .thenComparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
-
-        Map<UUID, Integer> order = new HashMap<>();
-        int group = 0;
-        int previousWeight = Integer.MAX_VALUE;
-        int within = 0;
-
-        for (Player target : players) {
-            int weight = plugin.getRoleManager().get(target).weight();
-            if (weight != previousWeight) {
-                group++;
-                within = 0;
-                previousWeight = weight;
-            }
-            order.put(target.getUniqueId(), group * 10000 + within + 1);
-            within++;
-        }
-
-        for (Player target : players) {
-            RoleManager.Role role = plugin.getRoleManager().get(target);
-            String team = plugin.getTeamManager() == null ? "" : plugin.getTeamManager().tag(target.getUniqueId());
-            String teamText = team.isEmpty() ? "[NONE]" : "[" + team + "]";
-
-            Component listName = Component.empty();
-            if (plugin.getLiveManager() != null && plugin.getLiveManager().isLive(target)) {
-                listName = listName.append(Component.text("🔴 LIVE ", NamedTextColor.RED, TextDecoration.BOLD));
-            }
-            listName = listName
-                    .append(Component.text(role.icon() + " ", roleColor(role), TextDecoration.BOLD))
-                    .append(Component.text(role.label() + "  ", roleColor(role), TextDecoration.BOLD))
-                    .append(Component.text(teamText + " ", NamedTextColor.GRAY))
-                    .append(Component.text(target.getName(), NamedTextColor.WHITE));
-
-            target.playerListName(listName);
-            target.setPlayerListOrder(order.getOrDefault(target.getUniqueId(), 1));
-            target.setCustomName(null);
-            target.setCustomNameVisible(false);
-        }
-    }
-
-    private TextColor roleColor(RoleManager.Role role) {
-        return TextColor.fromHexString(role.colors()[1]);
-    }
-
-    private void updateScoreboard(Player viewer, RoleManager.Role role) {
-        Scoreboard b = boards.computeIfAbsent(
-                viewer.getUniqueId(),
-                x -> Bukkit.getScoreboardManager().getNewScoreboard()
-        );
-        Objective o = b.getObjective("emerald");
-        if (o == null) {
-            o = b.registerNewObjective("emerald", "dummy", "§a§l💚 EMERALD SMP");
-            o.setDisplaySlot(DisplaySlot.SIDEBAR);
-        }
-
-        Set<String> old = oldEntries.computeIfAbsent(viewer.getUniqueId(), x -> new HashSet<>());
-        for (String s : old) b.resetScores(s);
-        old.clear();
-
-        long money = plugin.getEconomyManager().getBalance(viewer.getUniqueId());
-        long shards = plugin.getPlayerDataManager().getEmeraldShards(viewer.getUniqueId());
-        int online = Bukkit.getOnlinePlayers().size();
-        int max = Bukkit.getMaxPlayers();
-
-        line(o, old, "§8━━━━━━━━━━━━━━", 14);
-        line(o, old, "§a§l👑 RANK", 13);
-        line(o, old, "§f§l" + role.color() + role.label(), 12);
-        line(o, old, "§8", 11);
-        line(o, old, "§6§l💰 MONEY", 10);
-        line(o, old, "§f§l" + plugin.getEconomyManager().format(money), 9);
-        line(o, old, "§8", 8);
-        line(o, old, "§b§l💎 SHARDS", 7);
-        line(o, old, "§f§l" + String.format(Locale.US, "%,d", shards), 6);
-        line(o, old, "§8", 5);
-        line(o, old, "§7📶 PING", 4);
-        line(o, old, "§f" + viewer.getPing() + "ms", 3);
-        line(o, old, "§7👥 ONLINE §f" + online + "/" + max, 2);
-        line(o, old, "§8━━━━━━━━━━━━━━", 1);
-        line(o, old, "§7🌐 s1.seranodes.com:25638", 0);
-
-        viewer.setScoreboard(b);
-    }
-
-    private void line(Objective o, Set<String> set, String s, int score) {
-        String x = s;
-        while (set.contains(x)) x += "§r";
-        o.getScore(x).setScore(score);
-        set.add(x);
-    }
+    public void start() { taskId=Bukkit.getScheduler().runTaskTimer(plugin,this::updateAll,20L,10L).getTaskId(); updateAll(); }
+    public void stop(){if(taskId!=-1)Bukkit.getScheduler().cancelTask(taskId);for(Player p:Bukkit.getOnlinePlayers()){p.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());p.sendPlayerListHeaderAndFooter(Component.empty(),Component.empty());p.playerListName(Component.text(p.getName()));p.setCustomName(null);p.setCustomNameVisible(false);}boards.clear();oldEntries.clear();}
+    @EventHandler public void join(PlayerJoinEvent e){Bukkit.getScheduler().runTaskLater(plugin,this::updateAll,2L);}
+    @EventHandler public void quit(PlayerQuitEvent e){boards.remove(e.getPlayer().getUniqueId());oldEntries.remove(e.getPlayer().getUniqueId());Bukkit.getScheduler().runTaskLater(plugin,this::updateAll,1L);}
+    public void refresh(Player p){if(p!=null&&p.isOnline())update(p);} public void refreshAll(){updateAll();} private void updateAll(){for(Player p:Bukkit.getOnlinePlayers())update(p);}
+    private void update(Player viewer){int online=Bukkit.getOnlinePlayers().size(),max=Bukkit.getMaxPlayers();viewer.sendPlayerListHeaderAndFooter(Component.text("\n💚 EMERALD SMP",NamedTextColor.GREEN,TextDecoration.BOLD),Component.text("👥 ONLINE: "+online+"/"+max+"  •  🌐 s1.seranodes.com:25638",NamedTextColor.GRAY));updatePlayerList();updateScoreboard(viewer,plugin.getRoleManager().get(viewer));}
+    private void updatePlayerList(){List<Player> players=new ArrayList<>(Bukkit.getOnlinePlayers());players.sort(Comparator.comparingInt((Player p)->-plugin.getRoleManager().get(p).weight()).thenComparing(Player::getName,String.CASE_INSENSITIVE_ORDER));Map<UUID,Integer> order=new HashMap<>();int group=0,within=0,previousWeight=Integer.MAX_VALUE;for(Player target:players){int weight=plugin.getRoleManager().get(target).weight();if(weight!=previousWeight){group++;within=0;previousWeight=weight;}order.put(target.getUniqueId(),group*10000+within+1);within++;}for(Player target:players){RoleManager.Role role=plugin.getRoleManager().get(target);String team=plugin.getTeamManager()==null?"":plugin.getTeamManager().tag(target.getUniqueId());String teamText=team.isEmpty()?"[NONE]":"["+team+"]";Component listName=Component.empty();if(plugin.getLiveManager()!=null&&plugin.getLiveManager().isLive(target))listName=listName.append(Component.text("🔴 LIVE ",NamedTextColor.RED,TextDecoration.BOLD));listName=listName.append(Component.text(role.icon()+" ",roleColor(role),TextDecoration.BOLD)).append(Component.text(role.label()+"  ",roleColor(role),TextDecoration.BOLD)).append(Component.text(teamText+" ",NamedTextColor.GRAY)).append(Component.text(target.getName(),NamedTextColor.WHITE)).append(Component.text("  "+target.getPing()+"ms",NamedTextColor.GRAY));target.playerListName(listName);target.setPlayerListOrder(order.getOrDefault(target.getUniqueId(),1));target.setCustomName(null);target.setCustomNameVisible(false);}}
+    private TextColor roleColor(RoleManager.Role role){return TextColor.fromHexString(role.colors()[1]);}
+    private void updateScoreboard(Player viewer,RoleManager.Role role){Scoreboard b=boards.computeIfAbsent(viewer.getUniqueId(),x->Bukkit.getScoreboardManager().getNewScoreboard());Objective o=b.getObjective("emerald");if(o==null){o=b.registerNewObjective("emerald","dummy","§a§l💚 EMERALD SMP");o.setDisplaySlot(DisplaySlot.SIDEBAR);}Set<String> old=oldEntries.computeIfAbsent(viewer.getUniqueId(),x->new HashSet<>());for(String s:old)b.resetScores(s);old.clear();long money=plugin.getEconomyManager().getBalance(viewer.getUniqueId());long shards=plugin.getPlayerDataManager().getEmeraldShards(viewer.getUniqueId());line(o,old,"§a§l👑 "+role.label(),6);line(o,old,"§f💰 "+plugin.getEconomyManager().format(money),5);line(o,old,"§b💎 "+String.format(Locale.US,"%,d",shards),4);line(o,old,"§7🌐 s1.seranodes.com",3);line(o,old,"§8",2);line(o,old,"§a💚 EMERALD SMP",1);viewer.setScoreboard(b);}
+    private void line(Objective o,Set<String> set,String s,int score){String x=s;while(set.contains(x))x+="§r";o.getScore(x).setScore(score);set.add(x);}
 }
