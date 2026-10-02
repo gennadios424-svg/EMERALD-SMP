@@ -27,9 +27,10 @@ public final class ServerWorldSettings implements Listener {
 
     private void apply(World world) {
         String survival = plugin.getConfig().getString("server.survival-world", "world");
-        String spawn = plugin.getConfig().getString("spawn.world", "emerald_spawn");
+        String spawn = plugin.getConfig().getString("spawn.world", "");
 
-        if (world.getName().equalsIgnoreCase(spawn)
+        if (world.getName().equalsIgnoreCase("emerald_spawn")
+                || (!spawn.isBlank() && world.getName().equalsIgnoreCase(spawn))
                 || !world.getName().equalsIgnoreCase(survival)) {
             return;
         }
