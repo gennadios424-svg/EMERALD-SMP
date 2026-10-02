@@ -27,7 +27,7 @@ public final class ShopManager {
     public ShopManager(EmeraldSMP plugin){this.plugin=plugin;} public void reload(){views.clear();}
 
     public void openMain(Player p){
-        Inventory inv=plugin.getServer().createInventory(new ShopHolder("MAIN",null,0),36,"§2§l💚 EMERALD SMP SHOP");
+        ShopHolder holder=new ShopHolder("MAIN",null,0); Inventory inv=plugin.getServer().createInventory(holder,36,"§2§l💚 EMERALD SMP SHOP"); holder.setInventory(inv);
         for(int i=0;i<CATEGORY_SLOTS.length;i++)inv.setItem(CATEGORY_SLOTS[i],icon(CATEGORY_ICONS[i],CATEGORY_NAMES[i],List.of("§7Curated survival essentials","§8Click to browse")));
         inv.setItem(4,icon(Material.EMERALD,"§a§l💚 EMERALD SMP",List.of("§7A compact survival economy shop","§8Resources • Blocks • Redstone • CPvP • Nether")));
         inv.setItem(31,icon(Material.BARRIER,"§c§l✕ CLOSE",List.of()));
@@ -36,7 +36,7 @@ public final class ShopManager {
     public void openCategory(Player p,String key,int page){
         if(!CATEGORY_INDEX.containsKey(key))return;
         List<ShopItem> items=configuredItems(key);int pages=Math.max(1,(items.size()+44)/45);int safe=Math.max(0,Math.min(page,pages-1));
-        Inventory inv=plugin.getServer().createInventory(new ShopHolder("CATEGORY",key,safe),54,"§2§l💚 SHOP §8• §f"+categoryDisplay(key)+" §8• §f"+(safe+1)+"/"+pages);
+        ShopHolder holder=new ShopHolder("CATEGORY",key,safe); Inventory inv=plugin.getServer().createInventory(holder,54,"§2§l💚 SHOP §8• §f"+categoryDisplay(key)+" §8• §f"+(safe+1)+"/"+pages); holder.setInventory(inv);
         int from=safe*45,to=Math.min(from+45,items.size());for(int i=from;i<to;i++)inv.setItem(i-from,shopDisplay(items.get(i)));
         inv.setItem(45,icon(Material.ARROW,"§e§l⬅ BACK",List.of("§7Return to shop categories")));
         inv.setItem(48,icon(Material.ARROW,"§a⬅ PREVIOUS",List.of("§7Previous page")));
@@ -45,7 +45,7 @@ public final class ShopManager {
         views.put(p.getUniqueId(),new ShopView(key,safe,items));p.openInventory(inv);
     }
     public void openItem(Player p,ShopItem item,String key,int page){
-        Inventory inv=plugin.getServer().createInventory(new ShopHolder("BUY",key,page),27,"§2§l💚 BUY §8• §f"+pretty(item.material()));
+        ShopHolder holder=new ShopHolder("BUY",key,page); Inventory inv=plugin.getServer().createInventory(holder,27,"§2§l💚 BUY §8• §f"+pretty(item.material())); holder.setInventory(inv);
         inv.setItem(13,shopDisplay(item));inv.setItem(10,buyButton(item,1));inv.setItem(11,buyButton(item,16));inv.setItem(12,buyButton(item,32));inv.setItem(14,buyButton(item,64));
         inv.setItem(16,icon(Material.EMERALD,"§a§l💰 BUY",List.of("§7Select an amount above","§8Purchase only if you can afford it")));
         inv.setItem(18,icon(Material.ARROW,"§e§l⬅ BACK",List.of("§7Return to "+categoryDisplay(key))));inv.setItem(22,icon(Material.BARRIER,"§c§l✕ CLOSE",List.of()));
@@ -79,9 +79,10 @@ public final class ShopManager {
     public record ShopView(String category,int page,List<?> items){}
     public record ShopItem(String key,Material material,String displayName,long buyPrice,List<String> lore,boolean shards,String specialSpawnerType){}
     public static final class ShopHolder implements InventoryHolder {
-        private final String type,category; private final int page;
+        private final String type,category; private final int page; private Inventory inventory;
         public ShopHolder(String type,String category,int page){this.type=type;this.category=category;this.page=page;}
         public String type(){return type;} public String category(){return category;} public int page(){return page;}
-        @Override public Inventory getInventory(){return null;}
+        public void setInventory(Inventory inventory){this.inventory=inventory;}
+        @Override public Inventory getInventory(){return inventory;}
     }
 }
