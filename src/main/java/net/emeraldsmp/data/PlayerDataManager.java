@@ -60,6 +60,31 @@ public final class PlayerDataManager {
 
     public synchronized PlayerData getLoaded(UUID uuid) { return loaded.get(uuid); }
 
+    public synchronized Map<UUID, PlayerData> snapshotAll() {
+        Map<UUID, PlayerData> out = new HashMap<>(loaded);
+        if (dataFolder == null || !dataFolder.isDirectory()) return out;
+        File[] files = dataFolder.listFiles((dir, name) -> name.toLowerCase(java.util.Locale.ROOT).endsWith(".yml"));
+        if (files == null) return out;
+        for (File f : files) {
+            try {
+                UUID uuid = UUID.fromString(f.getName().substring(0, f.getName().length() - 4));
+                if (out.containsKey(uuid)) continue;
+                YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
+                long first = y.getLong("first-join", 0L);
+                long last = y.getLong("last-seen", 0L);
+                long bal = Math.max(0L, y.getLong("balance", 0L));
+                long shards = Math.max(0L, y.getLong("emerald-shards", 0L));
+                PlayerData d = new PlayerData(uuid, y.getString("username", uuid.toString()), first, last, bal, shards,
+                        Math.max(0L, y.getLong("investment.amount", 0L)),
+                        Math.max(0L, y.getLong("investment.earnings", 0L)),
+                        y.getBoolean("investment.auto-collect", false));
+                d.setLastIp(y.getString("last-ip"));
+                out.put(uuid, d);
+            } catch (Exception ignored) {}
+        }
+        return out;
+    }
+
     /**
      * Resolves a previously known player from Emerald SMP's persistent player-data files.
      * Returns null when the name has never been recorded by this plugin.
