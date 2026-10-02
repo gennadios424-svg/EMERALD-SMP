@@ -45,7 +45,7 @@ public final class WorthManager {
 
         if (results.isEmpty()) {
             views.remove(p.getUniqueId());
-            plugin.getMessageService().send(p, "&cNo items found for &f\\\"" + (query == null ? "" : query) + "&c\\\".");
+            plugin.getMessageService().send(p, "&cNo items found for &f" + (query == null ? "" : query) + "&c.");
             return;
         }
 
