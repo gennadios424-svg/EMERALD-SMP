@@ -200,7 +200,7 @@ public final class SellMenu implements Listener {
         // Explicitly handle shift-clicks from the player's inventory. Bukkit's generic
         // shift transfer is deliberately not trusted because it can target non-input
         // slots in a custom container.
-        if (raw >= SIZE && event.getClick() == ClickType.SHIFT_LEFT) {
+        if (raw >= SIZE && (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT)) {
             event.setCancelled(true);
             ItemStack clicked = event.getCurrentItem();
             if (clicked != null && !clicked.getType().isAir()) {
