@@ -12,7 +12,7 @@ import org.bukkit.event.player.*;
 import org.bukkit.scoreboard.*;
 import java.util.*;
 
-public final class ServerUI {
+public final class ServerUI implements Listener {
     private final EmeraldSMP plugin;
     private final Map<UUID, Scoreboard> boards = new HashMap<>();
     private final Map<UUID, Set<String>> oldEntries = new HashMap<>();
