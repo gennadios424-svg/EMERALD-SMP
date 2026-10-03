@@ -20,6 +20,8 @@ public final class EmeraldToolsManager implements Listener {
     private final EmeraldSMP plugin;
     private final NamespacedKey typeKey;
     private final NamespacedKey issuedKey;
+    private final NamespacedKey tokenKey;
+    private final NamespacedKey receivedAtKey;
     private final NamespacedKey expiryKey;
     private final BukkitTask expiryTask;
 
@@ -44,6 +46,8 @@ public final class EmeraldToolsManager implements Listener {
         this.plugin = plugin;
         this.typeKey = new NamespacedKey(plugin, "emerald-custom-tool");
         this.issuedKey = new NamespacedKey(plugin, "emerald-crate-issued");
+        this.tokenKey = new NamespacedKey(plugin, "emerald-crate-token");
+        this.receivedAtKey = new NamespacedKey(plugin, "emerald-item-received-at");
         this.expiryKey = new NamespacedKey(plugin, "emerald-item-expires");
         this.expiryTask = Bukkit.getScheduler().runTaskTimer(plugin, this::refreshAllExpiryLore, 20L, 20L);
     }
@@ -104,7 +108,8 @@ public final class EmeraldToolsManager implements Listener {
         long expiresAt = issuedAt + (type == ToolType.MONEY_HELMET ? HELMET_MS : SIX_DAYS_MS);
         meta.getPersistentDataContainer().set(issuedKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(expiryKey, PersistentDataType.LONG, expiresAt);
-        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "emerald-item-received-at"), PersistentDataType.LONG, issuedAt);
+        meta.getPersistentDataContainer().set(receivedAtKey, PersistentDataType.LONG, issuedAt);
+        meta.getPersistentDataContainer().set(tokenKey, PersistentDataType.STRING, UUID.randomUUID().toString());
         List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
         lore.add(0, "§e⏳ Expires in: §f" + formatRemaining(expiresAt));
         meta.setLore(lore);
@@ -118,10 +123,12 @@ public final class EmeraldToolsManager implements Listener {
         String value = meta.getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
         if (!type.name().equals(value)) return false;
         Byte issued = meta.getPersistentDataContainer().get(issuedKey, PersistentDataType.BYTE);
+        String token = meta.getPersistentDataContainer().get(tokenKey, PersistentDataType.STRING);
         Long expiresAt = meta.getPersistentDataContainer().get(expiryKey, PersistentDataType.LONG);
         // Special abilities require BOTH crate authentication and an unexpired timestamp.
         // Name, lore, material, enchantments, /give and admin-created definitions alone are insufficient.
-        return issued != null && issued == (byte) 1 && expiresAt != null && System.currentTimeMillis() < expiresAt;
+        return issued != null && issued == (byte) 1 && token != null && !token.isBlank()
+                && expiresAt != null && System.currentTimeMillis() < expiresAt;
     }
 
     public String getExpiryDisplay(ItemStack item) {
