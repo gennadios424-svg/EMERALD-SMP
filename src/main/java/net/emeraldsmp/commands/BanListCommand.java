@@ -186,6 +186,11 @@ public final class BanListCommand implements CommandExecutor, Listener {
     public void onClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         Inventory top = event.getView().getTopInventory();
+        if (top.getHolder() instanceof BanDetailsHolder details) {
+            event.setCancelled(true);
+            if (event.getRawSlot() == 22) openList(player, 1);
+            return;
+        }
         if (!(top.getHolder() instanceof BanListHolder holder)) return;
 
         event.setCancelled(true);
