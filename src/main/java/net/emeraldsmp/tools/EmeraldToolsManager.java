@@ -19,6 +19,7 @@ public final class EmeraldToolsManager implements Listener {
     private static final long HELMET_MS = 24L * 60L * 60L * 1000L;
     private final EmeraldSMP plugin;
     private final NamespacedKey typeKey;
+    private final NamespacedKey issuedKey;
     private final NamespacedKey expiryKey;
     private final BukkitTask expiryTask;
 
@@ -42,6 +43,7 @@ public final class EmeraldToolsManager implements Listener {
     public EmeraldToolsManager(EmeraldSMP plugin) {
         this.plugin = plugin;
         this.typeKey = new NamespacedKey(plugin, "emerald-custom-tool");
+        this.issuedKey = new NamespacedKey(plugin, "emerald-crate-issued");
         this.expiryKey = new NamespacedKey(plugin, "emerald-item-expires");
         this.expiryTask = Bukkit.getScheduler().runTaskTimer(plugin, this::refreshAllExpiryLore, 20L, 20L);
     }
@@ -76,7 +78,8 @@ public final class EmeraldToolsManager implements Listener {
                 lore.add("§7Works with /sell and the Emerald Sell Axe");
             }
         }
-        // Expiry is intentionally NOT started here. Emerald tool expiry starts only when the item is delivered as a crate reward.
+        // This creates the item definition only. It is deliberately NOT crate-authenticated
+        // and therefore must never activate special abilities until activateCrateReward().
         lore.add("");
         lore.add("§2§lEMERALD SMP");
         meta.setDisplayName(name);
@@ -95,9 +98,13 @@ public final class EmeraldToolsManager implements Listener {
         if (raw == null) return item;
         ToolType type;
         try { type = ToolType.valueOf(raw); } catch (IllegalArgumentException ex) { return item; }
-        if (meta.getPersistentDataContainer().has(expiryKey, PersistentDataType.LONG)) return item;
-        long expiresAt = System.currentTimeMillis() + (type == ToolType.MONEY_HELMET ? HELMET_MS : SIX_DAYS_MS);
+        if (meta.getPersistentDataContainer().has(issuedKey, PersistentDataType.BYTE)
+                && meta.getPersistentDataContainer().has(expiryKey, PersistentDataType.LONG)) return item;
+        long issuedAt = System.currentTimeMillis();
+        long expiresAt = issuedAt + (type == ToolType.MONEY_HELMET ? HELMET_MS : SIX_DAYS_MS);
+        meta.getPersistentDataContainer().set(issuedKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(expiryKey, PersistentDataType.LONG, expiresAt);
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "emerald-item-received-at"), PersistentDataType.LONG, issuedAt);
         List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
         lore.add(0, "§e⏳ Expires in: §f" + formatRemaining(expiresAt));
         meta.setLore(lore);
@@ -110,8 +117,11 @@ public final class EmeraldToolsManager implements Listener {
         ItemMeta meta = item.getItemMeta();
         String value = meta.getPersistentDataContainer().get(typeKey, PersistentDataType.STRING);
         if (!type.name().equals(value)) return false;
+        Byte issued = meta.getPersistentDataContainer().get(issuedKey, PersistentDataType.BYTE);
         Long expiresAt = meta.getPersistentDataContainer().get(expiryKey, PersistentDataType.LONG);
-        return expiresAt == null || System.currentTimeMillis() < expiresAt;
+        // Special abilities require BOTH crate authentication and an unexpired timestamp.
+        // Name, lore, material, enchantments, /give and admin-created definitions alone are insufficient.
+        return issued != null && issued == (byte) 1 && expiresAt != null && System.currentTimeMillis() < expiresAt;
     }
 
     public String getExpiryDisplay(ItemStack item) {
