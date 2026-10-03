@@ -40,7 +40,8 @@ public final class BanListCommand implements CommandExecutor {
             }
         }
 
-        List<BanEntry<String>> bans = new ArrayList<>(Bukkit.getBanList(BanList.Type.NAME).getEntries());
+        List<BanEntry<String>> bans = new ArrayList<>();
+        for (BanEntry<String> entry : Bukkit.getBanList(BanList.Type.NAME).getEntries()) bans.add(entry);
         bans.removeIf(e -> e.getTarget() == null || e.getTarget().isBlank());
         bans.sort(Comparator.comparing(e -> e.getTarget().toLowerCase(Locale.ROOT)));
         int total = bans.size();
@@ -50,12 +51,10 @@ public final class BanListCommand implements CommandExecutor {
         sender.sendMessage("§2§m━━━━━━━━━━━━━━━━━━━━");
         sender.sendMessage("§a§l💚 BAN LIST §7— Page " + page + "/" + pages);
         sender.sendMessage("§2§m━━━━━━━━━━━━━━━━━━━━");
-
         int from = (page - 1) * PER_PAGE;
         int to = Math.min(from + PER_PAGE, total);
         if (from >= to) sender.sendMessage("§7No players are currently banned.");
         else for (int i = from; i < to; i++) sender.sendMessage("§c🔨 §f" + bans.get(i).getTarget());
-
         sender.sendMessage("§7Total Banned: §f" + total);
         sender.sendMessage("§2§m━━━━━━━━━━━━━━━━━━━━");
         if (page > 1) sender.sendMessage(Component.text("§a◀ Previous").clickEvent(ClickEvent.runCommand("/banlist " + (page - 1))));
