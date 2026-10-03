@@ -15,12 +15,13 @@ public final class EconomyManager {
 
     public synchronized long getBalance(UUID uuid) {
         PlayerData data = plugin.getPlayerDataManager().getLoaded(uuid);
-        return data == null ? 0L : data.getBalance();
+        if (data != null) return data.getBalance();
+        return plugin.getPlayerDataManager().loadOrCreate(uuid, null).getBalance();
     }
 
     public synchronized boolean deposit(UUID uuid, long amount) {
         if (amount <= 0) return false;
-        PlayerData data = requireLoaded(uuid);
+        PlayerData data = requireData(uuid, null);
         return depositData(data, amount);
     }
 
@@ -41,7 +42,7 @@ public final class EconomyManager {
 
     public synchronized boolean withdraw(UUID uuid, long amount) {
         if (amount <= 0) return false;
-        PlayerData data = requireLoaded(uuid);
+        PlayerData data = requireData(uuid, null);
         long old = data.getBalance();
         if (old < amount) return false;
         data.setBalance(old - amount);
@@ -52,7 +53,7 @@ public final class EconomyManager {
 
     public synchronized boolean setBalance(UUID uuid, long amount) {
         if (amount < 0) return false;
-        PlayerData data = requireLoaded(uuid);
+        PlayerData data = requireData(uuid, null);
         long old = data.getBalance();
         data.setBalance(amount);
         if (plugin.getPlayerDataManager().save(data)) return true;
@@ -66,8 +67,8 @@ public final class EconomyManager {
 
     public synchronized boolean transfer(Player sender, Player receiver, long amount) {
         if (amount <= 0 || sender.getUniqueId().equals(receiver.getUniqueId())) return false;
-        PlayerData from = requireLoaded(sender.getUniqueId());
-        PlayerData to = requireLoaded(receiver.getUniqueId());
+        PlayerData from = requireData(sender.getUniqueId(), sender.getName());
+        PlayerData to = requireData(receiver.getUniqueId(), receiver.getName());
         long oldFrom = from.getBalance(), oldTo = to.getBalance();
         if (oldFrom < amount || Long.MAX_VALUE - oldTo < amount) return false;
         from.setBalance(oldFrom - amount); to.setBalance(oldTo + amount);
@@ -75,18 +76,25 @@ public final class EconomyManager {
         from.setBalance(oldFrom); to.setBalance(oldTo); return false;
     }
 
+    /** Parse exact whole-money input, including compact K/M/B suffixes. */
     public long parseAmount(String input) {
+        if (input == null) return -1L;
+        String raw = input.trim().toUpperCase(Locale.ROOT).replace(",", "");
+        if (raw.isEmpty()) return -1L;
+        BigDecimal multiplier = BigDecimal.ONE;
+        if (raw.endsWith("K")) { multiplier = BigDecimal.valueOf(1_000L); raw = raw.substring(0, raw.length() - 1); }
+        else if (raw.endsWith("M")) { multiplier = BigDecimal.valueOf(1_000_000L); raw = raw.substring(0, raw.length() - 1); }
+        else if (raw.endsWith("B")) { multiplier = BigDecimal.valueOf(1_000_000_000L); raw = raw.substring(0, raw.length() - 1); }
         try {
-            BigDecimal value = new BigDecimal(input);
+            BigDecimal value = new BigDecimal(raw).multiply(multiplier);
             if (value.signum() <= 0 || value.scale() > 0) return -1L;
             return value.longValueExact();
         } catch (NumberFormatException | ArithmeticException exception) { return -1L; }
     }
 
-    private PlayerData requireLoaded(UUID uuid) {
+    private PlayerData requireData(UUID uuid, String username) {
         PlayerData data = plugin.getPlayerDataManager().getLoaded(uuid);
-        if (data == null) throw new IllegalStateException("Player data is not loaded for " + uuid);
-        return data;
+        return data != null ? data : plugin.getPlayerDataManager().loadOrCreate(uuid, username);
     }
 
     /** Player-facing money formatter. Stored economy values remain exact longs. */
@@ -102,9 +110,7 @@ public final class EconomyManager {
         if (value >= 1_000_000_000D) { value /= 1_000_000_000D; suffix = "B"; }
         else if (value >= 1_000_000D) { value /= 1_000_000D; suffix = "M"; }
         else if (value >= 1_000D) { value /= 1_000D; suffix = "K"; }
-
         if (suffix.isEmpty()) return sign + Long.toString(Math.abs(amount));
-
         BigDecimal rounded = BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros();
         return sign + rounded.toPlainString() + suffix;
     }

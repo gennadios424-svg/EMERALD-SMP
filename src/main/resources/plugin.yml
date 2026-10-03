@@ -50,9 +50,10 @@ commands:
   tphere: {description: Instantly teleport a player to staff, usage: /tphere <player>}
   kick: {description: Emerald SMP staff kick, usage: /kick <player> [reason]}
   ban: {description: Emerald SMP staff ban, usage: /ban <player> [reason]}
-  ipban: {description: OWNER-only Emerald SMP IP ban, usage: /ipban <player> [reason]}
   unban: {description: Emerald SMP staff player unban, usage: /unban <player>}
+  ipban: {description: OWNER-only Emerald SMP IP ban, usage: /ipban <player> [reason]}
   ipunban: {description: OWNER-only Emerald SMP IP unban, usage: /ipunban <player>}
+  banlist: {description: Shows the server's persistent player ban list, usage: /banlist [page], permission: emerald.admin}
   suslist: {description: Opens the Emerald SMP anti-cheat suspect list, usage: /suslist [tp|remove|clear] [player], permission: emerald.anticheat}
   suswatch: {description: Vanish and watch an anti-cheat suspect, usage: /suswatch <player>|leave, permission: emerald.anticheat}
 permissions:
