@@ -82,15 +82,22 @@ jobs:
         run: |
           set -euo pipefail
           V=1.21.11
-          B=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/$V" | python3 -c 'import json,sys;print(json.load(sys.stdin)["builds"][-1])')
-          curl -fsSL -o paper.jar "https://api.papermc.io/v2/projects/paper/versions/$V/builds/$B/downloads/paper-$V-$B.jar"
-          mkdir -p server/plugins;cp EmeraldSMP-1.0.jar server/plugins/EmeraldSMP-1.0.jar;printf 'eula=true\n' > server/eula.txt
-          cd server;timeout 120s java -Xms512M -Xmx1G -jar ../paper.jar --nogui > console.log 2>&1 || true;cat console.log
+          UA="EmeraldSMP-CI/1.0 (https://github.com/gennadios424-svg/emerald-smp)"
+          JSON=$(curl -fsSL -A "$UA" "https://fill.papermc.io/v3/projects/paper/versions/$V/builds/latest")
+          URL=$(printf '%s' "$JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin)["downloads"]["server:default"]["url"])')
+          curl -fsSL -A "$UA" -o paper.jar "$URL"
+          mkdir -p server/plugins
+          cp EmeraldSMP-1.0.jar server/plugins/EmeraldSMP-1.0.jar
+          printf 'eula=true\n' > server/eula.txt
+          cd server
+          timeout 120s java -Xms512M -Xmx1G -jar ../paper.jar --nogui > console.log 2>&1 || true
+          cat console.log
           grep -Eq 'Enabling EmeraldSMP|EmeraldSMP.*enabled' console.log
       - name: Commit final JAR
         if: success()
         run: |
-          git config user.name "github-actions[bot]";git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add EmeraldSMP-1.0.jar FINAL-CHANGELOG.md
           git diff --cached --quiet || git commit -m "build: EmeraldSMP final restoration jar"
           git push
