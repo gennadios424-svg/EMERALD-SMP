@@ -1,5 +1,4 @@
 name: Emerald SMP Final Build
-
 on:
   push:
     paths:
@@ -55,21 +54,22 @@ jobs:
           javac --release 21 -cp "work/base:deps/*" -d final-classes src/main/java/net/emeraldsmp/EmeraldSMP.java src/main/java/net/emeraldsmp/FinalRestorationPatch.java
           cp final-classes/net/emeraldsmp/EmeraldSMP.class work/base/net/emeraldsmp/
           cp final-classes/net/emeraldsmp/FinalRestorationPatch.class work/base/net/emeraldsmp/
-      - name: Add commands
+      - name: Add final commands
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('work/base/plugin.yml');s=p.read_text()
-          a='''  role:
-            description: Secure Emerald SMP role manager
-            usage: /role <player> <role>
-            permission: emerald.roles
-          banlist:
-            description: Opens the staff ban list GUI
-            usage: /banlist
-            permission: emerald.anticheat
-          '''
-          if '  role:\n' not in s:s=s.replace('permissions:\n',a+'permissions:\n')
+          p=Path('work/base/plugin.yml')
+          s=p.read_text()
+          additions=("  role:\n"
+                     "    description: Secure Emerald SMP role manager\n"
+                     "    usage: /role <player> <role>\n"
+                     "    permission: emerald.roles\n"
+                     "  banlist:\n"
+                     "    description: Opens the staff ban list GUI\n"
+                     "    usage: /banlist\n"
+                     "    permission: emerald.anticheat\n")
+          if "  role:\n" not in s:
+              s=s.replace("permissions:\n", additions+"permissions:\n")
           p.write_text(s)
           PY
       - name: Build JAR
