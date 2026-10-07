@@ -21,7 +21,6 @@ public final class FinalRestorationPatch {
  private static final Set<UUID> joined=ConcurrentHashMap.newKeySet();
  public static void install(EmeraldSMP p){
   if(p.getServerUI()!=null){try{p.getServerUI().stop();}catch(Throwable ignored){} org.bukkit.event.HandlerList.unregisterAll(p.getServerUI());}
-  CleanUI ui=new CleanUI(p);p.getServer().getPluginManager().registerEvents(ui,p);ui.start();
   PatchListener l=new PatchListener(p);p.getServer().getPluginManager().registerEvents(l,p);
   p.getServer().getScheduler().runTaskTimer(p,()->rewardAfk(p),20L,20L);
  }
@@ -37,8 +36,7 @@ public final class FinalRestorationPatch {
  static final class PatchListener implements Listener,CommandExecutor,TabCompleter{
   final EmeraldSMP p;
   PatchListener(EmeraldSMP p){this.p=p;if(p.getCommand("role")!=null){p.getCommand("role").setExecutor(this);p.getCommand("role").setTabCompleter(this);}if(p.getCommand("banlist")!=null)p.getCommand("banlist").setExecutor(this);}
-  @EventHandler(priority=EventPriority.HIGHEST) public void join(PlayerJoinEvent e){Player x=e.getPlayer();joined.add(x.getUniqueId());p.getRoleManager().ensureMember(x);p.getServer().getScheduler().runTask(p,()->{if(!x.isOnline())return;try{if(p.getAuthManager()==null||p.getAuthManager().isAuthenticated(x))ground(x);}catch(Throwable ignored){}});}
-  @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void move(PlayerMoveEvent e){Player x=e.getPlayer();if(!joined.contains(x.getUniqueId()))return;try{if(p.getAuthManager()!=null&&!p.getAuthManager().isAuthenticated(x))return;}catch(Throwable ignored){}if(e.getTo()!=null&&(e.getFrom().getX()!=e.getTo().getX()||e.getFrom().getY()!=e.getTo().getY()||e.getFrom().getZ()!=e.getTo().getZ()))ground(x);}
+  @EventHandler(priority=EventPriority.HIGHEST) public void join(PlayerJoinEvent e){Player x=e.getPlayer();joined.add(x.getUniqueId());p.getRoleManager().ensureMember(x);}
   private void ground(Player x){String wn=p.getConfig().getString("spawn.world","");World w=wn.isBlank()?x.getWorld():Bukkit.getWorld(wn);if(w==null)w=x.getWorld();Location l=new Location(w,p.getConfig().getDouble("spawn.x",.5),p.getConfig().getDouble("spawn.y",100),p.getConfig().getDouble("spawn.z",.5),(float)p.getConfig().getDouble("spawn.yaw",0),(float)p.getConfig().getDouble("spawn.pitch",0));x.teleport(l);x.setFallDistance(0);try{x.setFlying(false);}catch(Throwable ignored){}}
   @EventHandler(priority=EventPriority.HIGHEST) public void crate(PlayerInteractEvent e){if(e.getClickedBlock()==null)return;CrateManager c=p.getCrateManager();if(c==null||!c.isCrate(e.getClickedBlock()))return;e.setCancelled(true);try{String t=(String)call(c,"type",new Class[]{org.bukkit.block.Block.class},e.getClickedBlock());if(e.getAction()==Action.LEFT_CLICK_BLOCK)call(c,"openPreview",new Class[]{Player.class,String.class},e.getPlayer(),t);else if(e.getAction()==Action.RIGHT_CLICK_BLOCK)call(c,"open",new Class[]{Player.class,String.class},e.getPlayer(),t);}catch(Throwable ignored){}}
   @EventHandler public void quit(PlayerQuitEvent e){joined.remove(e.getPlayer().getUniqueId());afkRewards.remove(e.getPlayer().getUniqueId());}
