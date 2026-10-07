@@ -148,7 +148,6 @@ public final class FinalRestorationPatch {
 
                 total += unit * item.getAmount();
                 soldStacks++;
-                inv.setItem(slot, null);
             }
 
             if (total <= 0 || soldStacks == 0) {
@@ -156,13 +155,17 @@ public final class FinalRestorationPatch {
                 return;
             }
 
+            // Deposit first. Items are only removed after the money operation
+            // succeeds, so a missing economy integration cannot delete drops.
             if (!addMoney(p, player, total)) {
                 player.sendMessage("§cCould not deposit the sale. Nothing was removed.");
-                // Rebuild is not safe because the original GUI owns the inventory;
-                // this path is only reached when money integration is unavailable.
-                // Put items back is therefore handled before calling addMoney below
-                // in the normal implementation.
                 return;
+            }
+
+            for (int slot = 0; slot < contentEnd; slot++) {
+                ItemStack item = inv.getItem(slot);
+                if (item == null || item.getType() == Material.AIR) continue;
+                if (findWorth(p, item.getType()) > 0) inv.setItem(slot, null);
             }
 
             player.sendMessage("§a§lSOLD §7» §a+$" + format(total) + " §7from spawner drops.");
