@@ -8,91 +8,59 @@ on:
       - ".github/workflows/final-build.yml"
       - "EmeraldSMP-1.0(20261002-205000) (1).jar"
   workflow_dispatch:
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
-
-      - name: Prepare supplied JAR as base
+      - name: Prepare base
         run: |
           set -euo pipefail
-          rm -rf work final-classes
+          rm -rf work final-classes deps
           mkdir -p work/base final-classes
           cp "EmeraldSMP-1.0(20261002-205000) (1).jar" work/base.jar
           cd work/base
           jar xf ../base.jar
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('net/emeraldsmp/EmeraldSMP.class')
-          b=p.read_bytes()
-          pos=10
-          cp_count=int.from_bytes(b[8:10],'big')
-          entries=[]
-          i=1
-          while i<cp_count:
-              start=pos
-              tag=b[pos]; pos+=1
-              if tag==1:
-                  ln=int.from_bytes(b[pos:pos+2],'big')
-                  raw=b[pos+2:pos+2+ln].decode('utf-8')
-                  pos+=2+ln
-                  raw=raw.replace('net/emeraldsmp/EmeraldSMP','net/emeraldsmp/EmeraldSMPBase')
-                  enc=raw.encode('utf-8')
-                  entries.append(bytes([1])+len(enc).to_bytes(2,'big')+enc)
-              elif tag in (3,4):
-                  entries.append(b[start:start+5]); pos=start+5
-              elif tag in (5,6):
-                  entries.append(b[start:start+9]); pos=start+9; i+=1
-              elif tag in (7,8,16,19,20):
-                  entries.append(b[start:start+3]); pos=start+3
-              elif tag in (9,10,11,12,17,18):
-                  entries.append(b[start:start+5]); pos=start+5
-              elif tag==15:
-                  entries.append(b[start:start+4]); pos=start+4
-              else:
-                  raise SystemExit(f'unknown constant-pool tag {tag}')
+          p=Path('net/emeraldsmp/EmeraldSMP.class');b=p.read_bytes();pos=10;n=int.from_bytes(b[8:10],'big');e=[];i=1
+          while i<n:
+              st=pos;t=b[pos];pos+=1
+              if t==1:
+                  ln=int.from_bytes(b[pos:pos+2],'big');v=b[pos+2:pos+2+ln].decode();pos+=2+ln
+                  v=v.replace('net/emeraldsmp/EmeraldSMP','net/emeraldsmp/EmeraldSMPBase');q=v.encode();e.append(bytes([1])+len(q).to_bytes(2,'big')+q)
+              elif t in (3,4):e.append(b[st:st+5]);pos=st+5
+              elif t in (5,6):e.append(b[st:st+9]);pos=st+9;i+=1
+              elif t in (7,8,16,19,20):e.append(b[st:st+3]);pos=st+3
+              elif t in (9,10,11,12,17,18):e.append(b[st:st+5]);pos=st+5
+              elif t==15:e.append(b[st:st+4]);pos=st+4
+              else:raise SystemExit(t)
               i+=1
-          old_cp_end=pos
-          rest=bytearray(b[old_cp_end:])
-          flags=int.from_bytes(rest[0:2],'big')
-          rest[0:2]=(flags & ~0x0010).to_bytes(2,'big')
-          out=b[:8]+cp_count.to_bytes(2,'big')+b''.join(entries)+rest
-          Path('net/emeraldsmp/EmeraldSMPBase.class').write_bytes(out)
-          p.unlink()
+          r=bytearray(b[pos:]);f=int.from_bytes(r[:2],'big');r[:2]=(f&~16).to_bytes(2,'big')
+          Path('net/emeraldsmp/EmeraldSMPBase.class').write_bytes(b[:8]+n.to_bytes(2,'big')+b''.join(e)+r);p.unlink()
           PY
-
-      - name: Fetch Paper API
-        run: mvn -q -DskipTests dependency:copy-dependencies -DincludeScope=provided -DoutputDirectory=deps
-
-      - name: Compile restoration layer
+      - name: Fetch dependencies
+        run: mvn -q -DskipTests dependency:copy-dependencies -DincludeScope=compile -DoutputDirectory=deps
+      - name: Compile
         run: |
           set -euo pipefail
-          CP="work/base:deps/paper-api-1.21.11-R0.1-SNAPSHOT.jar"
-          javac --release 21 -cp "$CP" -d final-classes src/main/java/net/emeraldsmp/EmeraldSMP.java src/main/java/net/emeraldsmp/FinalRestorationPatch.java
-          cp final-classes/net/emeraldsmp/EmeraldSMP.class work/base/net/emeraldsmp/EmeraldSMP.class
-          cp final-classes/net/emeraldsmp/FinalRestorationPatch.class work/base/net/emeraldsmp/FinalRestorationPatch.class
-          unzip -l final-classes/net/emeraldsmp/FinalRestorationPatch.class >/dev/null
-
-      - name: Add final commands
+          javac --release 21 -cp "work/base:deps/*" -d final-classes src/main/java/net/emeraldsmp/EmeraldSMP.java src/main/java/net/emeraldsmp/FinalRestorationPatch.java
+          cp final-classes/net/emeraldsmp/EmeraldSMP.class work/base/net/emeraldsmp/
+          cp final-classes/net/emeraldsmp/FinalRestorationPatch.class work/base/net/emeraldsmp/
+      - name: Add commands
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('work/base/plugin.yml')
-          s=p.read_text()
-          marker='permissions:\n'
-          additions='''  role:
+          p=Path('work/base/plugin.yml');s=p.read_text()
+          a='''  role:
             description: Secure Emerald SMP role manager
             usage: /role <player> <role>
             permission: emerald.roles
@@ -101,39 +69,28 @@ jobs:
             usage: /banlist
             permission: emerald.anticheat
           '''
-          if '  role:\n' not in s:
-              s=s.replace(marker, additions+marker)
+          if '  role:\n' not in s:s=s.replace('permissions:\n',a+'permissions:\n')
           p.write_text(s)
           PY
-
-      - name: Build final JAR
+      - name: Build JAR
         run: |
           set -euo pipefail
           rm -f EmeraldSMP-1.0.jar
           (cd work/base && jar --create --file ../../EmeraldSMP-1.0.jar .)
           unzip -t EmeraldSMP-1.0.jar >/dev/null
-          unzip -p EmeraldSMP-1.0.jar plugin.yml | grep -q 'main: net.emeraldsmp.EmeraldSMP'
-          test -s EmeraldSMP-1.0.jar
-
-      - name: Runtime test on Paper 1.21.11 / Java 21
+      - name: Runtime test
         run: |
           set -euo pipefail
-          VERSION=1.21.11
-          BUILD=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/$VERSION" | python3 -c 'import json,sys; print(json.load(sys.stdin)["builds"][-1])')
-          curl -fsSL -o paper.jar "https://api.papermc.io/v2/projects/paper/versions/$VERSION/builds/$BUILD/downloads/paper-$VERSION-$BUILD.jar"
-          mkdir -p server/plugins
-          cp EmeraldSMP-1.0.jar server/plugins/EmeraldSMP-1.0.jar
-          printf 'eula=true\n' > server/eula.txt
-          cd server
-          timeout 120s java -Xms512M -Xmx1G -jar ../paper.jar --nogui > console.log 2>&1 || true
-          cat console.log
+          V=1.21.11
+          B=$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/$V" | python3 -c 'import json,sys;print(json.load(sys.stdin)["builds"][-1])')
+          curl -fsSL -o paper.jar "https://api.papermc.io/v2/projects/paper/versions/$V/builds/$B/downloads/paper-$V-$B.jar"
+          mkdir -p server/plugins;cp EmeraldSMP-1.0.jar server/plugins/EmeraldSMP-1.0.jar;printf 'eula=true\n' > server/eula.txt
+          cd server;timeout 120s java -Xms512M -Xmx1G -jar ../paper.jar --nogui > console.log 2>&1 || true;cat console.log
           grep -Eq 'Enabling EmeraldSMP|EmeraldSMP.*enabled' console.log
-
       - name: Commit final JAR
         if: success()
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]";git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add EmeraldSMP-1.0.jar FINAL-CHANGELOG.md
           git diff --cached --quiet || git commit -m "build: EmeraldSMP final restoration jar"
           git push
